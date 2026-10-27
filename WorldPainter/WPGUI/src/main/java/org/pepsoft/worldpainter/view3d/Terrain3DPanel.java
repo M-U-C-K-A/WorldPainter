@@ -57,6 +57,10 @@ public class Terrain3DPanel extends JPanel {
         waterButton.setToolTipText(App.richToolTip("Water", "Show water and lava surfaces", null));
         waterButton.addActionListener(e -> view.setShowWater(waterButton.isSelected()));
         toolBar.add(waterButton);
+        final JToggleButton wavesButton = new JToggleButton(Icons.get("waves", 18), true);
+        wavesButton.setToolTipText(App.richToolTip("Moving water", "Animate the waves and the reflections of the sky and the sun on the water", null));
+        wavesButton.addActionListener(e -> view.setAnimateWater(wavesButton.isSelected()));
+        toolBar.add(wavesButton);
         final JToggleButton contoursButton = new JToggleButton(Icons.get("chart-spline", 18));
         contoursButton.setToolTipText(App.richToolTip("Contour lines", "Draw a line every " + Terrain3DView.CONTOUR_INTERVAL + " blocks of height", null));
         contoursButton.addActionListener(e -> view.setShowContours(contoursButton.isSelected()));
@@ -131,6 +135,7 @@ public class Terrain3DPanel extends JPanel {
                 legend.setBounds(12, h - 58, 280, 46);
                 final java.awt.Dimension helpSize = helpLabel.getPreferredSize();
                 helpLabel.setBounds(w - helpSize.width - 14, h - helpSize.height - 12, helpSize.width, helpSize.height);
+                sunControl.setBounds(w - SunControl.SIZE - 14, h - helpSize.height - 20 - SunControl.SIZE, SunControl.SIZE, SunControl.SIZE);
                 final java.awt.Dimension statusSize = statusLabel.getPreferredSize();
                 statusLabel.setBounds((w - statusSize.width) / 2, (h - statusSize.height) / 2, statusSize.width, statusSize.height);
             }
@@ -143,6 +148,8 @@ public class Terrain3DPanel extends JPanel {
         layers.add(infoCard, JLayeredPane.PALETTE_LAYER);
         layers.add(legend, JLayeredPane.PALETTE_LAYER);
         layers.add(helpLabel, JLayeredPane.PALETTE_LAYER);
+        sunControl = new SunControl();
+        layers.add(sunControl, JLayeredPane.PALETTE_LAYER);
         layers.add(statusLabel, JLayeredPane.MODAL_LAYER);
         add(layers, BorderLayout.CENTER);
     }
@@ -209,7 +216,7 @@ public class Terrain3DPanel extends JPanel {
         if ((! blocksButton.isSelected()) || (dimension == null) || (model == null)) {
             return;
         }
-        final Point target = view.getTargetBlock();
+        final Point target = view.getDetailCentre(DETAIL_SIZE);
         final Rectangle extent = TerrainModel.getBlockExtent(dimension);
         if ((detailArea != null) && covers(detailArea, extent, target)) {
             return;
@@ -313,6 +320,7 @@ public class Terrain3DPanel extends JPanel {
     }
 
     private final Terrain3DView view;
+    private SunControl sunControl;
     private final JToggleButton blocksButton;
     private final JSlider exaggerationSlider;
     private Rectangle detailArea;
@@ -426,6 +434,93 @@ public class Terrain3DPanel extends JPanel {
             }
         }
 
+        private static final long serialVersionUID = 1L;
+    }
+
+    /**
+     * A small globe, seen from above, on which the user drags the sun: the centre is straight overhead, the rim is the
+     * horizon, north is up.
+     */
+    private final class SunControl extends JComponent {
+        SunControl() {
+            setOpaque(false);
+            setToolTipText(App.richToolTip("Sun", "Drag the sun to light the land from another direction and height: the centre is straight overhead, the edge is the horizon. The shadows follow", null));
+            applyTimer.setRepeats(false);
+            final java.awt.event.MouseAdapter adapter = new java.awt.event.MouseAdapter() {
+                @Override
+                public void mousePressed(java.awt.event.MouseEvent e) {
+                    drag(e);
+                }
+
+                @Override
+                public void mouseDragged(java.awt.event.MouseEvent e) {
+                    drag(e);
+                }
+
+                @Override
+                public void mouseReleased(java.awt.event.MouseEvent e) {
+                    drag(e);
+                    applyTimer.stop();
+                    apply();
+                }
+            };
+            addMouseListener(adapter);
+            addMouseMotionListener(adapter);
+        }
+
+        private void drag(java.awt.event.MouseEvent e) {
+            final double cx = getWidth() / 2.0, cy = getHeight() / 2.0, radius = getWidth() / 2.0 - 8;
+            final double dx = e.getX() - cx, dy = e.getY() - cy;
+            azimuth = Math.toDegrees(Math.atan2(dx, -dy));
+            elevation = 90 * (1 - Math.min(1, Math.hypot(dx, dy) / radius));
+            repaint();
+            // Lighting the whole map takes a moment, so do it at most a few times per second while dragging
+            if (! applyTimer.isRunning()) {
+                applyTimer.start();
+            }
+        }
+
+        private void apply() {
+            view.setSun(azimuth, elevation);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            final Graphics2D g2 = (Graphics2D) g.create();
+            try {
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                final int size = Math.min(getWidth(), getHeight());
+                final double radius = size / 2.0 - 8, cx = getWidth() / 2.0, cy = getHeight() / 2.0;
+                final Color background = UIManager.getColor("Panel.background"), foreground = UIManager.getColor("Label.foreground");
+                g2.setColor(new Color(background.getRed(), background.getGreen(), background.getBlue(), 215));
+                g2.fill(new java.awt.geom.Ellipse2D.Double(cx - radius - 6, cy - radius - 6, (radius + 6) * 2, (radius + 6) * 2));
+                final Color line = ThemeUtils.getColour("WorldPainter.border", Color.GRAY);
+                g2.setColor(line);
+                g2.draw(new java.awt.geom.Ellipse2D.Double(cx - radius, cy - radius, radius * 2, radius * 2));
+                g2.draw(new java.awt.geom.Ellipse2D.Double(cx - radius / 2, cy - radius / 2, radius, radius));
+                g2.draw(new java.awt.geom.Line2D.Double(cx - radius, cy, cx + radius, cy));
+                g2.draw(new java.awt.geom.Line2D.Double(cx, cy - radius, cx, cy + radius));
+                g2.setFont(getFont().deriveFont(Font.BOLD, getFont().getSize2D() - 3f));
+                g2.setColor(foreground);
+                final FontMetrics fm = g2.getFontMetrics();
+                g2.drawString("N", (float) (cx - fm.stringWidth("N") / 2.0), (float) (cy - radius - 1));
+                // The sun
+                final double r = radius * (1 - elevation / 90), a = Math.toRadians(azimuth);
+                final double sx = cx + r * Math.sin(a), sy = cy - r * Math.cos(a);
+                g2.setColor(new Color(0xf59e0b));
+                g2.fill(new java.awt.geom.Ellipse2D.Double(sx - 6, sy - 6, 12, 12));
+                g2.setColor(new Color(0xfffbeb));
+                g2.draw(new java.awt.geom.Ellipse2D.Double(sx - 6, sy - 6, 12, 12));
+            } finally {
+                g2.dispose();
+            }
+        }
+
+        private double azimuth = -50, elevation = 40;
+        private final Timer applyTimer = new Timer(150, e -> apply());
+
+        static final int SIZE = 96;
         private static final long serialVersionUID = 1L;
     }
 }

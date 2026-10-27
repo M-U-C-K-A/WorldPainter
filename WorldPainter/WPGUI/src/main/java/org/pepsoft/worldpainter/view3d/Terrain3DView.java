@@ -54,13 +54,13 @@ class Terrain3DView extends JComponent {
                     pitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, pitch + dy * 0.006));
                 }
                 interacting = true;
-                repaint();
+                requestRender();
             }
 
             @Override
             public void mouseReleased(MouseEvent e) {
                 interacting = false;
-                repaint();
+                requestRender();
                 targetChanged();
             }
 
@@ -79,7 +79,8 @@ class Terrain3DView extends JComponent {
             @Override
             public void mouseWheelMoved(MouseWheelEvent e) {
                 distance = Math.max(MIN_DISTANCE, Math.min(maxDistance, distance * Math.pow(1.12, e.getPreciseWheelRotation())));
-                repaint();
+                requestRender();
+                targetChanged();
             }
 
             @Override
@@ -92,7 +93,7 @@ class Terrain3DView extends JComponent {
                         targetY = point[1];
                         targetH = point[2] / verticalScale();
                         distance = Math.max(MIN_DISTANCE, distance * 0.6);
-                        repaint();
+                        requestRender();
                         targetChanged();
                     }
                 }
@@ -103,17 +104,35 @@ class Terrain3DView extends JComponent {
         addMouseListener(mouseAdapter);
         addMouseMotionListener(mouseAdapter);
         addMouseWheelListener(mouseAdapter);
+        animationTimer.start();
+    }
+
+    @Override
+    public void updateUI() {
+        super.updateUI();
+        // The sky depends on the theme
+        frameDirty = true;
     }
 
     void setModel(TerrainModel model) {
         final boolean first = this.model == null;
         this.model = model;
         detail = null;
+        shadows = null;
+        detailShadows = null;
         maxDistance = Math.max(model.width, model.height) * 4.0;
         if (first || (targetX > model.width) || (targetY > model.height)) {
             resetView();
         }
         invalidateMesh();
+        requestRender();
+    }
+
+    /**
+     * Render the view again (as opposed to only animating the water of the last frame).
+     */
+    private void requestRender() {
+        frameDirty = true;
         repaint();
     }
 
@@ -135,23 +154,25 @@ class Terrain3DView extends JComponent {
         final int w = getWidth(), h = getHeight();
         distance = ((w > 0) && (h > 0)) ? (radius * 1.1 * focal(w) / (Math.min(w, h) / 2.0)) : (radius * 2.8);
         distance = Math.min(maxDistance, distance);
-        repaint();
+        requestRender();
         targetChanged();
     }
 
     void rotateBy(double degrees) {
         yaw += Math.toRadians(degrees);
-        repaint();
+        requestRender();
+        targetChanged();
     }
 
     void setYawDegrees(double degrees) {
         yaw = Math.toRadians(degrees);
-        repaint();
+        requestRender();
     }
 
     void setPitchDegrees(double degrees) {
         pitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, Math.toRadians(degrees)));
-        repaint();
+        requestRender();
+        targetChanged();
     }
 
     Mode getMode() {
@@ -161,18 +182,18 @@ class Terrain3DView extends JComponent {
     void setMode(Mode mode) {
         this.mode = mode;
         invalidateMesh();
-        repaint();
+        requestRender();
     }
 
     void setShowWater(boolean showWater) {
         this.showWater = showWater;
         invalidateMesh();
-        repaint();
+        requestRender();
     }
 
     void setShowContours(boolean showContours) {
         this.showContours = showContours;
-        repaint();
+        requestRender();
     }
 
     /**
@@ -184,7 +205,7 @@ class Terrain3DView extends JComponent {
 
     void setExaggeration(float exaggeration) {
         this.exaggeration = exaggeration;
-        repaint();
+        requestRender();
     }
 
     /**
@@ -194,15 +215,27 @@ class Terrain3DView extends JComponent {
         this.detail = detail;
         blockMesh = null;
         if (blocks) {
-            repaint();
+            requestRender();
         }
     }
 
     /**
-     * The block coordinates of the point the camera looks at.
+     * The block coordinates of the centre of the area which should be shown block by block: the land the camera sees
+     * up close, from just in front of the camera towards the point it looks at, rather than the point it orbits around
+     * (which, looking across the land, can be far away).
+     *
+     * @param areaSize The size of the area in blocks.
      */
-    Point getTargetBlock() {
-        return (model != null) ? new Point(model.x0 + (int) Math.floor(targetX * model.step), model.y0 + (int) Math.floor(targetY * model.step)) : null;
+    Point getDetailCentre(int areaSize) {
+        if (model == null) {
+            return null;
+        }
+        final double gx = Math.sin(yaw), gy = -Math.cos(yaw); // Forward along the ground
+        final double horizontal = distance * Math.cos(pitch); // From the camera to the target, along the ground
+        final double cameraX = targetX - gx * horizontal, cameraY = targetY - gy * horizontal;
+        final double ahead = Math.min(horizontal, areaSize * 0.4 / model.step);
+        final double x = Math.max(0, Math.min(model.width, cameraX + gx * ahead)), y = Math.max(0, Math.min(model.height, cameraY + gy * ahead));
+        return new Point(model.x0 + (int) Math.floor(x * model.step), model.y0 + (int) Math.floor(y * model.step));
     }
 
     /**
@@ -218,15 +251,141 @@ class Terrain3DView extends JComponent {
         }
     }
 
+    /**
+     * Set the direction of the sun.
+     *
+     * @param azimuth The compass direction of the sun in degrees, clockwise from north.
+     * @param elevation The height of the sun above the horizon in degrees.
+     */
+    void setSun(double azimuth, double elevation) {
+        sunAzimuth = Math.toRadians(azimuth);
+        sunElevation = Math.toRadians(Math.max(2, Math.min(90, elevation)));
+        shadows = null;
+        detailShadows = null;
+        invalidateMesh();
+        requestRender();
+    }
+
+    double getSunAzimuthDegrees() {
+        return Math.toDegrees(sunAzimuth);
+    }
+
+    double getSunElevationDegrees() {
+        return Math.toDegrees(sunElevation);
+    }
+
+    /**
+     * Whether the water ripples and glitters.
+     */
+    void setAnimateWater(boolean animateWater) {
+        this.animateWater = animateWater;
+        if (animateWater) {
+            animationTimer.start();
+        } else {
+            animationTimer.stop();
+        }
+        repaint();
+    }
+
+    /**
+     * The direction towards the sun, as x (east), y (south) and up components.
+     */
+    private double[] sunVector() {
+        final double cosElevation = Math.cos(sunElevation);
+        return new double[] {cosElevation * Math.sin(sunAzimuth), -cosElevation * Math.cos(sunAzimuth), Math.sin(sunElevation)};
+    }
+
+    /**
+     * Work out which samples are in the shadow of the land, by following a ray from every sample towards the sun.
+     *
+     * @return For every sample, how much sun it gets, from 0 (in shadow) to 255 (in full sun).
+     */
+    private byte[] calculateShadows(TerrainModel model) {
+        final double[] sun = sunVector();
+        final double horizontalLength = Math.hypot(sun[0], sun[1]);
+        final byte[] result = new byte[model.width * model.height];
+        if (horizontalLength < 1e-3) {
+            Arrays.fill(result, (byte) 255);
+            return result;
+        }
+        // Step one sample at a time along the direction of the sun, rising by the slope of the sun's rays
+        final double stepX = sun[0] / horizontalLength, stepY = sun[1] / horizontalLength;
+        final double rise = Math.tan(sunElevation) * model.step;
+        final float highest = model.highestHeight;
+        IntStream.range(0, model.height).parallel().forEach(sy -> {
+            for (int sx = 0; sx < model.width; sx++) {
+                final int i = sy * model.width + sx;
+                if (! model.present[i]) {
+                    continue;
+                }
+                final double start = surfaceHeight(model, i) + 0.5;
+                double x = sx + 0.5, y = sy + 0.5, rayHeight = start;
+                float light = 1.0f;
+                for (int k = 1; k <= MAX_SHADOW_STEPS; k++) {
+                    x += stepX;
+                    y += stepY;
+                    rayHeight += rise;
+                    if (rayHeight > highest) {
+                        break;
+                    }
+                    final int px = (int) x, py = (int) y;
+                    if ((px < 0) || (py < 0) || (px >= model.width) || (py >= model.height)) {
+                        break;
+                    }
+                    final int j = py * model.width + px;
+                    if (model.present[j]) {
+                        final float above = model.heights[j] - (float) rayHeight;
+                        if (above > 0) {
+                            // Soften the edge of the shadow a little
+                            light = Math.min(light, Math.max(0, 1 - above / 1.5f));
+                            if (light == 0) {
+                                break;
+                            }
+                        }
+                    }
+                }
+                result[i] = (byte) Math.round(light * 255);
+            }
+        });
+        return result;
+    }
+
+    private byte[] getShadows(TerrainModel model) {
+        if (model == this.model) {
+            if (shadows == null) {
+                shadows = calculateShadows(model);
+            }
+            return shadows;
+        } else {
+            if ((detailShadows == null) || (detailShadowsFor != model)) {
+                detailShadows = calculateShadows(model);
+                detailShadowsFor = model;
+            }
+            return detailShadows;
+        }
+    }
+
+    /**
+     * The light falling on a sample from the sun and the sky, in the same range as the old fixed light: about 0.3 in
+     * shadow or facing away from the sun, up to about 1.15 facing it.
+     */
+    private float sunShade(TerrainModel model, int i, byte[] shadows, double[] sun) {
+        final double gx = isWater(model, i) ? 0 : model.gradientsX[i], gy = isWater(model, i) ? 0 : model.gradientsY[i];
+        final double length = Math.sqrt(gx * gx + gy * gy + 1);
+        final double lambert = Math.max(0, (-gx * sun[0] - gy * sun[1] + sun[2]) / length);
+        final double sunlight = (shadows[i] & 0xff) / 255.0;
+        return (float) (0.32 + 0.83 * lambert * sunlight);
+    }
+
     void setBlocks(boolean blocks) {
         this.blocks = blocks;
         invalidateMesh();
-        repaint();
+        requestRender();
     }
 
     void setOrthographic(boolean orthographic) {
         this.orthographic = orthographic;
-        repaint();
+        requestRender();
     }
 
     /**
@@ -244,6 +403,8 @@ class Terrain3DView extends JComponent {
      */
     private int[] calculateColours(TerrainModel model, boolean flat) {
         final int n = model.width * model.height;
+        final byte[] shadows = getShadows(model);
+        final double[] sun = sunVector();
         final int[] result = new int[n];
         final float range = Math.max(1, model.highestHeight - model.lowestHeight);
         for (int i = 0; i < n; i++) {
@@ -252,7 +413,8 @@ class Terrain3DView extends JComponent {
             }
             final float h = model.heights[i];
             // Blocks get the same light as the smooth surface around them, in steps so that equal faces still merge
-            final float shade = flat ? (Math.round(model.normalShades[i] * 12) / 12f) : model.normalShades[i];
+            final float light = sunShade(model, i, shadows, sun);
+            final float shade = flat ? (Math.round(light * 12) / 12f) : light;
             int colour;
             switch (mode) {
                 case HEIGHT:
@@ -296,7 +458,6 @@ class Terrain3DView extends JComponent {
 
     private void invalidateMesh() {
         mesh = null;
-        coarseMesh = null;
         blockMesh = null;
     }
 
@@ -313,18 +474,14 @@ class Terrain3DView extends JComponent {
         return blockMesh;
     }
 
-    private Mesh getMesh(boolean coarse) {
-        if (coarse) {
-            if (coarseMesh == null) {
-                coarseMesh = buildMesh(COARSE_CELL_BUDGET);
-            }
-            return coarseMesh;
-        } else {
-            if (mesh == null) {
-                mesh = buildMesh(CELL_BUDGET);
-            }
-            return mesh;
+    /**
+     * The smooth mesh. The same mesh is used while dragging, so that the land does not change shape as the view moves.
+     */
+    private Mesh getMesh() {
+        if (mesh == null) {
+            mesh = buildMesh(CELL_BUDGET);
         }
+        return mesh;
     }
 
     /**
@@ -379,7 +536,7 @@ class Terrain3DView extends JComponent {
                     Arrays.fill(done, (gy + r) * nx + gx, (gy + r) * nx + gx + w, true);
                 }
                 final float x0 = offsetX + gx * unit, y0 = offsetY + gy * unit, x1 = offsetX + (gx + w) * unit, y1 = offsetY + (gy + h) * unit;
-                quads.add(KIND_TOP, x0, y0, top, x1, y0, top, x1, y1, top, x0, y1, top, colour, colour);
+                quads.add(isWater(model, i) ? KIND_WATER : KIND_TOP, x0, y0, top, x1, y0, top, x1, y1, top, x0, y1, top, colour, colour);
             }
         }
 
@@ -387,7 +544,13 @@ class Terrain3DView extends JComponent {
         // facing sides run along x; east and west facing sides along y. Sides at the edge of the land go down to the base
         // of the model (NaN)
         final int[] dxs = {0, 1, 0, -1}, dys = {-1, 0, 1, 0};
-        final float[] lights = {0.82f, 0.62f, 0.55f, 0.75f};
+        // The light on sides facing north, east, south and west: from the sun if it shines on them, plus the sky
+        final double[] sun = sunVector();
+        final float[] lights = new float[4];
+        for (int d = 0; d < 4; d++) {
+            lights[d] = (float) (0.5 + 0.55 * Math.max(0, dxs[d] * sun[0] + dys[d] * sun[1]));
+        }
+        final byte[] columnShadows = getShadows(model);
         for (int d = 0; d < 4; d++) {
             final boolean alongX = (d == 0) || (d == 2);
             final int lines = alongX ? ny : nx, length = alongX ? nx : ny;
@@ -416,7 +579,9 @@ class Terrain3DView extends JComponent {
                         run++;
                     }
                     final boolean edge = Float.isNaN(bottom);
-                    final int upper = shade(colour, lights[d]), lower = edge ? shade(EARTH, 0.55f * lights[d] / 0.82f) : shade(colour, lights[d] * 0.85f);
+                    // Sides in the shadow of the land get only the light of the sky
+                    final float light = 0.5f + (lights[d] - 0.5f) * ((columnShadows[gy * nx + gx] & 0xff) / 255f);
+                    final int upper = shade(colour, light / Math.max(0.3f, sunShade(model, gy * nx + gx, columnShadows, sun))), lower = edge ? shade(EARTH, 0.55f * light) : shade(upper, 0.85f);
                     // The face lies on the side of the column towards the neighbour
                     final float a0 = (alongX ? offsetX : offsetY) + k * unit, a1 = (alongX ? offsetX : offsetY) + (k + run) * unit;
                     if (alongX) {
@@ -517,10 +682,15 @@ class Terrain3DView extends JComponent {
             }
         }
         int t = 0;
+        mesh.kinds = new byte[mesh.triangleCount];
         for (int gy = 0; gy < ny - 1; gy++) {
             for (int gx = 0; gx < nx - 1; gx++) {
                 if (isCell(samples, nx, gx, gy)) {
                     final int a = gy * nx + gx, b = a + 1, c = a + nx + 1, d = a + nx;
+                    if (isWater(model, samples[a])) {
+                        mesh.kinds[t] = KIND_WATER;
+                        mesh.kinds[t + 1] = KIND_WATER;
+                    }
                     // Split the cell along the diagonal that best follows the surface
                     if (Math.abs(mesh.h[a] - mesh.h[c]) <= Math.abs(mesh.h[b] - mesh.h[d])) {
                         mesh.setTriangle(t++, a, b, c);
@@ -621,9 +791,20 @@ class Terrain3DView extends JComponent {
             blockXBuffer = new float[w * h];
             blockYBuffer = new float[w * h];
             kindBuffer = new byte[w * h];
+            basePixels = new int[w * h];
+            frameDirty = true;
         }
-        camera = new Camera(w, h);
-        render(camera, ((DataBufferInt) image.getRaster().getDataBuffer()).getData(), w, h);
+        final int[] pixels = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
+        if (frameDirty) {
+            camera = new Camera(w, h);
+            render(camera, pixels, w, h);
+            System.arraycopy(pixels, 0, basePixels, 0, pixels.length);
+            frameDirty = false;
+        } else {
+            // Only the water moves: start again from the last rendered frame
+            System.arraycopy(basePixels, 0, pixels, 0, pixels.length);
+        }
+        drawWater(pixels, w, h, camera, animateWater ? (System.nanoTime() - startTime) / 1e9 : 0);
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g2.drawImage(image, 0, 0, width, height, null);
     }
@@ -638,10 +819,14 @@ class Terrain3DView extends JComponent {
 
     private void render(Camera camera, int[] pixels, int w, int h) {
         final boolean dark = ThemeUtils.isDarkTheme();
-        final int skyTop = dark ? 0x0b1220 : 0xdbeafe, skyBottom = dark ? 0x18181b : 0xf8fafc;
+        // The sky: warmer towards the horizon when the sun is low
+        final float low = (float) Math.max(0, 1 - Math.toDegrees(sunElevation) / 25);
+        final int skyTop = dark ? 0x0b1220 : 0xbcd7f5, skyBottom = blend(dark ? 0x18181b : 0xf1f5f9, dark ? 0x3b2a22 : 0xffd2a8, low * 0.8f);
         for (int y = 0; y < h; y++) {
             Arrays.fill(pixels, y * w, (y + 1) * w, blend(skyTop, skyBottom, (float) y / h));
         }
+        skyColour = blend(skyTop, skyBottom, 0.6f);
+        drawSun(pixels, w, h, camera);
         Arrays.fill(depthBuffer, 0);
         Arrays.fill(heightBuffer, Float.NaN);
         Arrays.fill(faceBuffer, 0);
@@ -654,7 +839,7 @@ class Terrain3DView extends JComponent {
             exclude = new float[] {(float) (detail.x0 - model.x0) / model.step, (float) (detail.y0 - model.y0) / model.step,
                     (float) (detail.x0 + detail.width - model.x0) / model.step, (float) (detail.y0 + detail.height - model.y0) / model.step};
         }
-        drawMesh(getMesh(interacting), exclude, 0, camera, pixels, w, h, skyBottom);
+        drawMesh(getMesh(), exclude, 0, camera, pixels, w, h, skyBottom);
         if (blockMesh != null) {
             drawMesh(blockMesh, null, BLOCK_FACES, camera, pixels, w, h, skyBottom);
             drawBlockEdges(pixels, w, h, camera);
@@ -662,6 +847,85 @@ class Terrain3DView extends JComponent {
         if (showContours) {
             drawContours(pixels, w, h);
         }
+    }
+
+    /**
+     * Draw the sun and its glow into the sky, if it is in view.
+     */
+    private void drawSun(int[] pixels, int w, int h, Camera camera) {
+        final double[] sun = sunVector();
+        final double xc = sun[0] * camera.rx + sun[1] * camera.ry;
+        final double yc = sun[0] * camera.ux + sun[1] * camera.uy + sun[2] * camera.uh;
+        final double zc = sun[0] * camera.fx + sun[1] * camera.fy + sun[2] * camera.fh;
+        if (zc <= 0.05) {
+            return;
+        }
+        final double sx = camera.centreX + camera.focal * xc / zc, sy = camera.centreY - camera.focal * yc / zc;
+        final double core = w * 0.012, glow = w * 0.08;
+        final int x0 = Math.max(0, (int) (sx - glow * 3)), x1 = Math.min(w - 1, (int) (sx + glow * 3));
+        final int y0 = Math.max(0, (int) (sy - glow * 3)), y1 = Math.min(h - 1, (int) (sy + glow * 3));
+        final int sunColour = blend(0xfffbeb, 0xffb36b, (float) Math.max(0, 1 - Math.toDegrees(sunElevation) / 20));
+        for (int y = y0; y <= y1; y++) {
+            for (int x = x0; x <= x1; x++) {
+                final double d = Math.hypot(x - sx, y - sy);
+                final float amount = (d < core) ? 1.0f : (float) (0.55 * Math.exp(-((d - core) * (d - core)) / (2 * glow * glow)));
+                if (amount > 0.01f) {
+                    pixels[y * w + x] = blend(pixels[y * w + x], sunColour, amount);
+                }
+            }
+        }
+    }
+
+    /**
+     * Make the water ripple and reflect the sky and the sun, using the block coordinates of every water pixel and the
+     * time for the movement of the waves.
+     */
+    private void drawWater(int[] pixels, int w, int h, Camera camera, double time) {
+        final byte[] kinds = kindBuffer;
+        final float[] xs = blockXBuffer, ys = blockYBuffer;
+        final double[] sun = sunVector();
+        final int sky = skyColour;
+        final float t = (float) time;
+        IntStream.range(0, h).parallel().forEach(y -> {
+            for (int x = 0; x < w; x++) {
+                final int i = y * w + x;
+                if ((kinds[i] != KIND_WATER) || (faceBuffer[i] == 0)) {
+                    continue;
+                }
+                final float bx = xs[i], by = ys[i];
+                // The slope of the waves: a few crossing swells of different sizes
+                final double dx = 0.07 * Math.sin(bx * 0.55 + by * 0.21 + t * 1.6) + 0.04 * Math.sin(bx * 1.7 - by * 0.9 + t * 2.7) + 0.025 * Math.sin(bx * 3.1 + by * 2.3 - t * 3.9);
+                final double dy = 0.07 * Math.sin(by * 0.6 - bx * 0.18 + t * 1.3) + 0.04 * Math.sin(by * 1.9 + bx * 0.7 - t * 2.2) + 0.025 * Math.sin(by * 2.9 - bx * 2.6 + t * 3.5);
+                final double nLength = Math.sqrt(dx * dx + dy * dy + 1);
+                final double nx = -dx / nLength, ny = -dy / nLength, nz = 1 / nLength;
+                // The direction from the camera to this pixel
+                double vx, vy, vz;
+                if (camera.orthographic) {
+                    vx = camera.fx;
+                    vy = camera.fy;
+                    vz = camera.fh;
+                } else {
+                    final double px = (x + 0.5 - camera.centreX) / camera.focal, py = (camera.centreY - (y + 0.5)) / camera.focal;
+                    vx = camera.rx * px + camera.ux * py + camera.fx;
+                    vy = camera.ry * px + camera.uy * py + camera.fy;
+                    vz = camera.uh * py + camera.fh;
+                    final double vLength = Math.sqrt(vx * vx + vy * vy + vz * vz);
+                    vx /= vLength;
+                    vy /= vLength;
+                    vz /= vLength;
+                }
+                final double dot = vx * nx + vy * ny + vz * nz;
+                final double rx = vx - 2 * dot * nx, ry = vy - 2 * dot * ny, rz = vz - 2 * dot * nz;
+                final double specular = Math.pow(Math.max(0, rx * sun[0] + ry * sun[1] + rz * sun[2]), 90) * Math.min(1, sun[2] * 4);
+                final double fresnel = Math.pow(1 - Math.min(1, Math.abs(dot)), 4);
+                int colour = shade(pixels[i], (float) (1 + 1.6 * (dx * sun[0] + dy * sun[1])));
+                colour = blend(colour, sky, (float) Math.min(0.65, 0.15 + fresnel * 0.7));
+                if (specular > 0.003) {
+                    colour = blend(colour, 0xffffff, (float) Math.min(1, specular * 1.4));
+                }
+                pixels[i] = colour;
+            }
+        });
     }
 
     /**
@@ -808,6 +1072,9 @@ class Terrain3DView extends JComponent {
                 // horizontal axis of the face and the height on sides. The coordinate which is constant on a face is
                 // not compared, as it would only show rounding noise
                 final byte kind = kinds[i];
+                if (kind == KIND_WATER) {
+                    continue;
+                }
                 boolean edge = ((faces[i + 1] != face) && (faces[i + 1] != 0)) || ((faces[i + w] != face) && (faces[i + w] != 0));
                 if (! edge) {
                     edge = ((kind != KIND_SIDE_X) && crosses(xs[i], xs[i + 1], xs[i + w]))
@@ -943,12 +1210,23 @@ class Terrain3DView extends JComponent {
     }
 
     private TerrainModel model, detail;
-    private Mesh mesh, coarseMesh, blockMesh;
+    private Mesh mesh, blockMesh;
     private volatile Camera camera;
     private float[] depthBuffer, heightBuffer;
     private int[] faceBuffer;
     private float[] blockXBuffer, blockYBuffer;
-    private byte[] kindBuffer;
+    private byte[] kindBuffer, shadows, detailShadows;
+    private TerrainModel detailShadowsFor;
+    private int[] basePixels;
+    private int skyColour;
+    private boolean frameDirty = true, animateWater = true;
+    private double sunAzimuth = Math.toRadians(-50), sunElevation = Math.toRadians(40);
+    private final long startTime = System.nanoTime();
+    private final Timer animationTimer = new Timer(60, e -> {
+        if (isShowing() && (model != null)) {
+            repaint();
+        }
+    });
     private BufferedImage image;
     private Mode mode = Mode.TERRAIN;
     private boolean showWater = true, showContours, interacting, orthographic, blocks;
@@ -961,7 +1239,7 @@ class Terrain3DView extends JComponent {
     static final int[] SLOPE_RAMP = {0x3b82f6, 0x22c55e, 0xeab308, 0xf97316, 0xdc2626};
     static final int CONTOUR_INTERVAL = 8;
     private static final int EARTH = 0x6b5442;
-    private static final int CELL_BUDGET = 1_100_000, COARSE_CELL_BUDGET = 150_000;
+    private static final int CELL_BUDGET = 1_100_000;
     /**
      * The kinds of faces of the block mesh: tops, sides facing east or west (constant x), and sides facing north or
      * south (constant y). The smooth mesh is all tops.
@@ -970,7 +1248,8 @@ class Terrain3DView extends JComponent {
      * The face numbers of the block mesh start here, to tell them apart from those of the smooth surface.
      */
     private static final int BLOCK_FACES = 1 << 30;
-    private static final byte KIND_TOP = 0, KIND_SIDE_X = 1, KIND_SIDE_Y = 2;
+    private static final byte KIND_TOP = 0, KIND_SIDE_X = 1, KIND_SIDE_Y = 2, KIND_WATER = 3;
+    private static final int MAX_SHADOW_STEPS = 600;
     private static final double MIN_PITCH = Math.toRadians(-45), MAX_PITCH = Math.toRadians(89.5), MIN_DISTANCE = 4;
     private static final float NEAR = 0.5f, ORTHO_DEPTH = 1.0e6f;
     private static final long serialVersionUID = 1L;

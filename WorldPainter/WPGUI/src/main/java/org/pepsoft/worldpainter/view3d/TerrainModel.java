@@ -88,6 +88,8 @@ final class TerrainModel {
         final float[] smoothed = smooth(heights, present, width, height, Math.max(1, 4 / step));
         slopes = new float[width * height];
         normalShades = new float[width * height];
+        gradientsX = new float[width * height];
+        gradientsY = new float[width * height];
         for (int sy = 0; sy < height; sy++) {
             for (int sx = 0; sx < width; sx++) {
                 final int i = sy * width + sx;
@@ -103,6 +105,8 @@ final class TerrainModel {
                 final float hw = heightAt(heights, sx - 2, sy, heights[i]), he = heightAt(heights, sx + 2, sy, heights[i]);
                 final float hn = heightAt(heights, sx, sy - 2, heights[i]), hs = heightAt(heights, sx, sy + 2, heights[i]);
                 final float dx = (he - hw) / (4 * step), dy = (hs - hn) / (4 * step);
+                gradientsX[i] = dx;
+                gradientsY[i] = dy;
                 final double nx = -dx, ny = -dy, nz = 1;
                 final double length = Math.sqrt(nx * nx + ny * ny + nz * nz);
                 final double light = ((nx * -0.5) + (ny * -0.5) + (nz * 0.7071)) / length;
@@ -174,6 +178,10 @@ final class TerrainModel {
     final int x0, y0, step, width, height, minHeight, maxHeight;
     final float lowestHeight, highestHeight;
     final float[] heights, waterLevels, slopes, normalShades;
+    /**
+     * The change in height per block towards the east and the south, for lighting.
+     */
+    final float[] gradientsX, gradientsY;
     final int[] colours, biomes;
     final boolean[] present;
 
