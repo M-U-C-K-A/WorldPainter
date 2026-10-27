@@ -433,9 +433,14 @@ public class Main {
                     logger.debug("Installing look and feel: " + lookAndFeel);
                     ThemeUtils.installLookAndFeel(lookAndFeel, getUIScale());
                     if (ThemeUtils.isDarkTheme()) {
-                        // Use the light-on-dark icons and match the background of the editor to the theme
+                        // Use the light-on-dark icons
                         IconUtils.setTheme("dark_metal");
-                        VoidRenderer.setColour(UIManager.getColor("Panel.background").getRGB());
+                    }
+                    if (ThemeUtils.isModernTheme()) {
+                        // Show the canvas background through the void
+                        VoidRenderer.setColour(ThemeUtils.getCanvasBackground().getRGB() & 0xffffff);
+                    } else if (ThemeUtils.isDarkTheme()) {
+                        VoidRenderer.setColour(UIManager.getColor("Panel.background").getRGB() & 0xffffff);
                     }
                 } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {
                     logger.warn("Could not install selected look and feel", e);

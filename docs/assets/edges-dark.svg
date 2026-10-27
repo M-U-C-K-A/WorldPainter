@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="420" viewBox="0 0 600 420" fill="none">
+<style>
+.cliff { animation: cliff 5s ease-in-out infinite; }
+@keyframes cliff { 0%, 35% { opacity: 0.9; } 50%, 85% { opacity: 0.1; } 100% { opacity: 0.9; } }
+.draw { stroke-dasharray: 6 6; animation: dash 1.6s linear infinite; }
+@keyframes dash { to { stroke-dashoffset: -24; } }
+</style>
+<polygon points="52.8,95.0 71.9,106.0 71.9,194.0 52.8,183.0" fill="#fafafa" fill-opacity="0.07" stroke="#fafafa" stroke-opacity="0.55"/>
+<polygon points="110.0,62.0 129.1,73.0 71.9,106.0 52.8,95.0" fill="#fb923c" fill-opacity="0.18" stroke="#fafafa" stroke-opacity="0.85"/>
+<polygon points="71.9,106.0 90.9,117.0 90.9,205.0 71.9,194.0" fill="#fafafa" fill-opacity="0.07" stroke="#fafafa" stroke-opacity="0.55"/>
+<polygon points="129.1,73.0 148.1,84.0 90.9,117.0 71.9,106.0" fill="#fb923c" fill-opacity="0.18" stroke="#fafafa" stroke-opacity="0.85"/>
+<polygon points="90.9,117.0 110.0,128.0 110.0,216.0 90.9,205.0" fill="#fafafa" fill-opacity="0.07" stroke="#fafafa" stroke-opacity="0.55"/>
+<polygon points="148.1,84.0 167.2,95.0 110.0,128.0 90.9,117.0" fill="#fb923c" fill-opacity="0.18" stroke="#fafafa" stroke-opacity="0.85"/>
+<polygon points="110.0,128.0 129.1,139.0 129.1,227.0 110.0,216.0" fill="#fafafa" fill-opacity="0.07" stroke="#fafafa" stroke-opacity="0.55"/>
+<polygon points="167.2,95.0 186.2,106.0 129.1,139.0 110.0,128.0" fill="#fb923c" fill-opacity="0.18" stroke="#fafafa" stroke-opacity="0.85"/>
+<polygon points="129.1,139.0 148.1,150.0 148.1,238.0 129.1,227.0" fill="#fafafa" fill-opacity="0.03" stroke="#fafafa" stroke-opacity="0.55"/>
+<polygon points="186.2,106.0 205.3,117.0 148.1,150.0 129.1,139.0" fill="#fafafa" fill-opacity="0.02" stroke="#fafafa" stroke-opacity="0.85"/>
+<polygon points="148.1,150.0 167.2,161.0 167.2,249.0 148.1,238.0" fill="#fafafa" fill-opacity="0.03" stroke="#fafafa" stroke-opacity="0.55"/>
+<polygon points="205.3,117.0 224.3,128.0 167.2,161.0 148.1,150.0" fill="#fafafa" fill-opacity="0.02" stroke="#fafafa" stroke-opacity="0.85"/>
+<polygon points="167.2,172.0 186.2,183.0 186.2,260.0 167.2,249.0" fill="#fafafa" fill-opacity="0.03" stroke="#fafafa" stroke-opacity="0.55"/>
+<polygon points="224.3,139.0 243.4,150.0 186.2,183.0 167.2,172.0" fill="#fafafa" fill-opacity="0.02" stroke="#fafafa" stroke-opacity="0.85"/>
+<polygon points="186.2,194.0 205.3,205.0 205.3,271.0 186.2,260.0" fill="#fafafa" fill-opacity="0.03" stroke="#fafafa" stroke-opacity="0.55"/>
+<polygon points="243.4,161.0 262.4,172.0 205.3,205.0 186.2,194.0" fill="#fafafa" fill-opacity="0.02" stroke="#fafafa" stroke-opacity="0.85"/>
+<polygon points="205.3,216.0 224.3,227.0 224.3,282.0 205.3,271.0" fill="#fafafa" fill-opacity="0.03" stroke="#fafafa" stroke-opacity="0.55"/>
+<polygon points="262.4,183.0 281.5,194.0 224.3,227.0 205.3,216.0" fill="#fafafa" fill-opacity="0.02" stroke="#fafafa" stroke-opacity="0.85"/>
+<polygon points="224.3,238.0 243.4,249.0 243.4,293.0 224.3,282.0" fill="#fafafa" fill-opacity="0.03" stroke="#fafafa" stroke-opacity="0.55"/>
+<polygon points="281.5,205.0 300.5,216.0 243.4,249.0 224.3,238.0" fill="#fafafa" fill-opacity="0.02" stroke="#fafafa" stroke-opacity="0.85"/>
+<polygon points="243.4,260.0 262.4,271.0 262.4,304.0 243.4,293.0" fill="#fafafa" fill-opacity="0.03" stroke="#fafafa" stroke-opacity="0.55"/>
+<polygon points="300.5,227.0 319.6,238.0 262.4,271.0 243.4,260.0" fill="#fafafa" fill-opacity="0.02" stroke="#fafafa" stroke-opacity="0.85"/>
+<polygon points="262.4,282.0 281.5,293.0 281.5,315.0 262.4,304.0" fill="#fafafa" fill-opacity="0.03" stroke="#fafafa" stroke-opacity="0.55"/>
+<polygon points="319.6,249.0 338.6,260.0 281.5,293.0 262.4,282.0" fill="#fafafa" fill-opacity="0.02" stroke="#fafafa" stroke-opacity="0.85"/>
+<polygon points="281.5,293.0 300.5,304.0 300.5,326.0 281.5,315.0" fill="#fafafa" fill-opacity="0.03" stroke="#fafafa" stroke-opacity="0.55"/>
+<polygon points="338.6,260.0 357.7,271.0 300.5,304.0 281.5,293.0" fill="#fafafa" fill-opacity="0.02" stroke="#fafafa" stroke-opacity="0.85"/>
+<path class="cliff" d="M 129.1 139.0 L 129.1 205.0 L 300.5 304.0" stroke="#a1a1aa" stroke-width="1.5" stroke-dasharray="4 4"/>
+<path d="M 186.2 75.2 L 186.2 243.0" stroke="#fb923c" stroke-width="1" stroke-dasharray="2 4"/>
+<text x="178.2" y="67.2" text-anchor="end" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="12" fill="#fafafa">[ MAP EDGE ]</text>
+<path class="draw" d="M 129.1 285.0 L 300.5 384.0" stroke="#a1a1aa"/>
+<text x="224.8" y="358.5" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="12" fill="#fafafa">transition · 16 to 4096 blocks</text>
+<text x="24" y="404" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="12" fill="#a1a1aa">dashed: the cliff it replaces · Minecraft blends the last chunks</text>
+</svg>

@@ -7,12 +7,13 @@ package org.pepsoft.worldpainter.palettes;
 
 import org.jetbrains.annotations.NotNull;
 import org.pepsoft.util.IconUtils;
+import org.pepsoft.worldpainter.App;
 import org.pepsoft.worldpainter.layers.CustomLayer;
 import org.pepsoft.worldpainter.layers.Layer;
 import org.pepsoft.worldpainter.docking.DockableFrame;
 import org.pepsoft.worldpainter.docking.Side;
 import org.pepsoft.worldpainter.util.DockableFrameBuilder;
-import org.pepsoft.worldpainter.util.VerticalLabel;
+import org.pepsoft.worldpainter.util.Icons;
 import org.pepsoft.worldpainter.util.LayoutUtils;
 
 import javax.swing.*;
@@ -38,40 +39,28 @@ public class Palette {
         panel = new JPanel();
         panel.setLayout(new GridBagLayout());
 
-        // Row: Show/Solo labels
         GridBagConstraints constraints = new GridBagConstraints();
-        constraints.insets = new Insets(1, 1, 1, 1);
-        VerticalLabel label = new VerticalLabel("Show");
-        label.setOrientation(SwingConstants.VERTICAL);
-        label.setClockwise(false);
-        label.setMinimumSize(label.getPreferredSize());
-        constraints.anchor = GridBagConstraints.SOUTH;
-        panel.add(label, constraints);
-        label = new VerticalLabel("Solo");
-        label.setOrientation(SwingConstants.VERTICAL);
-        label.setClockwise(false);
-        label.setMinimumSize(label.getPreferredSize());
-        panel.add(label, constraints);
-        constraints.gridwidth = GridBagConstraints.REMAINDER;
-        constraints.weightx = 1.0;
-        constraints.anchor = GridBagConstraints.NORTHEAST;
-        final JButton editButton = new JButton(ICON_EDIT);
-        editButton.setMargin(new Insets(2, 2, 2, 2));
-        editButton.setToolTipText("Edit palette name and layer order");
-        editButton.addActionListener(this::editPalette);
-        panel.add(editButton, constraints);
+        constraints.insets = new Insets(1, 2, 1, 2);
+        constraints.fill = GridBagConstraints.HORIZONTAL;
 
-        // Row: palette show/solo checkboxes
+        // Row: palette show/solo toggles, and edit button
         constraints.anchor = GridBagConstraints.FIRST_LINE_START;
         constraints.weightx = 0.0;
         showCheckBox = new JCheckBox();
-        showCheckBox.setToolTipText("Uncheck to hide all layer on this palette from view (they will still be exported)");
+        App.styleIconToggle(showCheckBox, Icons.muted("eye-off", 16), Icons.get("eye", 16));
+        showCheckBox.setToolTipText(App.richToolTip("Show palette", "Hide or show all layers on this palette (they are exported either way)", null));
         showCheckBox.setSelected(true);
         showCheckBox.addActionListener(e -> setShow(showCheckBox.isSelected()));
         soloCheckBox = new JCheckBox();
-        soloCheckBox.setToolTipText("<html>Check to show <em>only</em> the layers on this palette (the other layers are still exported)</html>");
+        App.styleIconToggle(soloCheckBox, Icons.muted("focus", 16), Icons.accent("focus", 16));
+        soloCheckBox.setToolTipText(App.richToolTip("Solo palette", "Show <em>only</em> the layers on this palette (the other layers are still exported)", null));
         soloCheckBox.addActionListener(e -> setSolo(soloCheckBox.isSelected()));
-        LayoutUtils.addRowOfComponents(panel, constraints, asList(showCheckBox, soloCheckBox, new JLabel("<html><i>all </i></html>")));
+        final JButton editButton = new JButton("All layers", Icons.muted("settings-2", 14));
+        App.styleRowButton(editButton);
+        editButton.setHorizontalTextPosition(SwingConstants.LEADING);
+        editButton.setToolTipText(App.richToolTip("Edit palette", "Rename the palette and change the order of its layers", null));
+        editButton.addActionListener(this::editPalette);
+        LayoutUtils.addRowOfComponents(panel, constraints, asList(showCheckBox, soloCheckBox, editButton));
 
         // Row: components provided to constructor
         LayoutUtils.addRowOfComponents(panel, constraints, buttonComponents);

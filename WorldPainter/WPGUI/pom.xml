@@ -52,6 +52,12 @@
             <artifactId>flatlaf-extras</artifactId>
             <version>${flatlaf.version}</version>
         </dependency>
+        <dependency>
+            <!-- The Inter typeface, for a consistent, modern look on all platforms -->
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf-fonts-inter</artifactId>
+            <version>${flatlaf-fonts-inter.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.slf4j</groupId>

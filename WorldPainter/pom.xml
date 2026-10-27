@@ -105,6 +105,7 @@
         <!-- GUI dependencies -->
         <jpen.version>2-150301</jpen.version>
         <flatlaf.version>3.7.2</flatlaf.version>
+        <flatlaf-fonts-inter.version>4.1</flatlaf-fonts-inter.version>
         <logback.version>1.2.11</logback.version>
         <log4j-to-slf4j.version>2.17.2</log4j-to-slf4j.version>
 

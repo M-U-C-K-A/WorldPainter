@@ -33,6 +33,16 @@ public final class BitmapBrush extends AbstractBrush {
         imageReference = null;
     }
     
+    /**
+     * Create a brush from an image in memory, for instance one which was generated procedurally.
+     */
+    public BitmapBrush(BufferedImage image, String name) {
+        super(name);
+        imageFile = null;
+        this.image = image;
+        imageReference = null;
+    }
+
     public BitmapBrush(File imageFile) {
         super(imageFile.getName());
         if (! imageFile.isFile()) {

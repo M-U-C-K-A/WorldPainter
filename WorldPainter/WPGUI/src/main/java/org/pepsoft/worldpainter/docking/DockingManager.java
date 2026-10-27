@@ -6,6 +6,8 @@ import javax.swing.event.MenuListener;
 import java.awt.*;
 import java.awt.event.*;
 import java.beans.PropertyChangeListener;
+import org.pepsoft.worldpainter.util.HairlineBorder;
+import org.pepsoft.worldpainter.util.Icons;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
@@ -432,7 +434,12 @@ public class DockingManager {
     private final Map<String, String> selectedKeys = new HashMap<>();
     private final Map<String, Integer> groupHeights = new HashMap<>();
     private final Map<Side, Integer> columnWidths = new EnumMap<>(Side.class);
-    private final PropertyChangeListener frameListener = event -> {
+    private final PropertyChangeListener frameListener = this::frameChanged;
+
+    /**
+     * Keep the docks in sync when the key, title or icon of a frame changes.
+     */
+    private void frameChanged(java.beans.PropertyChangeEvent event) {
         final DockableFrame frame = (DockableFrame) event.getSource();
         switch (event.getPropertyName()) {
             case "key":
@@ -455,13 +462,13 @@ public class DockingManager {
                     ((DockGroup) parent).updateHeader();
                 } else {
                     final Window window = SwingUtilities.getWindowAncestor(frame);
-                    if ((window instanceof JDialog) && (window != DockingManager.this.owner)) {
+                    if ((window instanceof JDialog) && (window != owner)) {
                         ((JDialog) window).setTitle(frame.getTitle());
                     }
                 }
                 break;
         }
-    };
+    }
 
     private static final String MAGIC = "WPDOCK";
     private static final int FORMAT_VERSION = 1;
@@ -631,9 +638,10 @@ public class DockingManager {
             if (frameInfos.size() == 1) {
                 final FrameInfo info = frameInfos.get(0);
                 header = new JPanel(new BorderLayout());
-                header.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 2));
+                header.setBorder(new HairlineBorder(false, false, true, false, new Insets(4, 10, 4, 4)));
                 titleLabel = new JLabel();
-                titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD));
+                titleLabel.putClientProperty("FlatLaf.styleClass", "semibold");
+                titleLabel.setIconTextGap(8);
                 header.add(titleLabel, BorderLayout.CENTER);
                 header.add(createButtons(() -> info), BorderLayout.EAST);
                 header.setComponentPopupMenu(createFramePopupMenu(info));
@@ -647,11 +655,14 @@ public class DockingManager {
                 header = null;
                 titleLabel = null;
                 tabbedPane = new JTabbedPane(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
-                tabbedPane.putClientProperty("JTabbedPane.tabHeight", 26);
+                tabbedPane.putClientProperty("JTabbedPane.tabHeight", 32);
+                tabbedPane.putClientProperty("JTabbedPane.tabInsets", new Insets(0, 10, 0, 10));
                 tabbedPane.putClientProperty("JTabbedPane.minimumTabWidth", 24);
                 // Only show the title of the selected tab, and icons for the others, so that many tabs fit in a narrow
                 // column
                 tabbedPane.putClientProperty("JTabbedPane.tabWidthMode", "compact");
+                // Use the drop down list instead of scroll arrows when the tabs do not fit
+                tabbedPane.putClientProperty("JTabbedPane.scrollButtonsPolicy", "never");
                 tabbedPane.putClientProperty("JTabbedPane.showContentSeparator", Boolean.TRUE);
                 for (FrameInfo info: frameInfos) {
                     info.frame.setVisible(true);
@@ -691,7 +702,7 @@ public class DockingManager {
                     }
                 });
                 final JComponent buttons = createButtons(this::getSelectedFrameInfo);
-                if (UIManager.getLookAndFeel().getClass().getName().startsWith("com.formdev.flatlaf")) {
+                if (UIManager.getLookAndFeel() instanceof com.formdev.flatlaf.FlatLaf) {
                     tabbedPane.putClientProperty("JTabbedPane.trailingComponent", buttons);
                 } else {
                     final JPanel buttonBar = new JPanel(new BorderLayout());
@@ -727,12 +738,12 @@ public class DockingManager {
             toolBar.setFloatable(false);
             toolBar.setOpaque(false);
             toolBar.setBorder(null);
-            final JButton floatButton = new JButton(new GlyphIcon(GlyphIcon.Glyph.FLOAT));
-            floatButton.setToolTipText("Float this panel in its own window");
+            final JButton floatButton = new JButton(Icons.muted("picture-in-picture-2", 14));
+            floatButton.setToolTipText("<html><b>Float panel</b><br>Open this panel in its own window</html>");
             floatButton.addActionListener(e -> floatFrame(target.get().frame.getKey()));
             toolBar.add(floatButton);
-            final JButton hideButton = new JButton(new GlyphIcon(GlyphIcon.Glyph.CLOSE));
-            hideButton.setToolTipText("Hide this panel (show it again from the View → Panels menu)");
+            final JButton hideButton = new JButton(Icons.muted("x", 14));
+            hideButton.setToolTipText("<html><b>Hide panel</b><br>Show it again from View → Panels</html>");
             hideButton.addActionListener(e -> hideFrame(target.get().frame.getKey()));
             toolBar.add(hideButton);
             return toolBar;

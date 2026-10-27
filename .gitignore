@@ -7,3 +7,6 @@ target
 exports
 # Native packages built by packaging/package.sh
 /dist/
+
+# macOS Finder metadata
+.DS_Store

@@ -58,6 +58,9 @@ import org.pepsoft.worldpainter.tools.Eyedropper.PaintType;
 import org.pepsoft.worldpainter.tools.Eyedropper.SelectionListener;
 import org.pepsoft.worldpainter.tools.RespawnPlayerDialog;
 import org.pepsoft.worldpainter.tools.scripts.ScriptRunner;
+import com.formdev.flatlaf.FlatClientProperties;
+import org.pepsoft.util.swing.TiledImageViewer;
+import org.pepsoft.worldpainter.brushes.TerrainStamps;
 import org.pepsoft.worldpainter.docking.DockableFrame;
 import org.pepsoft.worldpainter.docking.DockingManager;
 import org.pepsoft.worldpainter.docking.Side;
@@ -152,6 +155,15 @@ public final class App extends JFrame implements BrushControl,
         }
 
         setIconImage(ICON);
+
+        fullWindowContent = SystemUtils.isMac() && ThemeUtils.isModernTheme();
+        if (fullWindowContent) {
+            // Let the header double as the title bar, like modern macOS applications
+            getRootPane().putClientProperty("apple.awt.fullWindowContent", true);
+            getRootPane().putClientProperty("apple.awt.transparentTitleBar", true);
+            getRootPane().putClientProperty("apple.awt.windowTitleVisible", false);
+            getRootPane().putClientProperty(FlatClientProperties.MACOS_WINDOW_BUTTONS_SPACING, FlatClientProperties.MACOS_WINDOW_BUTTONS_SPACING_MEDIUM);
+        }
 
         colourSchemes = new ColourScheme[] {
             DynmapColourScheme.loadDynMapColourScheme("default", 0),
@@ -1847,6 +1859,10 @@ public final class App extends JFrame implements BrushControl,
 
     @Override
     public void setTitle(String title) {
+        if (headerTitleLabel != null) {
+            // Show "world · dimension" in the header, without the application name
+            headerTitleLabel.setText(((title != null) && title.startsWith("WorldPainter - ")) ? title.substring(15).replace(" - ", " \u00b7 ") : title);
+        }
         StringBuilder sb = new StringBuilder();
         sb.append(title);
         if (Version.isSnapshot()) {
@@ -2644,6 +2660,9 @@ public final class App extends JFrame implements BrushControl,
         final float scale = (dimension != null) ? dimension.getScale() : 1.0f;
         int zoomPercentage = (int) (100 * factor / scale);
         zoomLabel.setText(MessageFormat.format(strings.getString("zoom.0"), zoomPercentage));
+        if (headerZoomLabel != null) {
+            headerZoomLabel.setText(zoomPercentage + "%");
+        }
         glassPane.setScale((float) factor / scale);
     }
 
@@ -2678,6 +2697,7 @@ public final class App extends JFrame implements BrushControl,
         }
         view.setRadius(radius);
         view.setBrushShape(brush.getBrushShape());
+        applyCanvasStyle();
 
         glassPane = new GlassPane();
         final BufferedImage cursorImage = IconUtils.loadUnscaledImage("org/pepsoft/worldpainter/cursor.png");
@@ -2710,20 +2730,21 @@ public final class App extends JFrame implements BrushControl,
 
         scrollController.install();
 
-        dockingManager.addFrame(new DockableFrameBuilder(createToolPanel(), "Tools", Side.WEST, 1).build());
+        dockingManager.addFrame(new DockableFrameBuilder(createToolPanel(), "Tools", Side.WEST, 1).withIcon(Icons.get("pencil-ruler")).build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", Side.WEST, 2).expand().scrollable().build());
+        dockingManager.addFrame(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", Side.WEST, 2).withIcon(Icons.get("sliders-horizontal")).expand().scrollable().build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createLayerPanel(), "Layers", Side.WEST, 3).build());
+        dockingManager.addFrame(new DockableFrameBuilder(createLayerPanel(), "Layers", Side.WEST, 3).withIcon(Icons.get("layers")).scrollable().build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createTerrainPanel(), "Terrain", Side.WEST, 3).build());
+        dockingManager.addFrame(new DockableFrameBuilder(createTerrainPanel(), "Terrain", Side.WEST, 3).withIcon(Icons.get("mountain-snow")).build());
 
-        biomesPanelFrame = new DockableFrameBuilder(createBiomesPanelContainer(), "Biomes", Side.WEST, 3).scrollable().build();
+        biomesPanelFrame = new DockableFrameBuilder(createBiomesPanelContainer(), "Biomes", Side.WEST, 3).withIcon(Icons.get("trees")).scrollable().build();
         dockingManager.addFrame(biomesPanelFrame);
 
-        dockingManager.addFrame(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", Side.WEST, 3).build());
+        dockingManager.addFrame(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", Side.WEST, 3).withIcon(Icons.get("message-square-text")).build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createBrushPanel(), "Brushes", Side.EAST, 1).build());
+        dockingManager.addFrame(new DockableFrameBuilder(createBrushPanel(), "Brushes", Side.EAST, 1).withIcon(Icons.get("brush")).build());
+        dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel("Terrain Stamps", new BrushGroup("Terrain Stamps", null, TerrainStamps.createBrushes())), "Terrain Stamps", Side.EAST, 1).withId("terrainStamps").withIcon(Icons.get("stamp")).scrollable().build());
 
         if (customBrushes.containsKey(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
             dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(CUSTOM_BRUSHES_DEFAULT_TITLE, customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE)), "Custom Brushes", Side.EAST, 1).withId("customBrushesDefault").scrollable().build());
@@ -2735,10 +2756,10 @@ public final class App extends JFrame implements BrushControl,
             dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), entry.getKey(), Side.EAST, 1).withId("customBrushes." + entry.getKey()).scrollable().build());
         }
         
-        dockingManager.addFrame(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", Side.EAST, 2).withId("brushSettings").build());
+        dockingManager.addFrame(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", Side.EAST, 2).withId("brushSettings").withIcon(Icons.get("settings-2")).build());
 
         infoPanel = createInfoPanel();
-        dockingManager.addFrame(new DockableFrameBuilder(infoPanel, "Info", Side.EAST, 2).withId("infoPanel").expand().withIcon(loadScaledIcon("information")).build());
+        dockingManager.addFrame(new DockableFrameBuilder(infoPanel, "Info", Side.EAST, 2).withId("infoPanel").expand().withIcon(Icons.get("info")).build());
 
         if (! dockingManager.loadLayoutFrom(config.getDefaultJideLayoutData())) {
             dockingManager.resetToDefault();
@@ -2803,7 +2824,8 @@ public final class App extends JFrame implements BrushControl,
         view.addMouseListener(viewListener);
         view.addMouseWheelListener(viewListener);
 
-        if (config.getShowCalloutCount() > 0) {
+        if (false && (config.getShowCalloutCount() > 0)) {
+            // Replaced by explanatory tooltips on the controls
             BufferedImage callout = loadCallout("callout_1");
             view.addOverlay("callout_1", 0, dockingManager.getFrame("tools"), callout);
             callout = loadCallout("callout_2");
@@ -2968,7 +2990,8 @@ public final class App extends JFrame implements BrushControl,
 
     private JPanel createStatusBar() {
         JPanel statusBar = new JPanel();
-        statusBar.setLayout(new FlowLayout(FlowLayout.LEADING));
+        statusBar.setLayout(new FlowLayout(FlowLayout.LEADING, 14, 3));
+        statusBar.setBorder(new HairlineBorder(true, false, false, false, new Insets(1, 4, 1, 4)));
         StringBuilder warnings = new StringBuilder();
         Configuration config = Configuration.getInstance();
         if (config.isAutosaveEnabled() && config.isAutosaveInhibited()) {
@@ -2982,38 +3005,39 @@ public final class App extends JFrame implements BrushControl,
         }
         if (warnings.length() > 0) {
             JLabel warningsLabel = new JLabel(warnings.toString(), IconUtils.loadScaledIcon("org/pepsoft/worldpainter/icons/error.png"), SwingConstants.LEADING);
-            warningsLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+            warningsLabel.setBorder(null);
             statusBar.add(warningsLabel);
         }
         locationLabel = new JLabel(MessageFormat.format(strings.getString("location.0.1"), "-99,999", "-99,999"));
-        locationLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        locationLabel.setBorder(null);
         statusBar.add(locationLabel);
         heightLabel = new JLabel(MessageFormat.format(strings.getString("height.0.of.1"), "-9,999", "9,999"));
-        heightLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        heightLabel.setBorder(null);
         statusBar.add(heightLabel);
         slopeLabel = new JLabel("Slope: 90°");
-        slopeLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        slopeLabel.setBorder(null);
         statusBar.add(slopeLabel);
         materialLabel = new JLabel(MessageFormat.format(strings.getString("material.0"), Material.MOSSY_COBBLESTONE.toString()));
-        materialLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        materialLabel.setBorder(null);
         statusBar.add(materialLabel);
         waterLabel = new JLabel(MessageFormat.format(strings.getString("fluid.level.1.depth.2"), 0, "-9,999", "9,999"));
-        waterLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        waterLabel.setBorder(null);
         statusBar.add(waterLabel);
         biomeLabel = new JLabel("Auto biome: Mega Spruce Taiga Hills (ID 161)");
-        biomeLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        biomeLabel.setBorder(null);
         statusBar.add(biomeLabel);
         radiusLabel = new JLabel(MessageFormat.format(strings.getString("radius.0"), 15984));
         radiusLabel.setToolTipText(strings.getString("scroll.the.mouse.wheel"));
-        radiusLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        radiusLabel.setBorder(null);
         statusBar.add(radiusLabel);
         zoomLabel = new JLabel(MessageFormat.format(strings.getString("zoom.0"), 3200));
-        zoomLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        zoomLabel.setBorder(null);
         statusBar.add(zoomLabel);
         final JProgressBar memoryBar = new JProgressBar();
-        memoryBar.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        memoryBar.setBorder(null);
         java.awt.Dimension preferredSize = memoryBar.getPreferredSize();
-        preferredSize.width = 100;
+        preferredSize.width = 80;
+        preferredSize.height = 6;
         memoryBar.setPreferredSize(preferredSize);
         memoryBar.addMouseListener(new MouseAdapter() {
             @Override
@@ -3040,12 +3064,19 @@ public final class App extends JFrame implements BrushControl,
             
             private final Runtime runtime = Runtime.getRuntime();
         }).start();
+        // Compact, muted text, as in modern applications
+        for (Component component: statusBar.getComponents()) {
+            if (component instanceof JLabel) {
+                component.setFont(component.getFont().deriveFont(component.getFont().getSize2D() - 1f));
+                ((JLabel) component).putClientProperty(FlatClientProperties.STYLE, "foreground: $WorldPainter.mutedForeground");
+            }
+        }
         return statusBar;
     }
 
     private JPanel createToolPanel() {
         JPanel toolPanel = new JPanel();
-        toolPanel.setLayout(new GridLayout(0, 4));
+        toolPanel.setLayout(new GridLayout(0, 4, 2, 2));
         // TODO: use function keys as accelerators?
         toolPanel.add(createButtonForOperation(new SprayPaint(view), 'r'));
         toolPanel.add(createButtonForOperation(new Pencil(view), 'p'));
@@ -3055,9 +3086,9 @@ public final class App extends JFrame implements BrushControl,
         toolPanel.add(createButtonForOperation(new Flood(view, false), 'f'));
         toolPanel.add(createButtonForOperation(new Flood(view, true)));
         toolPanel.add(createButtonForOperation(new Sponge(view)));
-        eyedropperToggleButton = new JToggleButton(loadScaledIcon("eyedropper"));
+        eyedropperToggleButton = new JToggleButton(Icons.get("pipette", 18));
         eyedropperToggleButton.setMnemonic('y');
-        eyedropperToggleButton.setMargin(App.BUTTON_INSETS);
+        styleToolButton(eyedropperToggleButton);
         eyedropperToggleButton.addActionListener(e -> {
             if (mapSelectionController.isSelectionActive()) {
                 // The user clicked on the eyedropper while it was already selected
@@ -3090,7 +3121,7 @@ public final class App extends JFrame implements BrushControl,
                 }
             });
         });
-        eyedropperToggleButton.setToolTipText("Eyedropper: Select a paint from the map (Alt+y)");
+        eyedropperToggleButton.setToolTipText(richToolTip("Eyedropper", "Pick a terrain or layer from the map to paint with", "Alt+Y"));
         eyedropperToggleButton.putClientProperty(KEY_HELP_KEY, "Operation/Eyedropper");
         toolPanel.add(eyedropperToggleButton);
 
@@ -3101,10 +3132,10 @@ public final class App extends JFrame implements BrushControl,
 
 //        toolPanel.add(createButtonForOperation(new Erode(view, this, mapDragControl), 'm'));
         toolPanel.add(createButtonForOperation(new SetSpawnPoint(view)));
-        final JButton button = new JButton(loadScaledIcon("globals"));
-        button.setMargin(App.BUTTON_INSETS);
+        final JButton button = new JButton(Icons.get("globe", 18));
+        styleToolButton(button);
         button.addActionListener(e -> showGlobalOperations());
-        button.setToolTipText(strings.getString("global.operations.fill.or.clear.the.world.with.a.terrain.biome.or.layer"));
+        button.setToolTipText(richToolTip("Global operations", "Fill or clear the whole world (or the selection) with a terrain, biome or layer", null));
         button.putClientProperty(KEY_HELP_KEY, "Operation/GlobalOperations");
         toolPanel.add(button);
         toolPanel.add(createButtonForOperation(new RaiseRotatedPyramid(view)));
@@ -3114,9 +3145,9 @@ public final class App extends JFrame implements BrushControl,
         copySelectionButton.setEnabled(selectionState.getValue());
         toolPanel.add(createButtonForOperation(new EditSelectionOperation(view, selectionState)));
         toolPanel.add(copySelectionButton);
-        final JButton clearSelectionButton = new JButton(loadScaledIcon("clear_selection"));
+        final JButton clearSelectionButton = new JButton(Icons.get("square-x", 18));
         clearSelectionButton.setEnabled(selectionState.getValue());
-        clearSelectionButton.setMargin(App.BUTTON_INSETS);
+        styleToolButton(clearSelectionButton);
         clearSelectionButton.addActionListener(e -> {
             if (dimension == null) {
                 DesktopUtils.beep();
@@ -3139,7 +3170,7 @@ public final class App extends JFrame implements BrushControl,
             // TODO: make this work correctly with undo/redo, and make "inside selection" ineffective when there is no selection, to avoid confusion
 //            selectionState.setValue(false);
         });
-        clearSelectionButton.setToolTipText("Clear the selection");
+        clearSelectionButton.setToolTipText(richToolTip("Clear selection", "Remove the current selection", null));
         selectionState.addObserver((o, selectionMayBePresent) -> {
             copySelectionButton.setEnabled((boolean) selectionMayBePresent);
             clearSelectionButton.setEnabled((boolean) selectionMayBePresent);
@@ -3167,22 +3198,20 @@ public final class App extends JFrame implements BrushControl,
         final JPanel layerPanel = new JPanel();
         layerPanel.setLayout(new GridBagLayout());
         GridBagConstraints constraints = new GridBagConstraints();
-        constraints.insets = new Insets(1, 1, 1, 1);
+        constraints.insets = new Insets(1, 2, 1, 2);
+        constraints.fill = GridBagConstraints.HORIZONTAL;
 
-        VerticalLabel label = new VerticalLabel("Show");
-        label.setOrientation(SwingConstants.VERTICAL);
-        label.setClockwise(false);
-        label.setMinimumSize(label.getPreferredSize());
-        constraints.anchor = GridBagConstraints.SOUTH;
-        layerPanel.add(label, constraints);
-        label = new VerticalLabel("Solo");
-        label.setOrientation(SwingConstants.VERTICAL);
-        label.setClockwise(false);
-        label.setMinimumSize(label.getPreferredSize());
-        layerPanel.add(label, constraints);
+        // Search field, filtering the rows by name
+        final JTextField searchField = new JTextField();
+        searchField.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, "Search layers");
+        searchField.putClientProperty(FlatClientProperties.TEXT_FIELD_LEADING_ICON, Icons.muted("search", 14));
+        searchField.putClientProperty(FlatClientProperties.TEXT_FIELD_SHOW_CLEAR_BUTTON, true);
         constraints.gridwidth = GridBagConstraints.REMAINDER;
         constraints.weightx = 1.0;
-        layerPanel.add(new JLabel(), constraints);
+        constraints.insets = new Insets(4, 2, 6, 2);
+        layerPanel.add(searchField, constraints);
+        constraints.insets = new Insets(1, 2, 1, 2);
+        final Map<String, List<Component>> searchableRows = new LinkedHashMap<>();
         
         Configuration config = Configuration.getInstance();
         constraints.anchor = GridBagConstraints.WEST;
@@ -3191,18 +3220,43 @@ public final class App extends JFrame implements BrushControl,
         terrainSoloCheckBox = (JCheckBox) terrainComponents.get(1);
         terrainModeComboBox = (JComboBox<TerrainMode>) terrainComponents.get(2);
         LayoutUtils.addRowOfComponents(layerPanel, constraints, terrainComponents);
-        LayoutUtils.addRowOfComponents(layerPanel, constraints, createLayerButton(FLUIDS_AS_LAYER, (char) 0, false, false));
+        searchableRows.put("terrain", terrainComponents);
+        List<Component> row = createLayerButton(FLUIDS_AS_LAYER, (char) 0, false, false);
+        LayoutUtils.addRowOfComponents(layerPanel, constraints, row);
+        searchableRows.put(FLUIDS_AS_LAYER.getName().toLowerCase(), row);
         for (Layer layer: layers) {
-            LayoutUtils.addRowOfComponents(layerPanel, constraints, createLayerButton(layer, layer.getMnemonic()));
+            row = createLayerButton(layer, layer.getMnemonic());
+            LayoutUtils.addRowOfComponents(layerPanel, constraints, row);
+            searchableRows.put(layer.getName().toLowerCase(), row);
         }
         if (! config.isEasyMode()) {
-            LayoutUtils.addRowOfComponents(layerPanel, constraints, createLayerButton(Populate.INSTANCE, 'p'));
+            row = createLayerButton(Populate.INSTANCE, 'p');
+            LayoutUtils.addRowOfComponents(layerPanel, constraints, row);
+            searchableRows.put(Populate.INSTANCE.getName().toLowerCase(), row);
         }
-        LayoutUtils.addRowOfComponents(layerPanel, constraints, createLayerButton(ReadOnly.INSTANCE, 'o'));
+        row = createLayerButton(ReadOnly.INSTANCE, 'o');
+        LayoutUtils.addRowOfComponents(layerPanel, constraints, row);
+        searchableRows.put(ReadOnly.INSTANCE.getName().toLowerCase(), row);
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { filter(); }
 
-        final JButton addLayerButton = new JButton(loadScaledIcon("plus"));
-        addLayerButton.setToolTipText(strings.getString("add.a.custom.layer"));
-        addLayerButton.setMargin(App.BUTTON_INSETS);
+            private void filter() {
+                final String query = searchField.getText().trim().toLowerCase();
+                searchableRows.forEach((name, components) -> {
+                    final boolean visible = query.isEmpty() || name.contains(query);
+                    components.forEach(component -> component.setVisible(visible));
+                });
+                layerPanel.revalidate();
+                layerPanel.repaint();
+            }
+        });
+
+        final JButton addLayerButton = new JButton("Add custom layer", Icons.get("plus", 14));
+        addLayerButton.setToolTipText(richToolTip("Add custom layer", strings.getString("add.a.custom.layer"), null));
+        addLayerButton.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_BORDERLESS);
+        addLayerButton.setHorizontalAlignment(SwingConstants.LEADING);
         addLayerButton.addActionListener(e -> {
             if (dimension == null) {
                 DesktopUtils.beep();
@@ -3215,14 +3269,9 @@ public final class App extends JFrame implements BrushControl,
                 customLayerMenu.show(layerPanel, addLayerButton.getX() + addLayerButton.getWidth(), addLayerButton.getY());
             }
         });
-        JPanel spacer = new JPanel();
-        constraints.gridwidth = 1;
-        constraints.weightx = 0.0;
-        layerPanel.add(spacer, constraints);
-        spacer = new JPanel();
-        layerPanel.add(spacer, constraints);
         constraints.gridwidth = GridBagConstraints.REMAINDER;
         constraints.weightx = 1.0;
+        constraints.insets = new Insets(6, 2, 1, 2);
         layerPanel.add(addLayerButton, constraints);
 
         layerPanel.putClientProperty(KEY_ICON, ICON_LAYERS);
@@ -3576,26 +3625,15 @@ public final class App extends JFrame implements BrushControl,
     private JPanel createBrushPanel() {
         JPanel optionsPanel = new JPanel();
         optionsPanel.setLayout(new GridBagLayout());
-        JPanel brushPanel = new JPanel(new GridLayout(0, 3));
-        brushPanel.add(createBrushButton(SymmetricBrush.SPIKE_CIRCLE));
-        brushPanel.add(createBrushButton(SymmetricBrush.SPIKE_SQUARE));
+        // A small set of versatile brushes; the Terrain Stamps palette provides shaped landforms
+        JPanel brushPanel = new JPanel(new GridLayout(0, 3, 2, 2));
+        brushPanel.add(createBrushButton(SymmetricBrush.COSINE_CIRCLE));
+        brushPanel.add(createBrushButton(SymmetricBrush.PLATEAU_CIRCLE));
+        brushPanel.add(createBrushButton(SymmetricBrush.LINEAR_CIRCLE));
+        brushPanel.add(createBrushButton(SymmetricBrush.CONSTANT_CIRCLE));
+        brushPanel.add(createBrushButton(SymmetricBrush.CONSTANT_SQUARE));
         brushPanel.add(createBrushButton(new BitmapBrush(App.class.getResourceAsStream("resources/brush_noise.png"), strings.getString("noise"))));
 
-        brushPanel.add(createBrushButton(SymmetricBrush.LINEAR_CIRCLE));
-        brushPanel.add(createBrushButton(SymmetricBrush.LINEAR_SQUARE));
-        brushPanel.add(createBrushButton(new BitmapBrush(App.class.getResourceAsStream("resources/brush_cracked_earth.png"), strings.getString("cracks"))));
-        
-        brushPanel.add(createBrushButton(SymmetricBrush.COSINE_CIRCLE));
-        brushPanel.add(createBrushButton(SymmetricBrush.COSINE_SQUARE));
-        brushPanel.add(createBrushButton(SymmetricBrush.CONSTANT_CIRCLE));
-
-        brushPanel.add(createBrushButton(SymmetricBrush.PLATEAU_CIRCLE));
-        brushPanel.add(createBrushButton(SymmetricBrush.PLATEAU_SQUARE));
-        brushPanel.add(createBrushButton(SymmetricBrush.CONSTANT_SQUARE));
-        
-        brushPanel.add(createBrushButton(SymmetricBrush.DOME_CIRCLE));
-        brushPanel.add(createBrushButton(SymmetricBrush.DOME_SQUARE));
-        
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.gridwidth = GridBagConstraints.REMAINDER;
         constraints.anchor = GridBagConstraints.FIRST_LINE_START;
@@ -3611,7 +3649,7 @@ public final class App extends JFrame implements BrushControl,
     private JPanel createCustomBrushPanel(String title, BrushGroup brushGroup) {
         JPanel customBrushesPanel = new JPanel();
         customBrushesPanel.setLayout(new GridBagLayout());
-        JPanel customBrushPanel = new JPanel(new GridLayout(0, 3));
+        JPanel customBrushPanel = new JPanel(new GridLayout(0, 3, 2, 2));
         for (Brush customBrush: brushGroup.brushes) {
             customBrushPanel.add(createBrushButton(customBrush));
         }
@@ -4621,8 +4659,38 @@ public final class App extends JFrame implements BrushControl,
 //        }
 //    }
 
-    private JToolBar createToolBar() {
-        JToolBar toolBar = new JToolBar();
+    /**
+     * Create the header of the window: the tool bar on the left, the name of the world in the centre and the zoom and
+     * theme controls on the right. On macOS with a modern theme the header doubles as the title bar.
+     */
+    private JComponent createToolBar() {
+        // Modern vector icons for the actions (also used in the menus)
+        setActionIcon(ACTION_NEW_WORLD, "file-plus");
+        setActionIcon(ACTION_OPEN_WORLD, "folder-open");
+        setActionIcon(ACTION_SAVE_WORLD, "save");
+        setActionIcon(ACTION_EXPORT_WORLD, "package");
+        setActionIcon(ACTION_UNDO, "undo-2");
+        setActionIcon(ACTION_REDO, "redo-2");
+        setActionIcon(ACTION_ZOOM_OUT, "minus");
+        setActionIcon(ACTION_ZOOM_RESET, "scan-search");
+        setActionIcon(ACTION_ZOOM_IN, "plus");
+        setActionIcon(ACTION_DIMENSION_PROPERTIES, "sliders-horizontal");
+        setActionIcon(ACTION_CHANGE_HEIGHT, "arrow-up-down");
+        setActionIcon(ACTION_ROTATE_WORLD, "rotate-cw");
+        setActionIcon(ACTION_SHIFT_WORLD, "move");
+        setActionIcon(ACTION_SCALE_WORLD, "expand");
+        setActionIcon(ACTION_EDIT_TILES, "layout-grid");
+        setActionIcon(ACTION_MOVE_TO_SPAWN, "flag");
+        setActionIcon(ACTION_MOVE_TO_ORIGIN, "locate-fixed");
+        setActionIcon(ACTION_GRID, "grid-3x3");
+        setActionIcon(ACTION_CONTOURS, "chart-spline");
+        setActionIcon(ACTION_OVERLAYS, "image");
+        setActionIcon(ACTION_VIEW_DISTANCE, "circle-dashed");
+        setActionIcon(ACTION_WALKING_DISTANCE, "footprints");
+        setActionIcon(ACTION_ROTATE_LIGHT_LEFT, "sunrise");
+        setActionIcon(ACTION_ROTATE_LIGHT_RIGHT, "sunset");
+
+        final JToolBar toolBar = createHeaderToolBar();
         toolBar.add(ACTION_NEW_WORLD);
         toolBar.add(ACTION_OPEN_WORLD);
         toolBar.add(ACTION_SAVE_WORLD);
@@ -4630,10 +4698,6 @@ public final class App extends JFrame implements BrushControl,
         toolBar.addSeparator();
         toolBar.add(ACTION_UNDO);
         toolBar.add(ACTION_REDO);
-        toolBar.addSeparator();
-        toolBar.add(ACTION_ZOOM_OUT);
-        toolBar.add(ACTION_ZOOM_RESET);
-        toolBar.add(ACTION_ZOOM_IN);
         toolBar.addSeparator();
         toolBar.add(ACTION_DIMENSION_PROPERTIES);
         if (! Configuration.getInstance().isEasyMode()) {
@@ -4666,9 +4730,99 @@ public final class App extends JFrame implements BrushControl,
         toolBar.add(ACTION_ROTATE_LIGHT_RIGHT);
 //        toolBar.add(Box.createHorizontalGlue());
 //        toolBar.add(ACTION_SHOW_HELP_PICKER);
+
+        // Zoom and theme controls on the right
+        final JToolBar rightToolBar = createHeaderToolBar();
+        rightToolBar.add(ACTION_ZOOM_OUT);
+        headerZoomLabel = new JLabel("100%", SwingConstants.CENTER);
+        headerZoomLabel.setPreferredSize(new java.awt.Dimension(Math.round(52 * getUIScale()), headerZoomLabel.getPreferredSize().height));
+        headerZoomLabel.setToolTipText("<html><b>Zoom</b><br>Click to reset to 100%</html>");
+        headerZoomLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        headerZoomLabel.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                ACTION_ZOOM_RESET.actionPerformed(new ActionEvent(headerZoomLabel, ActionEvent.ACTION_PERFORMED, null));
+            }
+        });
+        rightToolBar.add(headerZoomLabel);
+        rightToolBar.add(ACTION_ZOOM_IN);
+        if (ThemeUtils.isModernTheme()) {
+            rightToolBar.addSeparator();
+            themeToggleButton = new JButton();
+            themeToggleButton.addActionListener(e -> toggleTheme());
+            updateThemeToggleButton();
+            rightToolBar.add(themeToggleButton);
+        }
+
+        headerTitleLabel = new JLabel("WorldPainter", SwingConstants.CENTER);
+        headerTitleLabel.putClientProperty("FlatLaf.styleClass", "semibold");
+
+        final JPanel west = new JPanel(new BorderLayout());
+        west.setOpaque(false);
+        if (fullWindowContent) {
+            // Leave room for the macOS window buttons
+            final JPanel placeholder = new JPanel();
+            placeholder.setOpaque(false);
+            placeholder.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_PLACEHOLDER, "mac");
+            west.add(placeholder, BorderLayout.WEST);
+        }
+        west.add(toolBar, BorderLayout.CENTER);
+        final JPanel header = new JPanel(new BorderLayout(12, 0));
+        header.setBorder(new HairlineBorder(false, false, true, false, new Insets(4, 8, 4, 8)));
+        header.add(west, BorderLayout.WEST);
+        header.add(headerTitleLabel, BorderLayout.CENTER);
+        header.add(rightToolBar, BorderLayout.EAST);
+        return header;
+    }
+
+    private static JToolBar createHeaderToolBar() {
+        final JToolBar toolBar = new JToolBar();
+        toolBar.setFloatable(false);
+        toolBar.setBorder(null);
+        toolBar.setOpaque(false);
         return toolBar;
     }
-    
+
+    private static void setActionIcon(Action action, String iconName) {
+        final Icon icon = Icons.get(iconName, 18);
+        action.putValue(Action.SMALL_ICON, icon);
+        action.putValue(Action.LARGE_ICON_KEY, icon);
+    }
+
+    private void updateThemeToggleButton() {
+        final boolean dark = ThemeUtils.isDarkTheme();
+        themeToggleButton.setIcon(Icons.get(dark ? "sun" : "moon", 18));
+        themeToggleButton.setToolTipText(dark ? "<html><b>Light theme</b><br>Switch to the light theme</html>" : "<html><b>Dark theme</b><br>Switch to the dark theme</html>");
+    }
+
+    /**
+     * Switch between the modern light and dark themes, and remember the choice.
+     */
+    private void toggleTheme() {
+        final boolean dark = ! ThemeUtils.isDarkTheme();
+        ThemeUtils.switchModernTheme(dark);
+        Configuration.getInstance().setLookAndFeel(dark ? Configuration.LookAndFeel.MODERN_DARK : Configuration.LookAndFeel.MODERN_LIGHT);
+        updateThemeToggleButton();
+        applyCanvasStyle();
+        if (dimension != null) {
+            view.refreshTiles();
+        }
+    }
+
+    /**
+     * Give the canvas around the map the background of the theme, with a fixed grid of dots, unless the user has
+     * configured a custom background colour or image.
+     */
+    private void applyCanvasStyle() {
+        final Configuration config = Configuration.getInstance();
+        if (ThemeUtils.isModernTheme() && (config.getBackgroundColour() == -1) && (config.getBackgroundImage() == null)) {
+            VoidRenderer.setColour(ThemeUtils.getCanvasBackground().getRGB() & 0xffffff);
+            view.setBackground(ThemeUtils.getCanvasBackground());
+            view.setBackgroundImageMode(TiledImageViewer.BackgroundImageMode.REPEAT);
+            view.setBackgroundImage(ThemeUtils.createCanvasDotPattern());
+        }
+    }
+
     private void addStatisticsTo(MenuElement menuElement, @NonNls final String key, final EventLogger eventLogger) {
         if ((menuElement instanceof JMenuItem) && (! (menuElement instanceof JMenu))) {
             JMenuItem menuItem = (JMenuItem) menuElement;
@@ -4888,6 +5042,79 @@ public final class App extends JFrame implements BrushControl,
         return createButtonForOperation(operation, (char) 0);
     }
 
+    /**
+     * The name of the modern icon to use for a built-in operation, or {@code null} to use the operation's own icon.
+     */
+    private static String modernIconFor(Operation operation) {
+        switch (operation.getClass().getSimpleName()) {
+            case "SprayPaint": return "spray-can";
+            case "Pencil": return "pencil";
+            case "Fill": return "paint-bucket";
+            case "Text": return "type";
+            case "Flood": return operation.getName().toLowerCase().contains("lava") ? "flame" : "droplets";
+            case "Sponge": return "droplet-off";
+            case "Height": return "chevrons-up-down";
+            case "Flatten": return "equal";
+            case "Smooth": return "waves";
+            case "RaiseMountain": return "mountain-snow";
+            case "SetSpawnPoint": return "flag";
+            case "RaiseRotatedPyramid": return "diamond";
+            case "RaisePyramid": return "triangle";
+            case "CopySelectionOperation": return "copy";
+            case "EditSelectionOperation": return "square-dashed-mouse-pointer";
+            case "Erode": return "wind";
+            default: return null;
+        }
+    }
+
+    /**
+     * The name of the modern icon to use for a built-in layer, or {@code null} to use the layer's own icon.
+     */
+    private static String modernIconFor(Layer layer) {
+        if (layer instanceof CustomLayer) {
+            return null;
+        }
+        switch (layer.getName()) {
+            case "Water/Lava": return "droplets";
+            case "Frost": return "snowflake";
+            case "Caves": return "pickaxe";
+            case "Caverns": return "drill";
+            case "Chasms": return "chevrons-down";
+            case "Deciduous": return "tree-deciduous";
+            case "Pine": return "tree-pine";
+            case "Swamp": return "leaf";
+            case "Jungle": return "tree-palm";
+            case "Void": return "circle-off";
+            case "Resources": return "gem";
+            case "Populate": return "sprout";
+            case "Read Only": return "lock";
+            default: return null;
+        }
+    }
+
+    /**
+     * Give a button the look of a tool in a modern tool palette: square, borderless, highlighted when selected.
+     */
+    private static void styleToolButton(AbstractButton button) {
+        button.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+        button.setMargin(new Insets(6, 6, 6, 6));
+        button.setFocusable(false);
+    }
+
+    /**
+     * Create a tooltip with a bold title, an optional explanation and an optional keyboard shortcut.
+     */
+    public static String richToolTip(String title, String description, String shortcut) {
+        final StringBuilder sb = new StringBuilder("<html><b>").append(title).append("</b>");
+        if (shortcut != null) {
+            sb.append("&nbsp;&nbsp;<font color=\"#a1a1aa\">").append(shortcut).append("</font>");
+        }
+        if ((description != null) && (! description.equalsIgnoreCase(title))) {
+            sb.append("<br><div style=\"width: 220px\">").append(description).append("</div>");
+        }
+        return sb.append("</html>").toString();
+    }
+
     private AbstractButton createButtonForOperation(final Operation operation, char mnemonic) {
         BufferedImage icon = operation.getIcon();
         AbstractButton button = (operation instanceof GlobalOperation) ? new JButton() : new JToggleButton();
@@ -4895,20 +5122,17 @@ public final class App extends JFrame implements BrushControl,
             setSpawnPointToggleButton = (JToggleButton) button;
         }
         button.setMargin(App.BUTTON_INSETS);
-        if (icon != null) {
+        final String modernIcon = modernIconFor(operation);
+        if (modernIcon != null) {
+            button.setIcon(Icons.get(modernIcon, 18));
+        } else if (icon != null) {
             button.setIcon(new ImageIcon(icon));
         }
-        final StringBuilder tooltip = new StringBuilder();
-        tooltip.append(operation.getName());
-        final String description = operation.getDescription();
-        if ((description != null) && (! operation.getName().equalsIgnoreCase(description))) {
-            tooltip.append(": ").append(description);
-        }
+        styleToolButton(button);
         if (mnemonic != 0) {
             button.setMnemonic(mnemonic);
-            tooltip.append(" (Alt+").append(mnemonic).append(')');
         }
-        button.setToolTipText(tooltip.toString());
+        button.setToolTipText(richToolTip(operation.getName(), operation.getDescription(), (mnemonic != 0) ? ("Alt+" + Character.toUpperCase(mnemonic)) : null));
         if (operation instanceof GlobalOperation) {
             button.addActionListener(event ->  {
                 cancelPaintSelection();
@@ -5071,10 +5295,13 @@ public final class App extends JFrame implements BrushControl,
         if (createButton) {
             final JToggleButton button = new JToggleButton();
             button.setMargin(new Insets(2, 2, 2, 2));
-            if (layer.getIcon() != null) {
+            final String modernIcon = modernIconFor(layer);
+            if (modernIcon != null) {
+                button.setIcon(Icons.get(modernIcon, 16));
+            } else if (layer.getIcon() != null) {
                 button.setIcon(new ImageIcon(layer.getIcon()));
             }
-            button.setToolTipText(layer.getName() + ": " + layer.getDescription());
+            button.setToolTipText(richToolTip(layer.getName(), layer.getDescription(), null));
             // TODO: make this work again, but with Ctrl + Alt or something
 //            if (mnemonic != 0) {
 //                button.setMnemonic(mnemonic);
@@ -5094,7 +5321,8 @@ public final class App extends JFrame implements BrushControl,
             button.putClientProperty(KEY_PAINT_ID, createLayerPaintId(layer));
             return createLayerRow(layer, true, createSoloCheckbox, button);
         } else {
-            JLabel label = new JLabel(layer.getName(), new ImageIcon(layer.getIcon()), JLabel.LEADING);
+            final String modernIcon = modernIconFor(layer);
+            JLabel label = new JLabel(layer.getName(), (modernIcon != null) ? Icons.get(modernIcon, 16) : new ImageIcon(layer.getIcon()), JLabel.LEADING);
             label.putClientProperty(KEY_HELP_KEY, "Layer/" + layer.getId());
             return createLayerRow(layer, true, createSoloCheckbox, label);
         }
@@ -5106,7 +5334,8 @@ public final class App extends JFrame implements BrushControl,
         final JCheckBox checkBox;
         if (createShowCheckbox) {
             checkBox = new JCheckBox();
-            checkBox.setToolTipText(strings.getString("whether.or.not.to.display.this.layer"));
+            styleIconToggle(checkBox, Icons.muted("eye-off", 16), Icons.get("eye", 16));
+            checkBox.setToolTipText(richToolTip("Visibility", "Show or hide this layer in the editor (it is exported either way)", null));
             checkBox.setSelected(true);
             checkBox.addChangeListener(e -> {
                 if (checkBox.isSelected()) {
@@ -5125,8 +5354,9 @@ public final class App extends JFrame implements BrushControl,
         final JCheckBox soloCheckBox;
         if (createSoloCheckbox) {
             soloCheckBox = new JCheckBox();
+            styleIconToggle(soloCheckBox, Icons.muted("focus", 16), Icons.accent("focus", 16));
             layerSoloCheckBoxes.put(layer, soloCheckBox);
-            soloCheckBox.setToolTipText("<html>Check to show <em>only</em> this layer (the other layers are still exported)</html>");
+            soloCheckBox.setToolTipText(richToolTip("Solo", "Show <em>only</em> this layer (the other layers are still exported)", null));
             soloCheckBox.addActionListener(new SoloCheckboxHandler(soloCheckBox, layer));
             components.add(soloCheckBox);
         } else {
@@ -5134,10 +5364,38 @@ public final class App extends JFrame implements BrushControl,
             components.add(Box.createGlue());
         }
 
+        if (layerComponent instanceof AbstractButton) {
+            styleRowButton((AbstractButton) layerComponent);
+        } else if (layerComponent instanceof JLabel) {
+            ((JLabel) layerComponent).setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+            ((JLabel) layerComponent).setIconTextGap(8);
+        }
         components.add(layerComponent);
         layerControls.put(layer, new LayerControls(layer, checkBox, soloCheckBox, layerComponent));
 
         return components;
+    }
+
+    /**
+     * Turn a check box into a compact icon toggle, such as the eye of a layer panel.
+     */
+    public static void styleIconToggle(JCheckBox checkBox, Icon offIcon, Icon onIcon) {
+        checkBox.setIcon(offIcon);
+        checkBox.setSelectedIcon(onIcon);
+        checkBox.setRolloverEnabled(true);
+        checkBox.setFocusable(false);
+        checkBox.setBorder(BorderFactory.createEmptyBorder(4, 3, 4, 3));
+    }
+
+    /**
+     * Give a layer button the look of a row in a layer panel: full width, borderless, highlighted when selected.
+     */
+    public static void styleRowButton(AbstractButton button) {
+        button.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+        button.setHorizontalAlignment(SwingConstants.LEADING);
+        button.setIconTextGap(8);
+        button.setMargin(new Insets(5, 8, 5, 8));
+        button.setFocusable(false);
     }
 
     private JToggleButton createTerrainButton(final Terrain terrain) {
@@ -5267,8 +5525,10 @@ public final class App extends JFrame implements BrushControl,
 
     private JComponent createBrushButton(final Brush brush) {
         final JToggleButton button = new LazyLoadingIconToggleButton((int) (32 * getUIScale()), () -> setBrushThumbnail(brush));
-        button.setMargin(new Insets(2, 2, 2, 2));
-        button.setToolTipText(brush.getName());
+        button.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+        button.setMargin(new Insets(4, 4, 4, 4));
+        button.setFocusable(false);
+        button.setToolTipText(richToolTip(brush.getName(), "Brush shape; scroll to change the size, Alt+scroll to rotate", null));
         button.addItemListener(e -> {
             if (! programmaticChange) {
                 updateBrushRotation(brush, button);
@@ -5307,15 +5567,35 @@ public final class App extends JFrame implements BrushControl,
         return thumbnail;
     }
     
+    /**
+     * Render a brush as a small shaded relief, lit from the top left, so that its shape reads as a landform.
+     */
     private Icon createBrushThumbnail(Brush brush, int size) {
         final int radius = size / 2;
         brush.setRadius(radius - 1);
-        final BufferedImage image = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration().createCompatibleImage(size, size, Transparency.TRANSLUCENT);
+        final float[][] strengths = new float[size + 1][size + 1];
         for (int dx = -radius + 1; dx < radius; dx++) {
             for (int dy = -radius + 1; dy < radius; dy++) {
-                final float strength = brush.getFullStrength(dx, dy);
-                final int alpha = round(strength * 255f);
-                image.setRGB(dx + radius - 1, dy + radius - 1, (alpha << 24) | (darkMode ? 0xd0d0d0 : 0x000000));
+                strengths[dx + radius - 1][dy + radius - 1] = brush.getFullStrength(dx, dy);
+            }
+        }
+        final boolean dark = ThemeUtils.isDarkTheme();
+        final int base = dark ? 0xd4d4d8 : 0x71717a;
+        final BufferedImage image = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration().createCompatibleImage(size, size, Transparency.TRANSLUCENT);
+        for (int x = 0; x < size - 1; x++) {
+            for (int y = 0; y < size - 1; y++) {
+                final float strength = strengths[x][y];
+                if (strength <= 0) {
+                    continue;
+                }
+                final float left = (x > 0) ? strengths[x - 1][y] : 0, top = (y > 0) ? strengths[x][y - 1] : 0;
+                final float light = Math.max(-1, Math.min(1, ((strength - left) + (strength - top)) * radius * 0.6f));
+                final float shade = (dark ? 0.85f : 1.0f) + light * 0.35f;
+                final int r = Math.min(255, Math.max(0, Math.round(((base >> 16) & 0xff) * shade + (dark ? 0 : 40 * light))));
+                final int g = Math.min(255, Math.max(0, Math.round(((base >> 8) & 0xff) * shade + (dark ? 0 : 40 * light))));
+                final int b = Math.min(255, Math.max(0, Math.round((base & 0xff) * shade + (dark ? 0 : 40 * light))));
+                final int alpha = Math.min(255, Math.round((0.25f + 0.75f * strength) * 255f));
+                image.setRGB(x, y, (alpha << 24) | (r << 16) | (g << 8) | b);
             }
         }
         return new ImageIcon(image);
@@ -6777,6 +7057,9 @@ public final class App extends JFrame implements BrushControl,
     private Operation activeOperation;
     private File lastSelectedFile;
     private JLabel heightLabel, slopeLabel, locationLabel, waterLabel, materialLabel, radiusLabel, zoomLabel, biomeLabel, levelLabel, brushRotationLabel;
+    private JLabel headerTitleLabel, headerZoomLabel;
+    private JButton themeToggleButton;
+    private final boolean fullWindowContent;
     private int radius = 50;
     private Brush brush = SymmetricBrush.PLATEAU_CIRCLE, toolBrush = SymmetricBrush.COSINE_CIRCLE;
     private boolean programmaticChange;

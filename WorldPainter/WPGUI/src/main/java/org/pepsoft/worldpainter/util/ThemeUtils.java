@@ -1,17 +1,17 @@
 package org.pepsoft.worldpainter.util;
 
-import com.formdev.flatlaf.FlatDarkLaf;
 import com.formdev.flatlaf.FlatLaf;
-import com.formdev.flatlaf.FlatLightLaf;
-import com.formdev.flatlaf.themes.FlatMacDarkLaf;
-import com.formdev.flatlaf.themes.FlatMacLightLaf;
+import com.formdev.flatlaf.extras.FlatAnimatedLafChange;
+import com.formdev.flatlaf.fonts.inter.FlatInterFont;
 import org.pepsoft.util.SystemUtils;
 import org.pepsoft.worldpainter.Configuration;
+import org.pepsoft.worldpainter.laf.WorldPainterDarkLaf;
+import org.pepsoft.worldpainter.laf.WorldPainterLightLaf;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -103,35 +103,68 @@ public final class ThemeUtils {
         }
     }
 
+    /**
+     * Switch between the modern light and dark themes while the application is running, with a short cross-fade.
+     */
+    public static void switchModernTheme(boolean dark) {
+        FlatAnimatedLafChange.showSnapshot();
+        installFlatLaf(dark, 1.0f);
+        FlatLaf.updateUI();
+        FlatAnimatedLafChange.hideSnapshotWithAnimation();
+    }
+
+    /**
+     * Get a colour from the current theme.
+     */
+    public static Color getColour(String key, Color fallback) {
+        final Color colour = UIManager.getColor(key);
+        return (colour != null) ? colour : fallback;
+    }
+
+    /**
+     * The colour of the canvas around the map.
+     */
+    public static Color getCanvasBackground() {
+        return getColour("WorldPainter.canvasBackground", isDarkTheme() ? new Color(0x09090b) : new Color(0xf4f4f5));
+    }
+
+    /**
+     * Create a tile for the dotted background of the canvas around the map, to be repeated.
+     */
+    public static BufferedImage createCanvasDotPattern() {
+        final int cell = 22;
+        final BufferedImage image = new BufferedImage(cell, cell, BufferedImage.TYPE_INT_RGB);
+        final Graphics2D g2 = image.createGraphics();
+        try {
+            g2.setColor(getCanvasBackground());
+            g2.fillRect(0, 0, cell, cell);
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(getColour("WorldPainter.canvasDot", Color.GRAY));
+            g2.fill(new java.awt.geom.Ellipse2D.Float(cell / 2f - 1.1f, cell / 2f - 1.1f, 2.2f, 2.2f));
+        } finally {
+            g2.dispose();
+        }
+        return image;
+    }
+
     private static void installFlatLaf(boolean dark, float uiScale) {
         if (uiScale != 1.0f) {
             System.setProperty("flatlaf.uiScale", Float.toString(uiScale));
         }
-        FlatLaf.setGlobalExtraDefaults(Collections.singletonMap("@accentColor", ACCENT_COLOUR));
-        if (SystemUtils.isMac()) {
-            if (dark) {
-                FlatMacDarkLaf.setup();
-            } else {
-                FlatMacLightLaf.setup();
-            }
-        } else if (dark) {
-            FlatDarkLaf.setup();
-        } else {
-            FlatLightLaf.setup();
+        if (! fontInstalled) {
+            FlatInterFont.install();
+            FlatLaf.setPreferredFontFamily(FlatInterFont.FAMILY);
+            fontInstalled = true;
         }
-        // Tweaks for a cleaner, more compact look
-        UIManager.put("Component.arc", 6);
-        UIManager.put("Button.arc", 6);
-        UIManager.put("TextComponent.arc", 6);
-        UIManager.put("ScrollBar.showButtons", false);
-        UIManager.put("ScrollBar.thumbArc", 999);
-        UIManager.put("ScrollBar.thumbInsets", new Insets(2, 2, 2, 2));
-        UIManager.put("ScrollBar.width", 10);
-        UIManager.put("TabbedPane.showTabSeparators", false);
-        UIManager.put("TabbedPane.tabsPopupPolicy", "asNeeded");
-        UIManager.put("TitlePane.unifiedBackground", true);
-        UIManager.put("ToolBar.separatorWidth", 9);
-        UIManager.put("SplitPaneDivider.style", "plain");
+        if (dark) {
+            WorldPainterDarkLaf.setup();
+        } else {
+            WorldPainterLightLaf.setup();
+        }
+        // Shorter delays make tooltips feel responsive, as in modern web applications
+        ToolTipManager.sharedInstance().setInitialDelay(450);
+        ToolTipManager.sharedInstance().setReshowDelay(100);
+        ToolTipManager.sharedInstance().setDismissDelay(15000);
     }
 
     private static String run(String... command) throws IOException, InterruptedException {
@@ -143,6 +176,6 @@ public final class ThemeUtils {
         return new String(output, UTF_8);
     }
 
-    private static final String ACCENT_COLOUR = "#3D9A50";
+    private static boolean fontInstalled;
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ThemeUtils.class);
 }

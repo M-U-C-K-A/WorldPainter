@@ -38,6 +38,8 @@ public class GlassPane extends javax.swing.JPanel {
             jLabel1.setIcon(IconUtils.loadScaledIcon("org/pepsoft/worldpainter/scale_bar.png")); // NOI18N
             jLabel2.setIcon(IconUtils.loadScaledIcon("org/pepsoft/worldpainter/north_arrow_up.png")); // NOI18N
         }
+        // Keep the north arrow visible on dark themes
+        jLabel2.setIcon(new org.pepsoft.worldpainter.util.TintedIcon(jLabel2.getIcon()));
 //        jPanel2.add(miniMap, BorderLayout.CENTER);
     }
     
