@@ -7,23 +7,32 @@ package org.pepsoft.worldpainter.layers.tunnel;
 
 import org.pepsoft.util.mdc.MDCCapturingRuntimeException;
 import org.pepsoft.worldpainter.*;
+import org.pepsoft.worldpainter.Dimension;
 import org.pepsoft.worldpainter.Dimension.Anchor;
 import org.pepsoft.worldpainter.exporting.LayerExporter;
 import org.pepsoft.worldpainter.layers.*;
 import org.pepsoft.worldpainter.layers.exporters.ExporterSettings;
 import org.pepsoft.worldpainter.layers.pockets.UndergroundPocketsLayer;
+import org.pepsoft.worldpainter.layers.renderers.PaintRenderer;
 import org.pepsoft.worldpainter.operations.Filter;
 
+import java.awt.*;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.Serial;
 import java.io.Serializable;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE;
-import static org.pepsoft.worldpainter.Dimension.Role.CAVE_FLOOR;
-import static org.pepsoft.worldpainter.Dimension.Role.DETAIL;
+import static org.pepsoft.worldpainter.Dimension.Role.*;
+import static org.pepsoft.worldpainter.Platform.Capability.NAME_BASED;
+import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.EdgeShape.LINEAR;
+import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.EdgeShape.SMOOTH;
+import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.FillMode.AIR;
+import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.FillMode.CAVE_AIR;
+import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.LayerMode.CAVE;
+import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.LayerMode.FLOATING;
 import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.Mode.CUSTOM_DIMENSION;
 
 /**
@@ -31,8 +40,13 @@ import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.Mode.CUSTOM_DIM
  * @author SchmitzP
  */
 public class TunnelLayer extends CustomLayer {
-    public TunnelLayer(String name, Object paint) {
+    public TunnelLayer(String name, LayerMode mode, Object paint, Platform platform) {
         super(name, name, DataSize.BIT, 22, paint);
+        if (mode == null) {
+            throw new NullPointerException("mode");
+        }
+        this.mode = mode;
+        fillMode = platform.capabilities.contains(NAME_BASED) ? CAVE_AIR : AIR;
     }
 
     public Mode getRoofMode() {
@@ -195,7 +209,10 @@ public class TunnelLayer extends CustomLayer {
 
     @Override
     public String getType() {
-        return "Cave/Tunnel";
+        return switch (mode) {
+            case CAVE -> "Cave/Tunnel";
+            case FLOATING -> "Floating Dimension";
+        };
     }
 
     public int getFloodLevel() {
@@ -246,40 +263,135 @@ public class TunnelLayer extends CustomLayer {
         this.floorDimensionId = floorDimensionId;
     }
 
+    public FillMode getFillMode() {
+        return fillMode;
+    }
+
+    public void setFillMode(FillMode fillMode) {
+        this.fillMode = fillMode;
+    }
+
+    public int getFillLightLevel() {
+        return fillLightLevel;
+    }
+
+    public void setFillLightLevel(int fillLightLevel) {
+        this.fillLightLevel = fillLightLevel;
+    }
+
+    public MixedMaterial getFillMaterial() {
+        return fillMaterial;
+    }
+
+    public void setFillMaterial(MixedMaterial fillMaterial) {
+        this.fillMaterial = fillMaterial;
+    }
+
+    public LayerMode getLayerMode() {
+        return mode;
+    }
+
+    public EdgeShape getBottomEdgeShape() {
+        return bottomEdgeShape;
+    }
+
+    public void setBottomEdgeShape(EdgeShape bottomEdgeShape) {
+        this.bottomEdgeShape = bottomEdgeShape;
+    }
+
+    public boolean isApplyBiomesAboveGround() {
+        return applyBiomesAboveGround;
+    }
+
+    public void setApplyBiomesAboveGround(boolean applyBiomesAboveGround) {
+        this.applyBiomesAboveGround = applyBiomesAboveGround;
+    }
+
+    public boolean isApplyBiomesBelowGround() {
+        return applyBiomesBelowGround;
+    }
+
+    public void setApplyBiomesBelowGround(boolean applyBiomesBelowGround) {
+        this.applyBiomesBelowGround = applyBiomesBelowGround;
+    }
+
+    public int getBiomeHeightAboveGround() {
+        return biomeHeightAboveGround;
+    }
+
+    public void setBiomeHeightAboveGround(int biomeHeightAboveGround) {
+        this.biomeHeightAboveGround = biomeHeightAboveGround;
+    }
+
+    public boolean isFloorDimensionShapeDirty() {
+        return floorDimensionShapeDirty;
+    }
+
+    public void setFloorDimensionShapeDirty(boolean floorDimensionShapeDirty) {
+        this.floorDimensionShapeDirty = floorDimensionShapeDirty;
+    }
+
+    /**
+     * Ensure that tiles exist in the floor dimension for this layer for all the places where the layer is painted, and
+     * mark out the shape of the layer on the floor dimension using the {@link NotPresentBlock} layer.
+     */
     public Dimension updateFloorDimension(Dimension dimension, String name) {
         final Anchor anchor = dimension.getAnchor();
-        final Dimension floorDimension = dimension.getWorld().getDimension(new Anchor(anchor.dim, CAVE_FLOOR, anchor.invert, floorDimensionId));
+        final Dimension floorDimension = dimension.getWorld().getDimension(new Anchor(anchor.dim, (mode == CAVE) ? CAVE_FLOOR : FLOATING_FLOOR, anchor.invert, floorDimensionId));
         if (name != null) {
             floorDimension.setName(name);
         }
         final TileFactory tileFactory = floorDimension.getTileFactory();
         floorDimension.setEventsInhibited(true);
         try {
+            final Set<Point> tilesToRemove = new HashSet<>(floorDimension.getTileCoords());
             dimension.visitTiles().forFilter(Filter.build(dimension).onlyOn(this).build()).andDo(tile -> {
                 Tile floorTile = floorDimension.getTileForEditing(tile.getX(), tile.getY());
                 if (floorTile == null) {
                     floorTile = tileFactory.createTile(tile.getX(), tile.getY());
                     floorDimension.addTile(floorTile);
-                } else {
-                    floorTile.clearLayerData(NotPresentBlock.INSTANCE);
+                    floorDimensionShapeDirty = true;
                 }
+                boolean anyLayerPresent = false;
                 for (int x = 0; x < TILE_SIZE; x++) {
                     for (int y = 0; y < TILE_SIZE; y++) {
-                        if (! tile.getBitLayerValue(this, x, y)) {
-                            floorTile.setBitLayerValue(NotPresentBlock.INSTANCE, x, y, true);
+                        final boolean layerPresent = tile.getBitLayerValue(this, x, y);
+                        anyLayerPresent |= layerPresent;
+                        if (floorTile.getBitLayerValue(NotPresentBlock.INSTANCE, x, y) == layerPresent) {
+                            floorTile.setBitLayerValue(NotPresentBlock.INSTANCE, x, y, ! layerPresent);
+                            floorDimensionShapeDirty = true;
                         }
                     }
                 }
+                if (anyLayerPresent) {
+                    tilesToRemove.remove(new Point(tile.getX(), tile.getY()));
+                }
             });
+            // tilesToRemove now contains the coordinates of all tiles where the layer _used_ to be present, but is no
+            // longer
+            if (! tilesToRemove.isEmpty()) {
+                // We intentionally don't remove tiles from the floor dimension, in case the change to the layer shape is
+                // undone
+                for (Point coords: tilesToRemove) {
+                    final Tile tileToRemove = floorDimension.getTileForEditing(coords.x, coords.y);
+                    tileToRemove.setBitLayerValue(NotPresentBlock.INSTANCE);
+                }
+                floorDimensionShapeDirty = true;
+            }
         } finally {
             floorDimension.setEventsInhibited(false);
         }
         return floorDimension;
     }
 
+    /**
+     * Ensure that tiles exist in the floor dimension for this layer for all the places where the layer is painted. That
+     * might not be the case if the user has painted the layer in additional places but not then edited the floor
+     * dimension to fill in those places.
+     */
     public void updateFloorDimensionTiles(Dimension dimension) {
         final Anchor anchor = dimension.getAnchor();
-        final Dimension floorDimension = dimension.getWorld().getDimension(new Anchor(anchor.dim, CAVE_FLOOR, anchor.invert, floorDimensionId));
+        final Dimension floorDimension = dimension.getWorld().getDimension(new Anchor(anchor.dim, (mode == CAVE) ? CAVE_FLOOR : FLOATING_FLOOR, anchor.invert, floorDimensionId));
         final TileFactory tileFactory = floorDimension.getTileFactory();
         floorDimension.setEventsInhibited(true);
         try {
@@ -313,14 +425,16 @@ public class TunnelLayer extends CustomLayer {
      */
     public static TunnelLayer find(Dimension floorDimension) {
         final Anchor floorAnchor = floorDimension.getAnchor();
-        if (floorAnchor.role != CAVE_FLOOR) {
-            throw new IllegalArgumentException("Not a CAVE_FLOOR dimension");
+        if ((floorAnchor.role != CAVE_FLOOR) && (floorAnchor.role != FLOATING_FLOOR)){
+            throw new IllegalArgumentException("Not a CAVE_FLOOR or FLOATING_FLOOR dimension");
         }
         final Anchor detailAnchor = new Anchor(floorAnchor.dim, DETAIL, floorAnchor.invert, 0);
         final Dimension detailDimension = floorDimension.getWorld().getDimension(detailAnchor);
+        final LayerMode layerMode = (floorAnchor.role == CAVE_FLOOR) ? CAVE : FLOATING;
         if (detailDimension != null) {
             for (CustomLayer layer: detailDimension.getCustomLayers()) {
                 if ((layer instanceof TunnelLayer)
+                        && (((TunnelLayer) layer).getLayerMode() == layerMode)
                         && (((TunnelLayer) layer).getFloorDimensionId() != null)
                         && (((TunnelLayer) layer).getFloorDimensionId() == floorAnchor.id)) {
                     return (TunnelLayer) layer;
@@ -332,7 +446,7 @@ public class TunnelLayer extends CustomLayer {
         }
     }
 
-    public static boolean isLayerTypeSupportedForFloorDimension(Class<? extends Layer> layerType) {
+    public static boolean isLayerTypeSupportedForCaveFloorDimension(Class<? extends Layer> layerType) {
         return ! (Caves.class.isAssignableFrom(layerType)
                 || Caverns.class.isAssignableFrom(layerType)
                 || Chasms.class.isAssignableFrom(layerType)
@@ -343,13 +457,32 @@ public class TunnelLayer extends CustomLayer {
                 || UndergroundPocketsLayer.class.isAssignableFrom(layerType));
     }
 
-    public static boolean isLayerSupportedForFloorDimension(Layer layer) {
-        if (! isLayerTypeSupportedForFloorDimension(layer.getClass())) {
+    public static boolean isLayerTypeSupportedForFloatingFloorDimension(Class<? extends Layer> layerType) {
+        // TODO support more layers for floating dimensions
+        return isLayerTypeSupportedForCaveFloorDimension(layerType);
+    }
+
+    public static boolean isLayerSupportedForCaveFloorDimension(Layer layer) {
+        if (! isLayerTypeSupportedForCaveFloorDimension(layer.getClass())) {
             return false;
         }
         if (layer instanceof CombinedLayer) {
             for (Layer constituentLayer: ((CombinedLayer) layer).getLayers()) {
-                if (! isLayerSupportedForFloorDimension(constituentLayer)) {
+                if (! isLayerSupportedForCaveFloorDimension(constituentLayer)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    public static boolean isLayerSupportedForFloatingFloorDimension(Layer layer) {
+        if (! isLayerTypeSupportedForFloatingFloorDimension(layer.getClass())) {
+            return false;
+        }
+        if (layer instanceof CombinedLayer) {
+            for (Layer constituentLayer: ((CombinedLayer) layer).getLayers()) {
+                if (! isLayerSupportedForFloatingFloorDimension(constituentLayer)) {
                     return false;
                 }
             }
@@ -361,17 +494,26 @@ public class TunnelLayer extends CustomLayer {
 
     @Override
     public Class<? extends LayerExporter> getExporterType() {
-        return TunnelLayerExporter.class;
+        return switch (mode) {
+            case CAVE -> TunnelLayerExporter.class;
+            case FLOATING -> FloatingLayerExporter.class;
+        };
     }
 
     @Override
-    public TunnelLayerExporter getExporter(Dimension dimension, Platform platform, ExporterSettings settings) {
-        return new TunnelLayerExporter(dimension, platform, this, getHelper(dimension)); // TODO creating the helper is not necessary to do for every exporter instance
+    public AbstractTunnelLayerExporter getExporter(Dimension dimension, Platform platform, ExporterSettings settings) {
+        return switch (mode) {
+            case CAVE -> new TunnelLayerExporter(dimension, platform, this, getHelper(dimension)); // TODO creating the helper is not necessary to do for every exporter instance
+            case FLOATING -> new FloatingLayerExporter(dimension, platform, this, getHelper(dimension)); // TODO creating the helper is not necessary to do for every exporter instance
+        };
     }
 
     @Override
-    public TunnelLayerRenderer getRenderer() {
-        return new TunnelLayerRenderer(this);
+    public PaintRenderer getRenderer() {
+        return switch (mode) {
+            case CAVE -> new TunnelLayerRenderer(this);
+            case FLOATING -> new PaintRenderer(getPaint(), getOpacity());
+        };
     }
 
     @Override
@@ -437,6 +579,7 @@ public class TunnelLayer extends CustomLayer {
         }
     }
 
+    @Serial
     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
         in.defaultReadObject();
 
@@ -461,9 +604,21 @@ public class TunnelLayer extends CustomLayer {
                 floorLayers = null;
             }
         }
+        if (wpVersion < 3) {
+            fillMode = AIR;
+            fillLightLevel = 8;
+        }
+        if (wpVersion < 4) {
+            mode = CAVE;
+        }
+        if (wpVersion < 5) {
+            bottomEdgeShape = LINEAR;
+            biomeHeightAboveGround = 16;
+        }
         wpVersion = CURRENT_WP_VERSION;
     }
 
+    // The "roof" settings double for the bottom of floating dimensions
     Mode roofMode = Mode.FIXED_HEIGHT_ABOVE_FLOOR, floorMode = Mode.FIXED_HEIGHT;
     int roofLevel = 16, floorLevel = 32, floorWallDepth = 4, roofWallDepth = 4, roofMin = Integer.MIN_VALUE, roofMax = Integer.MAX_VALUE, floorMin = Integer.MIN_VALUE, floorMax = Integer.MAX_VALUE, floodLevel = Integer.MIN_VALUE;
     private boolean stalactites, stalagmites, floodWithLava, removeWater;
@@ -474,11 +629,42 @@ public class TunnelLayer extends CustomLayer {
     private int wpVersion = CURRENT_WP_VERSION;
     private List<LayerSettings> orderedFloorLayers, orderedRoofLayers;
     Integer floorDimensionId;
+    private FillMode fillMode;
+    private int fillLightLevel = 8;
+    private MixedMaterial fillMaterial;
+    private LayerMode mode;
+    Integer roofDimensionId;
+    private EdgeShape bottomEdgeShape = SMOOTH;
+    private boolean applyBiomesAboveGround, applyBiomesBelowGround;
+    private int biomeHeightAboveGround = 16;
 
-    private static final int CURRENT_WP_VERSION = 2;
+    private transient boolean floorDimensionShapeDirty;
+
+    private static final int CURRENT_WP_VERSION = 5;
+    @Serial
     private static final long serialVersionUID = 1L;
     
     public enum Mode { FIXED_HEIGHT, CONSTANT_DEPTH, INVERTED_DEPTH, CUSTOM_DIMENSION, FIXED_HEIGHT_ABOVE_FLOOR }
+    public enum FillMode { CAVE_AIR, AIR, LIGHT, MIXED_MATERIAL }
+
+    public enum LayerMode {
+        /**
+         * In cave mode this layer will carve out a void dictated by the floor and roof level settings and apply the
+         * floor features to the terrain at the bottom of the void and the roof features, if any, to the terrain above
+         * the void, if any.
+         */
+        CAVE,
+
+        /**
+         * In floating mode this layer will not carve out a void but place terrain at the level of the floor dimension,
+         * to the depth dictated by the roof level settings. It will apply the floor features to the top of the terrain
+         * and the roof features, if any, to the bottom of the terrain. In this mode the layer must always have a floor
+         * dimension, since it dictates the height of the floor. TODO: explore non-dimension floor level modes?
+         */
+        FLOATING
+    }
+
+    public enum EdgeShape {SHEER, LINEAR, SMOOTH, ROUNDED}
 
     public static class LayerSettings implements Serializable, Cloneable {
         public LayerSettings(int minLevel, int maxLevel) {
@@ -572,6 +758,7 @@ public class TunnelLayer extends CustomLayer {
 
         private Layer layer;
         
+        @Serial
         private static final long serialVersionUID = 1L;
     }
 }

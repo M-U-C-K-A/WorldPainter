@@ -90,6 +90,7 @@ public final class Constants {
     public static final String EVENT_KEY_ACTION_MERGE_WORLD       = "action.mergeWorld";
     public static final String EVENT_KEY_ACTION_OPEN_WORLD        = "action.openWorld";
     public static final String EVENT_KEY_ACTION_SAVE_WORLD        = "action.saveWorld";
+    public static final String EVENT_KEY_ACTION_AUTOSAVE_WORLD    = "action.autosaveWorld";
     public static final String EVENT_KEY_ACTION_MIGRATE_WORLD     = "action.migrateWorld";
     public static final String EVENT_KEY_ACTION_MIGRATE_HEIGHT    = "action.migrateHeight";
     public static final String EVENT_KEY_ACTION_MIGRATE_ROTATION  = "action.migrateRotation";
@@ -114,6 +115,7 @@ public final class Constants {
     public static final Version V_1_16   = new Version(1, 16);
     public static final Version V_1_17   = new Version(1, 17);
     public static final Version V_1_18   = new Version(1, 18);
+    public static final Version V_26_1   = new Version(26, 1);
 
     public static final int MIN_HEIGHT = -8388608;
     public static final int MAX_HEIGHT = 8388608;
@@ -126,4 +128,6 @@ public final class Constants {
      */
     public static final Set<Layer> SYSTEM_LAYERS = ImmutableSet.of(SelectionChunk.INSTANCE, SelectionBlock.INSTANCE,
             FloodWithLava.INSTANCE, NotPresent.INSTANCE, NotPresentBlock.INSTANCE);
+
+    public static final String MESSAGE_KEY_MASTER_WARNING = "org.pepsoft.worldpainter.ImportHeightMapDialog.masterDimension";
 }

@@ -14,14 +14,16 @@ import org.pepsoft.worldpainter.Dimension.Anchor;
 import org.pepsoft.worldpainter.exporting.WorldExportSettings;
 import org.pepsoft.worldpainter.history.HistoryEntry;
 import org.pepsoft.worldpainter.layers.Biome;
+import org.pepsoft.worldpainter.layers.CustomLayer;
 import org.pepsoft.worldpainter.layers.Layer;
+import org.pepsoft.worldpainter.layers.tunnel.TunnelLayer;
 
 import java.awt.*;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.io.*;
-import java.util.List;
 import java.util.*;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -31,10 +33,12 @@ import static java.util.Objects.requireNonNull;
 import static org.pepsoft.minecraft.Material.WOOL_MAGENTA;
 import static org.pepsoft.worldpainter.Constants.*;
 import static org.pepsoft.worldpainter.Dimension.Anchor.*;
+import static org.pepsoft.worldpainter.Dimension.Role.DETAIL;
 import static org.pepsoft.worldpainter.Generator.END;
 import static org.pepsoft.worldpainter.Generator.NETHER;
 import static org.pepsoft.worldpainter.World2.Warning.MISSING_CUSTOM_TERRAINS;
 import static org.pepsoft.worldpainter.biomeschemes.Minecraft1_7Biomes.BIOME_PLAINS;
+import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.LayerMode.FLOATING;
 
 /**
  *
@@ -494,6 +498,19 @@ public class World2 extends InstanceKeeper implements Serializable, Cloneable {
         }
     }
 
+    public Anchor getSpawnPointDimension() {
+        return spawnPointDimension;
+    }
+
+    public void setSpawnPointDimension(Anchor spawnPointDimension) {
+        if (! Objects.equals(spawnPointDimension, this.spawnPointDimension)) {
+            final Anchor oldSpawnPointDimension = this.spawnPointDimension;
+            this.spawnPointDimension = spawnPointDimension;
+            changeNo++;
+            propertyChangeSupport.firePropertyChange("spawnPointDimension", oldSpawnPointDimension, spawnPointDimension);
+        }
+    }
+
     public <T> Optional<T> getAttribute(AttributeKey<T> key) {
         return Optional.ofNullable(
                 (attributes != null)
@@ -518,8 +535,8 @@ public class World2 extends InstanceKeeper implements Serializable, Cloneable {
     }
 
     /**
-     * Transforms all dimensions of this world horizontally. If an undo manager
-     * is installed this operation will destroy all undo info.
+     * Transforms all dimensions of this world horizontally. If an undo manager is installed, this operation will
+     * destroy all undo info. This version also transforms the {@code upIs} property.
      * 
      * @param transform The coordinate transform to apply.
      * @param progressReceiver A progress receiver which will be informed of
@@ -541,9 +558,9 @@ public class World2 extends InstanceKeeper implements Serializable, Cloneable {
     }
     
     /**
-     * Transforms one dimension horizontally. If it's the surface dimension also
-     * transforms any surface-related metadata stored in the world. If an undo
-     * manager is installed this operation will destroy all undo info.
+     * Transforms one dimension horizontally. If it's the surface dimension also transforms any surface-related metadata
+     * stored in the world. If an undo manager is installed, this operation will destroy all undo info. This version
+     * does <em>not</em> transform the {@code upIs} property.
      *
      * @param anchor The anchor of the dimension to transform.
      * @param transform The coordinate transform to apply.
@@ -556,9 +573,6 @@ public class World2 extends InstanceKeeper implements Serializable, Cloneable {
             Point oldSpawnPoint = spawnPoint;
             spawnPoint = transform.transform(spawnPoint);
             propertyChangeSupport.firePropertyChange("spawnPoint", oldSpawnPoint, spawnPoint);
-            Direction oldUpIs = upIs;
-            upIs = transform.inverseTransform(upIs);
-            propertyChangeSupport.firePropertyChange("upIs", oldUpIs, upIs);
         }
         changeNo++;
     }
@@ -849,6 +863,29 @@ public class World2 extends InstanceKeeper implements Serializable, Cloneable {
         if (wpVersion < 12) {
             minHeight = platform.minZ;
         }
+        if (wpVersion < 13) {
+            // Floating dimensions got their own anchor.role
+            final Set<Dimension> dimensionsToAdd = new HashSet<>();
+            for (Iterator<Map.Entry<Anchor, Dimension>> i = dimensionsByAnchor.entrySet().iterator(); i.hasNext(); ) {
+                final Map.Entry<Anchor, Dimension> entry = i.next();
+                if (entry.getKey() == null) {
+                    // If the dimension in question is Configuration.defaultTerrainAndLayerSettings then that dimension
+                    // and its World2 might still be being deserialised at this point, meaning that entry.key is still
+                    // null, as is dimension.anchor. That dimension is never accessed via its anchor, so we just leave
+                    // it like that
+                    continue;
+                }
+                if (entry.getKey().role == Dimension.Role.CAVE_FLOOR) {
+                    final Dimension dimension = entry.getValue();
+                    if (findFloatingLayer(dimension) != null) {
+                        i.remove();
+                        dimension.changeAnchorToFloatingFloor();
+                        dimensionsToAdd.add(dimension);
+                    }
+                }
+            }
+            dimensionsToAdd.forEach(dimension -> dimensionsByAnchor.put(dimension.getAnchor(), dimension));
+        }
         wpVersion = CURRENT_WP_VERSION;
 
         // The number of custom terrains increases now and again; correct old
@@ -856,6 +893,19 @@ public class World2 extends InstanceKeeper implements Serializable, Cloneable {
         if (mixedMaterials.length != Terrain.CUSTOM_TERRAIN_COUNT) {
             mixedMaterials = Arrays.copyOf(mixedMaterials, Terrain.CUSTOM_TERRAIN_COUNT);
         }
+    }
+
+    private TunnelLayer findFloatingLayer(Dimension caveFloorDimension) {
+        final Anchor floorAnchor = caveFloorDimension.getAnchor();
+        for (CustomLayer layer: dimensionsByAnchor.get(new Anchor(floorAnchor.dim, DETAIL, floorAnchor.invert, 0)).getCustomLayers()) {
+            if ((layer instanceof TunnelLayer)
+                    && (((TunnelLayer) layer).getLayerMode() == FLOATING)
+                    && (((TunnelLayer) layer).getFloorDimensionId() != null)
+                    && (((TunnelLayer) layer).getFloorDimensionId() == floorAnchor.id)) {
+                return (TunnelLayer) layer;
+            }
+        }
+        return null;
     }
 
     private String name = "Generated World";
@@ -908,6 +958,7 @@ public class World2 extends InstanceKeeper implements Serializable, Cloneable {
     private WorldExportSettings exportSettings;
     private List<File> dataPacks;
     private int minHeight;
+    private Anchor spawnPointDimension;
     private transient Set<Warning> warnings;
     private transient Map<String, Object> metadata;
     private transient long changeNo;
@@ -919,7 +970,6 @@ public class World2 extends InstanceKeeper implements Serializable, Cloneable {
     @Deprecated
     public static final int BIOME_ALGORITHM_AUTO_BIOMES         =  7; 
     
-    public static final int DEFAULT_MAX_HEIGHT = org.pepsoft.minecraft.Constants.DEFAULT_MAX_HEIGHT_ANVIL;
     public static final long DEFAULT_OCEAN_SEED = 27594263L; // A seed with a large ocean around the origin, and not many mushroom islands nearby. Should be used with Large Biomes
     public static final long DEFAULT_LAND_SEED = 227290L; // A seed with a huge continent around the origin. Should be used with Large Biomes
     
@@ -955,7 +1005,7 @@ public class World2 extends InstanceKeeper implements Serializable, Cloneable {
      */
     public static final String METADATA_KEY_NAME = "name";
 
-    private static final int CURRENT_WP_VERSION = 12;
+    private static final int CURRENT_WP_VERSION = 13;
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(World2.class);
     private static final long serialVersionUID = 2011062401L;

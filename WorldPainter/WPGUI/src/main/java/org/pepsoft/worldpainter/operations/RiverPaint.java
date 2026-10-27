@@ -1,6 +1,8 @@
 package org.pepsoft.worldpainter.operations;
 
-import org.pepsoft.worldpainter.*;
+import org.pepsoft.worldpainter.Dimension;
+import org.pepsoft.worldpainter.Terrain;
+import org.pepsoft.worldpainter.WorldPainterView;
 import org.pepsoft.worldpainter.layers.FloodWithLava;
 
 /**
@@ -12,9 +14,9 @@ import org.pepsoft.worldpainter.layers.FloodWithLava;
  *
  * Created by Pepijn Schmitz on 30-09-15.
  */
-public class RiverPaint extends RadiusOperation {
-    public RiverPaint(WorldPainterView view, RadiusControl radiusControl, MapDragControl mapDragControl) {
-        super("RiverPaint", "Paint a river of water or lava", view, radiusControl, mapDragControl, 100, "operation.riverPaint", "river");
+public class RiverPaint extends AbstractBrushOperation {
+    public RiverPaint(WorldPainterView view) {
+        super("RiverPaint", "Paint a river of water or lava", view, 100, "operation.riverPaint", "river");
     }
 
     @Override

@@ -28,10 +28,17 @@ import org.pepsoft.worldpainter.tools.Eyedropper.PaintType;
 import org.pepsoft.worldpainter.tools.Eyedropper.SelectionListener;
 
 import javax.swing.*;
-import java.util.Arrays;
+import java.awt.event.ActionEvent;
+import java.io.Serial;
 import java.util.EnumSet;
 import java.util.Set;
 
+import static java.awt.event.KeyEvent.VK_Z;
+import static java.util.Arrays.asList;
+import static javax.swing.JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT;
+import static javax.swing.KeyStroke.getKeyStroke;
+import static org.pepsoft.util.DesktopUtils.PLATFORM_COMMAND_MASK;
+import static org.pepsoft.util.DesktopUtils.beep;
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE;
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE_BITS;
 import static org.pepsoft.worldpainter.biomeschemes.Minecraft1_7Biomes.BIOME_PLAINS;
@@ -43,8 +50,10 @@ import static org.pepsoft.worldpainter.tools.Eyedropper.PaintType.*;
  *
  * @author pepijn
  */
+@SuppressWarnings({"unused", "FieldCanBeLocal"}) // Managed by NetBeans
 public class FillDialog extends WPDialogWithPaintSelection implements Listener, MapSelectionListener {
     /** Creates new form FillDialog */
+    @SuppressWarnings("MagicConstant")
     public FillDialog(App app, Dimension dimension, Layer[] layers, ColourScheme colourScheme, Integer[] biomes, CustomBiomeManager customBiomeManager, WorldPainterView view, ObservableBoolean selectionState) {
         super(app);
         this.dimension = dimension;
@@ -61,29 +70,43 @@ public class FillDialog extends WPDialogWithPaintSelection implements Listener, 
         brushOptions1.setMaxHeight(dimension.getMaxHeight());
         brushOptions1.setSelectionState(selectionState);
 
-        comboBoxBiome.setModel(new DefaultComboBoxModel(biomes));
+        comboBoxBiome.setModel(new DefaultComboBoxModel<>(biomes));
         comboBoxBiome.setRenderer(new BiomeListCellRenderer(colourScheme, customBiomeManager, platform));
         
-        comboBoxSetLayer.setModel(new DefaultComboBoxModel(layers));
+        comboBoxSetLayer.setModel(new DefaultComboBoxModel<>(layers));
         comboBoxSetLayer.setRenderer(new LayerListCellRenderer());
-        
-        Set<Layer> layersInUse = dimension.getAllLayers(false);
-        layersInUse.removeAll(Arrays.asList(Biome.INSTANCE, FloodWithLava.INSTANCE, SelectionBlock.INSTANCE, SelectionChunk.INSTANCE, NotPresent.INSTANCE, NotPresentBlock.INSTANCE));
-        if (! layersInUse.isEmpty()) {
-            comboBoxClearLayer.setModel(new DefaultComboBoxModel(layersInUse.toArray(new Layer[layersInUse.size()])));
-            comboBoxClearLayer.setRenderer(new LayerListCellRenderer());
-        } else {
-            comboBoxClearLayer.setEnabled(false);
-            radioButtonClearLayer.setEnabled(false);
-        }
 
-        comboBoxInvertLayer.setModel(new DefaultComboBoxModel(layers));
+        initClearLayer();
+
+        comboBoxInvertLayer.setModel(new DefaultComboBoxModel<>(layers));
         comboBoxInvertLayer.setRenderer(new LayerListCellRenderer());
 
         brushOptions1.setListener(this);
         brushOptions1.setMapSelectionListener(this);
-        
-        getRootPane().setDefaultButton(buttonFill);
+
+        ((SpinnerNumberModel) spinnerTerrainHeight.getModel()).setMinimum(dimension.getMinHeight());
+        ((SpinnerNumberModel) spinnerTerrainHeight.getModel()).setMaximum(dimension.getMaxHeight() - 1);
+        final TileFactory tileFactory = dimension.getTileFactory();
+        if (tileFactory instanceof HeightMapTileFactory) {
+            spinnerTerrainHeight.setValue(((HeightMapTileFactory) tileFactory).getWaterHeight());
+        } else {
+            spinnerTerrainHeight.setValue(62);
+        }
+
+        ActionMap actionMap = rootPane.getActionMap();
+        actionMap.put("undo", new AbstractAction("undo") {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                undo();
+            }
+
+            @Serial
+            private static final long serialVersionUID = 1L;
+        });
+
+        InputMap inputMap = rootPane.getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
+        inputMap.put(getKeyStroke(VK_Z, PLATFORM_COMMAND_MASK), "undo");
+        rootPane.setDefaultButton(buttonFill);
 
         scaleToUI();
         pack();
@@ -153,6 +176,22 @@ public class FillDialog extends WPDialogWithPaintSelection implements Listener, 
         });
     }
 
+    private void initClearLayer() {
+        Set<Layer> layersInUse = dimension.getAllLayers(false);
+        layersInUse.removeAll(asList(Biome.INSTANCE, FloodWithLava.INSTANCE, SelectionBlock.INSTANCE, SelectionChunk.INSTANCE, NotPresent.INSTANCE, NotPresentBlock.INSTANCE));
+        if (! layersInUse.isEmpty()) {
+            radioButtonClearLayer.setEnabled(true);
+            comboBoxClearLayer.setModel(new DefaultComboBoxModel<>(layersInUse.toArray(new Layer[layersInUse.size()])));
+            comboBoxClearLayer.setRenderer(new LayerListCellRenderer());
+        } else {
+            if (radioButtonClearLayer.isSelected()) {
+                buttonGroup1.clearSelection();
+            }
+            radioButtonClearLayer.setEnabled(false);
+            comboBoxClearLayer.setModel(new DefaultComboBoxModel<>());
+        }
+    }
+
     private void setControlStates() {
         comboBoxTerrain.setEnabled(radioButtonTerrain.isSelected());
         buttonFillTerrainSelectOnMap.setEnabled(radioButtonTerrain.isSelected());
@@ -165,7 +204,9 @@ public class FillDialog extends WPDialogWithPaintSelection implements Listener, 
         buttonInvertLayerSelectOnMap.setEnabled(radioButtonInvertLayer.isSelected());
         comboBoxBiome.setEnabled(radioButtonBiome.isSelected());
         buttonFillBiomeSelectOnMap.setEnabled(radioButtonBiome.isSelected());
-        buttonFill.setEnabled(radioButtonTerrain.isSelected() || radioButtonSetLayer.isSelected() || radioButtonClearLayer.isSelected() || radioButtonInvertLayer.isSelected() || radioButtonBiome.isSelected() || radioButtonResetBiomes.isSelected() || radioButtonResetWater.isSelected() || radioButtonResetTerrain.isSelected() || radioButtonMakeBiomesPermanent.isSelected() || radioButtonAddToSelection.isSelected() || radioButtonRemoveFromSelection.isSelected());
+        comboBoxTerrainOperation.setEnabled(radioButtonTerrainHeight.isSelected());
+        spinnerTerrainHeight.setEnabled(radioButtonTerrainHeight.isSelected());
+        buttonFill.setEnabled(radioButtonTerrain.isSelected() || radioButtonSetLayer.isSelected() || radioButtonClearLayer.isSelected() || radioButtonInvertLayer.isSelected() || radioButtonBiome.isSelected() || radioButtonResetBiomes.isSelected() || radioButtonResetWater.isSelected() || radioButtonResetTerrain.isSelected() || radioButtonMakeBiomesPermanent.isSelected() || radioButtonAddToSelection.isSelected() || radioButtonRemoveFromSelection.isSelected() || radioButtonTerrainHeight.isSelected());
     }
     
     private void fill() {
@@ -173,7 +214,7 @@ public class FillDialog extends WPDialogWithPaintSelection implements Listener, 
         dimension.rememberChanges();
         view.setInhibitUpdates(true);
         try {
-            Dimension result = ProgressDialog.executeTask(this, new ProgressTask<Dimension>() {
+            Dimension result = ProgressDialog.executeTask(this, new ProgressTask<>() {
                 @Override
                 public String getName() {
                     if (radioButtonTerrain.isSelected()) {
@@ -198,6 +239,12 @@ public class FillDialog extends WPDialogWithPaintSelection implements Listener, 
                         return "Adding to selection";
                     } else if (radioButtonRemoveFromSelection.isSelected()) {
                         return "Removing from selection";
+                    } else if (radioButtonTerrainHeight.isSelected()) {
+                        return switch ((String) comboBoxTerrainOperation.getSelectedItem()) {
+                            case "raise" -> "Raising terrain level to " + spinnerTerrainHeight.getValue();
+                            case "lower" -> "Lowering terrain level to " + spinnerTerrainHeight.getValue();
+                            default -> "Setting terrain level to " + spinnerTerrainHeight.getValue();
+                        };
                     } else {
                         throw new InternalError();
                     }
@@ -227,6 +274,8 @@ public class FillDialog extends WPDialogWithPaintSelection implements Listener, 
                         addToSelection(progressReceiver);
                     } else if (radioButtonRemoveFromSelection.isSelected()) {
                         removeFromSelection(progressReceiver);
+                    } else if (radioButtonTerrainHeight.isSelected()) {
+                        changeTerrainHeight(progressReceiver);
                     }
                     return dimension;
                 }
@@ -245,6 +294,9 @@ public class FillDialog extends WPDialogWithPaintSelection implements Listener, 
                     ok();
                 } else {
                     buttonCancel.setText("Close");
+                    initClearLayer();
+                    setControlStates();
+                    buttonUndo.setEnabled(true);
                 }
             }
         } finally {
@@ -765,9 +817,106 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
             }, progressReceiver);
         }
     }
+
+    private void changeTerrainHeight(ProgressReceiver progressReceiver) throws OperationCancelled {
+        dimension.visitTilesForEditing().forFilter(filter).andDo(tile -> {
+            final int worldTileX = tile.getX() << TILE_SIZE_BITS;
+            final int worldTileY = tile.getY() << TILE_SIZE_BITS;
+            final float selectedHeight = (Integer) spinnerTerrainHeight.getValue();
+            final boolean filterSet = filter != null;
+            switch ((String) comboBoxTerrainOperation.getSelectedItem()) {
+                case "raise terrain height to":
+                    for (int x = 0; x < TILE_SIZE; x++) {
+                        for (int y = 0; y < TILE_SIZE; y++) {
+                            final float strength = filterSet
+                                    ? filter.modifyStrength(worldTileX | x, worldTileY | y, 1.0f)
+                                    : 1.0f;
+                            if (strength > 0.0f) {
+                                final float currentHeight = tile.getHeight(x, y);
+                                if (currentHeight < selectedHeight) {
+                                    tile.setHeight(x, y, (strength < 1.0f)
+                                            ? (strength * selectedHeight) + ((1.0f - strength) * currentHeight)
+                                            : selectedHeight);
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case "raise terrain height by":
+                    final int maxZ = dimension.getMaxHeight() - 1;
+                    for (int x = 0; x < TILE_SIZE; x++) {
+                        for (int y = 0; y < TILE_SIZE; y++) {
+                            final float strength = filterSet
+                                    ? filter.modifyStrength(worldTileX | x, worldTileY | y, 1.0f)
+                                    : 1.0f;
+                            if (strength > 0.0f) {
+                                final float currentHeight = tile.getHeight(x, y);
+                                final float targetHeight = Math.min(currentHeight + selectedHeight, maxZ);
+                                if (currentHeight < targetHeight) {
+                                    tile.setHeight(x, y, (strength < 1.0f)
+                                            ? (strength * targetHeight) + ((1.0f - strength) * currentHeight)
+                                            : targetHeight);
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case "lower terrain height to":
+                    for (int x = 0; x < TILE_SIZE; x++) {
+                        for (int y = 0; y < TILE_SIZE; y++) {
+                            final float strength = filterSet
+                                    ? filter.modifyStrength(worldTileX | x, worldTileY | y, 1.0f)
+                                    : 1.0f;
+                            if (strength > 0.0f) {
+                                final float currentHeight = tile.getHeight(x, y);
+                                if (currentHeight > selectedHeight) {
+                                    tile.setHeight(x, y, (strength < 1.0f)
+                                            ? (strength * selectedHeight) + ((1.0f - strength) * currentHeight)
+                                            : selectedHeight);
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case "lower terrain height by":
+                    final int minZ = dimension.getMinHeight();
+                    for (int x = 0; x < TILE_SIZE; x++) {
+                        for (int y = 0; y < TILE_SIZE; y++) {
+                            final float strength = filterSet
+                                    ? filter.modifyStrength(worldTileX | x, worldTileY | y, 1.0f)
+                                    : 1.0f;
+                            if (strength > 0.0f) {
+                                final float currentHeight = tile.getHeight(x, y);
+                                final float targetHeight = Math.max(currentHeight - selectedHeight, minZ);
+                                if (currentHeight > targetHeight) {
+                                    tile.setHeight(x, y, (strength < 1.0f)
+                                            ? (strength * targetHeight) + ((1.0f - strength) * currentHeight)
+                                            : targetHeight);
+                                }
+                            }
+                        }
+                    }
+                    break;
+                default:
+                    for (int x = 0; x < TILE_SIZE; x++) {
+                        for (int y = 0; y < TILE_SIZE; y++) {
+                            final float strength = filterSet
+                                    ? filter.modifyStrength(worldTileX | x, worldTileY | y, 1.0f)
+                                    : 1.0f;
+                            if (strength > 0.0f) {
+                                tile.setHeight(x, y, (strength < 1.0f)
+                                        ? (strength * selectedHeight) + ((1.0f - strength) * tile.getHeight(x, y))
+                                        : selectedHeight);
+                            }
+                        }
+                    }
+                    break;
+            }
+        }, progressReceiver);
+    }
     
     private void selectOnMap(JComboBox<?> comboBox, PaintType... paintTypes) {
-        selectFromMap(EnumSet.copyOf(Arrays.asList(paintTypes)), new SelectionListener() {
+        selectFromMap(EnumSet.copyOf(asList(paintTypes)), new SelectionListener() {
             @Override
             public void terrainSelected(Terrain terrain) {
                 comboBox.setSelectedItem(terrain);
@@ -786,12 +935,21 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
         });
     }
 
+    private void undo() {
+        if (app.performUndo()) {
+            initClearLayer();
+            setControlStates();
+        } else {
+            beep();
+        }
+    }
+
     /** This method is called from within the constructor to
      * initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is
      * always regenerated by the Form Editor.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "DataFlowIssue", "Convert2Lambda", "Anonymous2MethodRef"}) // Managed by NetBeans
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
@@ -803,17 +961,17 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
         brushOptions1 = new org.pepsoft.worldpainter.panels.BrushOptions();
         jPanel1 = new javax.swing.JPanel();
         sliderLayerValue = new javax.swing.JSlider();
-        comboBoxBiome = new javax.swing.JComboBox();
+        comboBoxBiome = new javax.swing.JComboBox<>();
         radioButtonSetLayer = new javax.swing.JRadioButton();
         radioButtonResetBiomes = new javax.swing.JRadioButton();
         radioButtonClearLayer = new javax.swing.JRadioButton();
         radioButtonResetTerrain = new javax.swing.JRadioButton();
         radioButtonTerrain = new javax.swing.JRadioButton();
-        comboBoxClearLayer = new javax.swing.JComboBox();
+        comboBoxClearLayer = new javax.swing.JComboBox<>();
         radioButtonResetWater = new javax.swing.JRadioButton();
-        comboBoxSetLayer = new javax.swing.JComboBox();
-        comboBoxInvertLayer = new javax.swing.JComboBox();
-        comboBoxTerrain = new javax.swing.JComboBox();
+        comboBoxSetLayer = new javax.swing.JComboBox<>();
+        comboBoxInvertLayer = new javax.swing.JComboBox<>();
+        comboBoxTerrain = new javax.swing.JComboBox<>();
         radioButtonInvertLayer = new javax.swing.JRadioButton();
         radioButtonBiome = new javax.swing.JRadioButton();
         radioButtonMakeBiomesPermanent = new javax.swing.JRadioButton();
@@ -824,6 +982,9 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
         buttonRemoveLayerSelectOnMap = new javax.swing.JButton();
         buttonInvertLayerSelectOnMap = new javax.swing.JButton();
         buttonFillBiomeSelectOnMap = new javax.swing.JButton();
+        radioButtonTerrainHeight = new javax.swing.JRadioButton();
+        comboBoxTerrainOperation = new javax.swing.JComboBox<>();
+        spinnerTerrainHeight = new javax.swing.JSpinner();
         jLabel3 = new javax.swing.JLabel();
         jLabel4 = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
@@ -833,6 +994,7 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
         checkBoxKeepOpen = new javax.swing.JCheckBox();
         jLabel8 = new javax.swing.JLabel();
         jLabel9 = new javax.swing.JLabel();
+        buttonUndo = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("Global Operations");
@@ -1019,6 +1181,19 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
             }
         });
 
+        buttonGroup1.add(radioButtonTerrainHeight);
+        radioButtonTerrainHeight.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                radioButtonTerrainHeightActionPerformed(evt);
+            }
+        });
+
+        comboBoxTerrainOperation.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "raise terrain height to", "raise terrain height by", "set terrain height to", "lower terrain height to", "lower terrain height by" }));
+        comboBoxTerrainOperation.setEnabled(false);
+
+        spinnerTerrainHeight.setModel(new javax.swing.SpinnerNumberModel(62, -64, 384, 1));
+        spinnerTerrainHeight.setEnabled(false);
+
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
@@ -1063,8 +1238,14 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
                     .addComponent(radioButtonMakeBiomesPermanent)
                     .addComponent(radioButtonAddToSelection)
                     .addComponent(radioButtonRemoveFromSelection)
-                    .addComponent(radioButtonResetWater))
-                .addContainerGap())
+                    .addComponent(radioButtonResetWater)
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addComponent(radioButtonTerrainHeight)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(comboBoxTerrainOperation, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(spinnerTerrainHeight, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addGap(33, 33, 33))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1078,6 +1259,12 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
                 .addComponent(radioButtonResetTerrain)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(radioButtonResetWater)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addComponent(radioButtonTerrainHeight)
+                    .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(comboBoxTerrainOperation, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(spinnerTerrainHeight, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addGroup(jPanel1Layout.createSequentialGroup()
@@ -1169,6 +1356,15 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
             }
         });
 
+        buttonUndo.setText("Undo");
+        buttonUndo.setToolTipText("Undo the most recent action");
+        buttonUndo.setEnabled(false);
+        buttonUndo.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                buttonUndoActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -1204,6 +1400,8 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(checkBoxKeepOpen)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(buttonUndo)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(buttonFill)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(buttonCancel)
@@ -1235,7 +1433,8 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(buttonCancel)
                     .addComponent(buttonFill)
-                    .addComponent(checkBoxKeepOpen))
+                    .addComponent(checkBoxKeepOpen)
+                    .addComponent(buttonUndo))
                 .addContainerGap())
         );
 
@@ -1334,6 +1533,14 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
         selectOnMap(comboBoxBiome, BIOME);
     }//GEN-LAST:event_buttonFillBiomeSelectOnMapActionPerformed
 
+    private void radioButtonTerrainHeightActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_radioButtonTerrainHeightActionPerformed
+        setControlStates();
+    }//GEN-LAST:event_radioButtonTerrainHeightActionPerformed
+
+    private void buttonUndoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonUndoActionPerformed
+        undo();
+    }//GEN-LAST:event_buttonUndoActionPerformed
+
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private org.pepsoft.worldpainter.panels.BrushOptions brushOptions1;
     private javax.swing.JButton buttonCancel;
@@ -1344,12 +1551,14 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
     private javax.swing.ButtonGroup buttonGroup1;
     private javax.swing.JButton buttonInvertLayerSelectOnMap;
     private javax.swing.JButton buttonRemoveLayerSelectOnMap;
+    private javax.swing.JButton buttonUndo;
     private javax.swing.JCheckBox checkBoxKeepOpen;
-    private javax.swing.JComboBox comboBoxBiome;
-    private javax.swing.JComboBox comboBoxClearLayer;
-    private javax.swing.JComboBox comboBoxInvertLayer;
-    private javax.swing.JComboBox comboBoxSetLayer;
-    private javax.swing.JComboBox comboBoxTerrain;
+    private javax.swing.JComboBox<Integer> comboBoxBiome;
+    private javax.swing.JComboBox<Layer> comboBoxClearLayer;
+    private javax.swing.JComboBox<Layer> comboBoxInvertLayer;
+    private javax.swing.JComboBox<Layer> comboBoxSetLayer;
+    private javax.swing.JComboBox<Terrain> comboBoxTerrain;
+    private javax.swing.JComboBox<String> comboBoxTerrainOperation;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
@@ -1372,7 +1581,9 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
     private javax.swing.JRadioButton radioButtonResetWater;
     private javax.swing.JRadioButton radioButtonSetLayer;
     private javax.swing.JRadioButton radioButtonTerrain;
+    private javax.swing.JRadioButton radioButtonTerrainHeight;
     private javax.swing.JSlider sliderLayerValue;
+    private javax.swing.JSpinner spinnerTerrainHeight;
     // End of variables declaration//GEN-END:variables
 
     private final ColourScheme colourScheme;

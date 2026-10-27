@@ -13,6 +13,7 @@ import ch.qos.logback.core.util.StatusPrinter;
 import org.pepsoft.util.plugins.PluginManager;
 import org.pepsoft.worldpainter.Configuration;
 import org.pepsoft.worldpainter.Version;
+import org.pepsoft.worldpainter.WPContext;
 import org.pepsoft.worldpainter.layers.Layer;
 import org.pepsoft.worldpainter.plugins.WPPluginManager;
 import org.pepsoft.worldpainter.tools.scripts.ScriptingContext;
@@ -51,7 +52,7 @@ public class ScriptingTool {
         StatusPrinter.printInCaseOfErrorsOrWarnings(logContext);
 
         System.err.println("WorldPainter scripting host version " + Version.VERSION + ".\n" +
-                "Copyright 2011-2023 pepsoft.org, The Netherlands.\n" +
+                "Copyright 2011-2026 pepsoft.org, The Netherlands.\n" +
                 "This is free software distributed under the terms of the GPL, version 3, a copy\n" +
                 "of which you can find in the installation directory.\n");
 
@@ -125,7 +126,7 @@ public class ScriptingTool {
         } else {
             logger.error("Trusted root certificate not available; not loading plugins");
         }
-        WPPluginManager.initialise(config.getUuid());
+        WPPluginManager.initialise(config.getUuid(), WPContext.INSTANCE);
 
         if (args.length > 1) {
             System.err.print("Executing script \"" + scriptFileName + "\" with arguments ");

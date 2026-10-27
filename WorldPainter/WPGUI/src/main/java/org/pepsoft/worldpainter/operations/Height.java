@@ -6,8 +6,6 @@
 package org.pepsoft.worldpainter.operations;
 
 import org.pepsoft.worldpainter.Dimension;
-import org.pepsoft.worldpainter.MapDragControl;
-import org.pepsoft.worldpainter.RadiusControl;
 import org.pepsoft.worldpainter.WorldPainter;
 import org.pepsoft.worldpainter.panels.DefaultFilter;
 
@@ -17,25 +15,15 @@ import javax.swing.*;
  *
  * @author pepijn
  */
-public class Height extends RadiusOperation {
-    public Height(WorldPainter view, RadiusControl radiusControl, MapDragControl mapDragControl) {
-        super("Height", "Raise or lower the terrain", view, radiusControl, mapDragControl, 100, "operation.height");
+public class Height extends AbstractBrushOperation {
+    public Height(WorldPainter view) {
+        super("Height", "Raise or lower the terrain", view, 100, "operation.height");
     }
 
     @Override
     public JPanel getOptionsPanel() {
         return optionsPanel;
     }
-
-//    @Override
-//    protected void altPressed() {
-//        dimensionSnapshot = getDimension().getSnapshot();
-//    }
-//
-//    @Override
-//    protected void altReleased() {
-//        dimensionSnapshot = null;
-//    }
 
     @Override
     protected void tick(int centreX, int centreY, boolean inverse, boolean first, float dynamicLevel) {
@@ -89,5 +77,4 @@ public class Height extends RadiusOperation {
 
     private final TerrainShapingOptions<Height> options = new TerrainShapingOptions<>();
     private final TerrainShapingOptionsPanel optionsPanel = new TerrainShapingOptionsPanel("Height", "<ul><li>Left-click to raise the terrain<li>Right-click to lower the terrain</ul>", options);
-//    private Dimension dimensionSnapshot;
 }

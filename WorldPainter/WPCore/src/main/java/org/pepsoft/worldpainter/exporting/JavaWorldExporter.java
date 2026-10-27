@@ -9,8 +9,8 @@ import org.pepsoft.minecraft.*;
 import org.pepsoft.minecraft.SuperflatPreset.Structure;
 import org.pepsoft.util.FileUtils;
 import org.pepsoft.util.ProgressReceiver;
-import org.pepsoft.worldpainter.Dimension;
 import org.pepsoft.worldpainter.*;
+import org.pepsoft.worldpainter.Dimension;
 import org.pepsoft.worldpainter.Dimension.Anchor;
 import org.pepsoft.worldpainter.history.HistoryEntry;
 import org.pepsoft.worldpainter.platforms.JavaPlatformProvider;
@@ -37,7 +37,7 @@ import static org.pepsoft.worldpainter.Dimension.Border.ENDLESS_BARRIER;
 import static org.pepsoft.worldpainter.Dimension.Border.ENDLESS_WATER;
 import static org.pepsoft.worldpainter.Dimension.Role.DETAIL;
 import static org.pepsoft.worldpainter.Platform.Capability.GENERATOR_PER_DIMENSION;
-import static org.pepsoft.worldpainter.biomeschemes.Minecraft1_20Biomes.*;
+import static org.pepsoft.worldpainter.biomeschemes.Minecraft1_21Biomes.*;
 import static org.pepsoft.worldpainter.util.BiomeUtils.getBiomeScheme;
 
 /**
@@ -87,8 +87,16 @@ public class JavaWorldExporter extends AbstractWorldExporter { // TODO can this 
                     }
                 }
                 spawnPoint = new Point((minX + maxX) / 2, (minY + maxY) / 2);
+                // TODO if the spawn point was not on the surface, figure out if its dimension exists here as well and if so place it there
+                level.setSpawn(DIM_NORMAL, spawnPoint.x, Math.max(getIntHeightAt(DIM_NORMAL, spawnPoint.x, spawnPoint.y), getWaterLevelAt(DIM_NORMAL, spawnPoint.x, spawnPoint.y)) + 1, spawnPoint.y);
+            } else {
+                if (world.getSpawnPointDimension() != null) {
+                    final Dimension spawnDimension = world.getDimension(world.getSpawnPointDimension());
+                    level.setSpawn(DIM_NORMAL, spawnPoint.x, Math.max(spawnDimension.getIntHeightAt(spawnPoint.x, spawnPoint.y), spawnDimension.getWaterLevelAt(spawnPoint.x, spawnPoint.y)) + 1, spawnPoint.y);
+                } else {
+                    level.setSpawn(DIM_NORMAL, spawnPoint.x, Math.max(getIntHeightAt(DIM_NORMAL, spawnPoint.x, spawnPoint.y), getWaterLevelAt(DIM_NORMAL, spawnPoint.x, spawnPoint.y)) + 1, spawnPoint.y);
+                }
             }
-            level.setSpawn(spawnPoint.x, Math.max(getIntHeightAt(DIM_NORMAL, spawnPoint.x, spawnPoint.y), getWaterLevelAt(DIM_NORMAL, spawnPoint.x, spawnPoint.y)) + 1,spawnPoint.y);
         }
 
         if (world.getGameType() == GameType.HARDCORE) {
@@ -335,20 +343,7 @@ public class JavaWorldExporter extends AbstractWorldExporter { // TODO can this 
     protected ChunkFactory.Stats exportDimension(File worldDir, Dimension dimension, ProgressReceiver progressReceiver) {
         return doWithMdcContext(() -> {
             final Anchor anchor = dimension.getAnchor();
-            final File dimensionDir;
-            switch (anchor.dim) {
-                case DIM_NORMAL:
-                    dimensionDir = worldDir;
-                    break;
-                case DIM_NETHER:
-                    dimensionDir = new File(worldDir, "DIM-1");
-                    break;
-                case DIM_END:
-                    dimensionDir = new File(worldDir, "DIM1");
-                    break;
-                default:
-                    throw new IllegalArgumentException("Dimension " + anchor.dim + " not supported");
-            }
+            final File dimensionDir = platformProvider.getDimensionDir(platform, worldDir, anchor.dim);
             for (DataType dataType: platformProvider.getDataTypes(platform)) {
                 File regionDir = new File(dimensionDir, dataType.name().toLowerCase());
                 if (! regionDir.exists()) {

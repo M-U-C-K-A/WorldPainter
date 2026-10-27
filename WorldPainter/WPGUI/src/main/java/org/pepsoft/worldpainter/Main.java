@@ -42,8 +42,8 @@ import java.nio.file.StandardOpenOption;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.util.List;
 import java.util.*;
+import java.util.List;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
@@ -65,6 +65,16 @@ public class Main {
     public static void main(String[] args) throws IOException {
         // Force language to English for now. TODO: remove this once the first translations are implemented
         Locale.setDefault(Locale.US);
+
+        // Check that this is not a headless runtime. Do it this early because we have seen exceptions from the uncaught
+        // exception handler on headless runtimes in the wild, which is the next thing we install after this
+        if (GraphicsEnvironment.isHeadless()) {
+            System.err.printf("The Java runtime (%s %s, version %s) is headless.%nPlease install a complete Java runtime (or make it the default).%n",
+                    System.getProperty("java.vm.vendor"),
+                    System.getProperty("java.vm.name"),
+                    System.getProperty("java.vm.version"));
+            System.exit(1);
+        }
 
         Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler());
 
@@ -307,7 +317,7 @@ public class Main {
         } else {
             logger.info("[SAFE MODE] Not loading plugins");
         }
-        WPPluginManager.initialise(config.getUuid());
+        WPPluginManager.initialise(config.getUuid(), WPContext.INSTANCE);
         // Load all the platform descriptors to ensure that when worlds containing older versions of them are loaded
         // later they are replaced with the current versions, rather than the other way around
         for (Platform platform : PlatformManager.getInstance().getAllPlatforms()) {
@@ -505,6 +515,7 @@ public class Main {
                     }
                     myConfig.setMessageDisplayed(SNAPSHOT_MESSAGE_KEY);
                 }
+
                 if (world != null) {
                     // On a Mac we may be doing this unnecessarily because we may be opening a .world file, but it has
                     // proven difficult to detect that. TODO

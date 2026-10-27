@@ -60,26 +60,22 @@ import org.pepsoft.worldpainter.tools.Eyedropper.PaintType;
 import org.pepsoft.worldpainter.tools.Eyedropper.SelectionListener;
 import org.pepsoft.worldpainter.tools.RespawnPlayerDialog;
 import org.pepsoft.worldpainter.tools.scripts.ScriptRunner;
+import org.pepsoft.worldpainter.util.*;
 import org.pepsoft.worldpainter.util.BetterAction;
 import org.pepsoft.worldpainter.util.FileFilter;
 import org.pepsoft.worldpainter.util.FileUtils;
-import org.pepsoft.worldpainter.util.*;
 import org.pepsoft.worldpainter.vo.AttributeKeyVO;
 import org.pepsoft.worldpainter.vo.EventVO;
 import org.pepsoft.worldpainter.vo.UsageVO;
 
 import javax.imageio.ImageIO;
+import javax.swing.*;
 import javax.swing.Box;
 import javax.swing.Timer;
-import javax.swing.*;
 import javax.swing.border.BevelBorder;
-import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.geom.AffineTransform;
-import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
-import java.awt.image.BufferedImageOp;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyVetoException;
@@ -90,16 +86,16 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.text.MessageFormat;
 import java.text.NumberFormat;
-import java.util.List;
 import java.util.*;
+import java.util.List;
 import java.util.function.Function;
 import java.util.zip.GZIPInputStream;
 
 import static com.jidesoft.docking.DockContext.DOCK_SIDE_EAST;
 import static com.jidesoft.docking.DockContext.DOCK_SIDE_WEST;
-import static com.jidesoft.docking.DockableFrame.*;
 import static java.awt.Color.BLACK;
 import static java.awt.Color.WHITE;
+import static java.awt.GridBagConstraints.HORIZONTAL;
 import static java.awt.event.ComponentEvent.COMPONENT_RESIZED;
 import static java.awt.event.KeyEvent.*;
 import static java.lang.Math.round;
@@ -112,8 +108,10 @@ import static javax.swing.KeyStroke.getKeyStroke;
 import static org.pepsoft.minecraft.Constants.*;
 import static org.pepsoft.util.AwtUtils.doLaterOnEventThread;
 import static org.pepsoft.util.AwtUtils.doOnEventThread;
+import static org.pepsoft.util.DesktopUtils.PLATFORM_COMMAND_MASK;
 import static org.pepsoft.util.GUIUtils.getUIScale;
 import static org.pepsoft.util.IconUtils.*;
+import static org.pepsoft.util.MathUtils.mod;
 import static org.pepsoft.util.swing.MessageUtils.*;
 import static org.pepsoft.util.swing.ProgressDialog.NOT_CANCELABLE;
 import static org.pepsoft.util.swing.ProgressDialog.NO_FOCUS_STEALING;
@@ -142,9 +140,10 @@ import static org.pepsoft.worldpainter.util.BiomeUtils.getBiomeScheme;
  *
  * @author pepijn
  */
-public final class App extends JFrame implements RadiusControl,
+@SuppressWarnings("MagicConstant")
+public final class App extends JFrame implements BrushControl,
         BiomesViewerFrame.SeedListener, BrushOptions.Listener, CustomBiomeListener,
-        DockableHolder, PropertyChangeListener, Dimension.Listener, Tile.Listener {
+        DockableHolder, PropertyChangeListener, Dimension.Listener, Tile.Listener, MapDragControl {
     private App() {
         super((mode == Mode.WORLDPAINTER) ? "WorldPainter" : "MinecraftMapEditor"); // NOI18N
 
@@ -189,6 +188,7 @@ public final class App extends JFrame implements RadiusControl,
             installMacCustomisations();
         }
 
+        MainFrame.setMainFrame(this);
         initComponents();
 
         getRootPane().putClientProperty(KEY_HELP_KEY, "Main");
@@ -280,7 +280,6 @@ public final class App extends JFrame implements RadiusControl,
             logger.info("High resolution display support enabled. Scale: {}", getUIScale());
         }
 
-        MainFrame.setMainFrame(this);
         mapSelectionController = new MapSelectionController(this, view);
 
         PlantLayerEditor.loadIconsInBackground();
@@ -448,6 +447,7 @@ public final class App extends JFrame implements RadiusControl,
                         }
                         break;
                     case CAVE_FLOOR:
+                    case FLOATING_FLOOR:
                         // Keep the surface dimension in sync with the last edited cave floor
                         detailDimension = world.getDimension(new Anchor(anchor.dim, DETAIL, anchor.invert, 0));
                         detailDimension.setLastViewPosition(viewPosition);
@@ -525,7 +525,7 @@ public final class App extends JFrame implements RadiusControl,
             viewSurfaceMenuItem.setSelected(anchor.dim == DIM_NORMAL);
             viewNetherMenuItem.setSelected(anchor.dim == DIM_NETHER);
             viewEndMenuItem.setSelected(anchor.dim == DIM_END);
-            ACTION_EDIT_TILES.setEnabled(anchor.role != CAVE_FLOOR);
+            ACTION_EDIT_TILES.setEnabled((anchor.role != CAVE_FLOOR) && (anchor.role != FLOATING_FLOOR));
 
             // Legacy: if this is an older world with an overlay enabled, warn the user that it may be incorrectly
             // located (we used to offer to fix this, but this should be exceedingly rare).
@@ -543,11 +543,11 @@ public final class App extends JFrame implements RadiusControl,
                 showBackgroundStatus = backgroundDimension != null;
                 backgroundZoom = 4;
                 view.setBackgroundDimension(backgroundDimension, backgroundZoom, FADE_TO_FIFTY_PERCENT);
-            } else if (anchor.role == CAVE_FLOOR) {
+            } else if ((anchor.role == CAVE_FLOOR) || (anchor.role == FLOATING_FLOOR)) {
                 backgroundDimension = world.getDimension(new Anchor(anchor.dim, DETAIL, anchor.invert, 0));
                 showBackgroundStatus = false;
                 backgroundZoom = 0;
-                outsideDimensionLabel = "Outside Cave/Tunnel";
+                outsideDimensionLabel = (anchor.role == CAVE_FLOOR) ? "Outside Cave/Tunnel" : "Outside Floating Dimension";
                 view.setBackgroundDimension(backgroundDimension, backgroundZoom, FADE_TO_TWENTYFIVE_PERCENT);
             } else {
                 backgroundDimension = null;
@@ -834,7 +834,7 @@ public final class App extends JFrame implements RadiusControl,
     }
 
     private void updateRadiusLabel() {
-        if ((dimension != null) && (activeOperation instanceof RadiusOperation)) {
+        if ((dimension != null) && (activeOperation instanceof BrushOperation)) {
             final float scale = dimension.getScale();
             setTextIfDifferent(radiusLabel, MessageFormat.format(strings.getString("radius.0"), round(radius * scale)));
         } else {
@@ -858,10 +858,6 @@ public final class App extends JFrame implements RadiusControl,
         return level;
     }
 
-    public int getRadius() {
-        return radius;
-    }
-
     public Brush getToolBrush() {
         return toolBrush;
     }
@@ -882,8 +878,8 @@ public final class App extends JFrame implements RadiusControl,
         this.maxRadius = maxRadius;
         if (radius > maxRadius) {
             radius = maxRadius;
-            if (activeOperation instanceof RadiusOperation) {
-                ((RadiusOperation) activeOperation).setRadius(radius);
+            if (activeOperation instanceof BrushOperation) {
+                ((BrushOperation) activeOperation).setRadius(radius);
             }
             view.setRadius(radius);
             updateRadiusLabel();
@@ -1040,7 +1036,10 @@ public final class App extends JFrame implements RadiusControl,
                     public java.lang.Void execute(ProgressReceiver progressReceiver) throws OperationCancelled {
                         newWorld.transform(CoordinateTransform.ROTATE_CLOCKWISE_270_DEGREES, progressReceiver);
                         for (Dimension dimension: newWorld.getDimensions()) {
-                            newWorld.addHistoryEntry(HistoryEntry.WORLD_DIMENSION_ROTATED, dimension.getName(), 270);
+                            final Anchor anchor = dimension.getAnchor();
+                            if (((anchor.role == DETAIL) || (anchor.role == MASTER)) && (! anchor.invert)) {
+                                newWorld.addHistoryEntry(HistoryEntry.WORLD_DIMENSION_ROTATED, dimension.getName(), 270);
+                            }
                         }
                         return null;
                     }
@@ -1362,77 +1361,81 @@ public final class App extends JFrame implements RadiusControl,
     // RadiusControl
 
     @Override
-    public void increaseRadius(int amount) {
-        int oldRadius = radius;
+    public int getRadius() {
+        return radius;
+    }
+
+    @Override
+    public void increaseRadius(int steps) {
         if (radius == 0) {
-            radius = 1;
+            setRadius(1);
         } else {
-            double factor = Math.pow(1.1, amount);
-            radius = (int) (radius * factor);
-            if (radius == oldRadius) {
-                radius++;
+            final double factor = Math.pow(1.1, steps);
+            int newRadius = (int) (radius * factor);
+            if (newRadius == radius) {
+                newRadius++;
             }
-            if (radius > maxRadius) {
-                radius = maxRadius;
-            }
-            if (radius == oldRadius) {
-                return;
-            }
+            setRadius(newRadius);
         }
-        if (activeOperation instanceof RadiusOperation) {
-            ((RadiusOperation) activeOperation).setRadius(radius);
+    }
+
+    @Override
+    public void increaseRadiusByOne() {
+        setRadius(radius + 1);
+    }
+    
+    @Override
+    public void decreaseRadius(int steps) {
+        final double factor = Math.pow(0.9, steps);
+        int newRadius = (int) (radius * factor);
+        if (newRadius == radius) {
+            newRadius--;
+        }
+        setRadius(newRadius);
+    }
+
+    @Override
+    public void decreaseRadiusByOne() {
+        setRadius(radius - 1);
+    }
+
+    @Override
+    public void setRadius(int radius) {
+        if (radius < 0) {
+            radius = 0;
+        } else if (radius > maxRadius) {
+            radius = maxRadius;
+        }
+        if (radius == this.radius) {
+            return;
+        }
+        this.radius = radius;
+        if (activeOperation instanceof BrushOperation) {
+            ((BrushOperation) activeOperation).setRadius(radius);
         }
         view.setRadius(radius);
         updateRadiusLabel();
     }
 
     @Override
-    public void increaseRadiusByOne() {
-        if (radius < maxRadius) {
-            radius++;
-            if (activeOperation instanceof RadiusOperation) {
-                ((RadiusOperation) activeOperation).setRadius(radius);
-            }
-            view.setRadius(radius);
-            updateRadiusLabel();
-        }
-    }
-    
-    @Override
-    public void decreaseRadius(int amount) {
-        if (radius > 0) {
-            int oldRadius = radius;
-            double factor = Math.pow(0.9, amount);
-            radius = (int) (radius * factor);
-            if (radius == oldRadius) {
-                radius--;
-            }
-            if (radius < 0) {
-                radius = 0;
-            }
-            if (radius == oldRadius) {
-                return;
-            }
-            if (activeOperation instanceof RadiusOperation) {
-                ((RadiusOperation) activeOperation).setRadius(radius);
-            }
-            view.setRadius(radius);
-            updateRadiusLabel();
-        }
+    public int getRotation() {
+        return (activeOperation instanceof PaintOperation) ? brushRotation : toolBrushRotation;
     }
 
     @Override
-    public void decreaseRadiusByOne() {
-        if (radius > 0) {
-            radius--;
-            if (activeOperation instanceof RadiusOperation) {
-                ((RadiusOperation) activeOperation).setRadius(radius);
-            }
-            view.setRadius(radius);
-            updateRadiusLabel();
+    public void setRotation(int rotation) {
+        if ((rotation < -180) || (rotation > 180)) {
+            rotation = mod(rotation + 180, 360) - 180;
         }
+        brushRotationSlider.setValue(rotation);
+        if (activeOperation instanceof PaintOperation) {
+            brushRotation = rotation;
+        } else {
+            toolBrushRotation = rotation;
+        }
+        updateBrushRotation();
     }
-    
+
     // SeedListener
     
     @Override
@@ -1446,7 +1449,28 @@ public final class App extends JFrame implements RadiusControl,
             }
         }
     }
-    
+
+    // MapDragControl
+
+    @Override
+    public boolean isMapDraggingInhibited() {
+        return mapDraggingInhibited;
+    }
+
+    @Override
+    public void setMapDraggingInhibited(boolean mapDraggingInhibited) {
+        if (mapDraggingInhibited != this.mapDraggingInhibited) {
+            this.mapDraggingInhibited = mapDraggingInhibited;
+            if (mapDraggingInhibited) {
+                scrollController.uninstall();
+            } else {
+                scrollController.install();
+            }
+        }
+    }
+
+    private boolean mapDraggingInhibited;
+
     public static App getInstance() {
         if (getInstanceIfExists() == null) {
             new App();
@@ -1581,8 +1605,8 @@ public final class App extends JFrame implements RadiusControl,
         } else {
             toolFilter = filter;
         }
-        if (activeOperation instanceof RadiusOperation) {
-            ((RadiusOperation) activeOperation).setFilter(filter);
+        if (activeOperation instanceof FilteredOperation) {
+            ((FilteredOperation) activeOperation).setFilter(filter);
         }
     }
 
@@ -1880,7 +1904,7 @@ public final class App extends JFrame implements RadiusControl,
         Terrain.setCustomMaterial(index, customMaterial);
 
         if (customTerrainPanel == null) {
-            dockingManager.addFrame(new DockableFrameBuilder(createCustomTerrainPanel(), "Custom Terrain", DOCK_SIDE_WEST, 3).withId("customTerrain").build());
+            dockingManager.addFrame(new DockableFrameBuilder(createCustomTerrainPanel(), "Custom Terrain", DOCK_SIDE_WEST, 3).withId("customTerrain").scrollable().build());
         }
 
         JToggleButton newButton = createTerrainButton(Terrain.getCustomTerrain(index));
@@ -1901,6 +1925,24 @@ public final class App extends JFrame implements RadiusControl,
             };
             paintUpdater.updatePaint();
             dockingManager.activateFrame("customTerrain");
+        }
+    }
+
+    boolean performUndo() {
+        if ((currentUndoManager != null) && currentUndoManager.undo()) {
+            currentUndoManager.armSavePoint();
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    boolean performRedo() {
+        if ((currentUndoManager != null) && currentUndoManager.redo()) {
+            currentUndoManager.armSavePoint();
+            return true;
+        } else {
+            return false;
         }
     }
 
@@ -1927,6 +1969,17 @@ public final class App extends JFrame implements RadiusControl,
             final File brushesDir = new File(Configuration.getConfigDir(), "brushes");
             if (brushesDir.isDirectory()) {
                 loadCustomBrushes(CUSTOM_BRUSHES_DEFAULT_TITLE, brushesDir);
+                final Configuration config = Configuration.getInstance();
+                if ((customBrushes.size() == 1)
+                        && customBrushes.containsKey(CUSTOM_BRUSHES_DEFAULT_TITLE)
+                        && (customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE).brushes.size() >= 25)
+                        && (! config.isMessageDisplayed(BRUSH_FOLDER_TIP_KEY))) {
+                    StartupMessages.addMessage("Tip: you have many Custom Brushes in one folder.\n" +
+                            "You can distribute your Custom Brushes over\n" +
+                            "multiple palettes by moving them to\n" +
+                            "separate subfolders");
+                    config.setMessageDisplayed(BRUSH_FOLDER_TIP_KEY);
+                }
             }
         } else {
             logger.info("[SAFE MODE] Not loading custom brushes");
@@ -2447,10 +2500,14 @@ public final class App extends JFrame implements RadiusControl,
                     }
                     return null;
                 }
-            }, NOT_CANCELABLE, NO_FOCUS_STEALING);
+            }, NOT_CANCELABLE, NO_FOCUS_STEALING); // TODO make cancelable. Close the output stream? That oughta do it. But also move the previous autosave file back...
 
             lastSaveTimestamp = lastChangeTimestamp = System.currentTimeMillis();
             lastAutosavedState = world.getChangeNo();
+
+            // Log an event
+            final EventVO event = new EventVO(EVENT_KEY_ACTION_AUTOSAVE_WORLD).addTimestamp().setTransient();
+            Configuration.getInstance().logEvent(event);
         } catch (RuntimeException | Error e) {
             logger.error("An exception occurred while trying to autosave world", e);
             beepAndShowWarning(this, "An error occurred while trying to autosave the world.\n" +
@@ -2666,39 +2723,17 @@ public final class App extends JFrame implements RadiusControl,
 
         getContentPane().add(createStatusBar(), BorderLayout.SOUTH);
 
-        final ScrollController scrollController = new ScrollController();
         scrollController.install();
 
-        mapDragControl = new MapDragControl() {
-            @Override
-            public boolean isMapDraggingInhibited() {
-                return mapDraggingInhibited;
-            }
-
-            @Override
-            public void setMapDraggingInhibited(boolean mapDraggingInhibited) {
-                if (mapDraggingInhibited != this.mapDraggingInhibited) {
-                    this.mapDraggingInhibited = mapDraggingInhibited;
-                    if (mapDraggingInhibited) {
-                        scrollController.uninstall();
-                    } else {
-                        scrollController.install();
-                    }
-                }
-            }
-            
-            private boolean mapDraggingInhibited;
-        };
-        
         dockingManager.addFrame(new DockableFrameBuilder(createToolPanel(), "Tools", DOCK_SIDE_WEST, 1).build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", DOCK_SIDE_WEST, 2).expand().build());
+        dockingManager.addFrame(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", DOCK_SIDE_WEST, 2).expand().scrollable().build());
 
         dockingManager.addFrame(new DockableFrameBuilder(createLayerPanel(), "Layers", DOCK_SIDE_WEST, 3).build());
 
         dockingManager.addFrame(new DockableFrameBuilder(createTerrainPanel(), "Terrain", DOCK_SIDE_WEST, 3).build());
 
-        biomesPanelFrame = new DockableFrameBuilder(createBiomesPanelContainer(), "Biomes", DOCK_SIDE_WEST, 3).build();
+        biomesPanelFrame = new DockableFrameBuilder(createBiomesPanelContainer(), "Biomes", DOCK_SIDE_WEST, 3).scrollable().build();
         dockingManager.addFrame(biomesPanelFrame);
 
         dockingManager.addFrame(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", DOCK_SIDE_WEST, 3).build());
@@ -2706,13 +2741,13 @@ public final class App extends JFrame implements RadiusControl,
         dockingManager.addFrame(new DockableFrameBuilder(createBrushPanel(), "Brushes", DOCK_SIDE_EAST, 1).build());
 
         if (customBrushes.containsKey(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
-            dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(CUSTOM_BRUSHES_DEFAULT_TITLE, customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE)), "Custom Brushes", DOCK_SIDE_EAST, 1).withId("customBrushesDefault").build());
+            dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(CUSTOM_BRUSHES_DEFAULT_TITLE, customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE)), "Custom Brushes", DOCK_SIDE_EAST, 1).withId("customBrushesDefault").scrollable().build());
         }
         for (Map.Entry<String, BrushGroup> entry: customBrushes.entrySet()) {
             if (entry.getKey().equals(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
                 continue;
             }
-            dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), entry.getKey(), DOCK_SIDE_EAST, 1).withId("customBrushes." + entry.getKey()).build());
+            dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), entry.getKey(), DOCK_SIDE_EAST, 1).withId("customBrushes." + entry.getKey()).scrollable().build());
         }
         
         dockingManager.addFrame(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", DOCK_SIDE_EAST, 2).withId("brushSettings").build());
@@ -2764,7 +2799,7 @@ public final class App extends JFrame implements RadiusControl,
                     } else {
                         ACTION_ROTATE_BRUSH_RIGHT.actionPerformed(new ActionEvent(e.getSource(), e.getID(), e.paramString()));
                     }
-                } else if (activeOperation instanceof RadiusOperation) {
+                } else if (activeOperation instanceof BrushOperation) {
                     if (e.isShiftDown()) {
                         if (e.getWheelRotation() < 0) {
                             decreaseRadiusByOne();
@@ -2803,6 +2838,7 @@ public final class App extends JFrame implements RadiusControl,
                 increaseRadius(1);
             }
 
+            @Serial
             private static final long serialVersionUID = 2011090601L;
         });
         actionMap.put(ACTION_NAME_INCREASE_RADIUS_BY_ONE, new BetterAction(ACTION_NAME_INCREASE_RADIUS_BY_ONE, "Increase brush radius by one") {
@@ -2811,6 +2847,7 @@ public final class App extends JFrame implements RadiusControl,
                 increaseRadiusByOne();
             }
 
+            @Serial
             private static final long serialVersionUID = 2011090601L;
         });
         actionMap.put(ACTION_NAME_DECREASE_RADIUS, new BetterAction(ACTION_NAME_DECREASE_RADIUS, strings.getString("decrease.radius")) {
@@ -2819,6 +2856,7 @@ public final class App extends JFrame implements RadiusControl,
                 decreaseRadius(1);
             }
 
+            @Serial
             private static final long serialVersionUID = 2011090601L;
         });
         actionMap.put(ACTION_NAME_DECREASE_RADIUS_BY_ONE, new BetterAction(ACTION_NAME_DECREASE_RADIUS_BY_ONE, "Decrease brush radius by one") {
@@ -2827,6 +2865,7 @@ public final class App extends JFrame implements RadiusControl,
                 decreaseRadiusByOne();
             }
 
+            @Serial
             private static final long serialVersionUID = 2011090601L;
         });
         actionMap.put(ACTION_NAME_REDO, ACTION_REDO);
@@ -3025,14 +3064,14 @@ public final class App extends JFrame implements RadiusControl,
         JPanel toolPanel = new JPanel();
         toolPanel.setLayout(new GridLayout(0, 4));
         // TODO: use function keys as accelerators?
-        toolPanel.add(createButtonForOperation(new SprayPaint(view, this, mapDragControl), 'r'));
-        toolPanel.add(createButtonForOperation(new Pencil(view, this, mapDragControl), 'p'));
+        toolPanel.add(createButtonForOperation(new SprayPaint(view), 'r'));
+        toolPanel.add(createButtonForOperation(new Pencil(view), 'p'));
         toolPanel.add(createButtonForOperation(new Fill(view), 'l'));
         toolPanel.add(createButtonForOperation(new Text(view), 'x'));
 
         toolPanel.add(createButtonForOperation(new Flood(view, false), 'f'));
         toolPanel.add(createButtonForOperation(new Flood(view, true)));
-        toolPanel.add(createButtonForOperation(new Sponge(view, this, mapDragControl)));
+        toolPanel.add(createButtonForOperation(new Sponge(view)));
         eyedropperToggleButton = new JToggleButton(loadScaledIcon("eyedropper"));
         eyedropperToggleButton.setMnemonic('y');
         eyedropperToggleButton.setMargin(App.BUTTON_INSETS);
@@ -3072,10 +3111,10 @@ public final class App extends JFrame implements RadiusControl,
         eyedropperToggleButton.putClientProperty(KEY_HELP_KEY, "Operation/Eyedropper");
         toolPanel.add(eyedropperToggleButton);
 
-        toolPanel.add(createButtonForOperation(new Height(view, this, mapDragControl), 'h'));
-        toolPanel.add(createButtonForOperation(new Flatten(view, this, mapDragControl), 'a'));
-        toolPanel.add(createButtonForOperation(new Smooth(view, this, mapDragControl), 's'));
-        toolPanel.add(createButtonForOperation(new RaiseMountain(view, this, mapDragControl), 'm'));
+        toolPanel.add(createButtonForOperation(new Height(view), 'h'));
+        toolPanel.add(createButtonForOperation(new Flatten(view), 'a'));
+        toolPanel.add(createButtonForOperation(new Smooth(view), 's'));
+        toolPanel.add(createButtonForOperation(new RaiseMountain(view), 'm'));
 
 //        toolPanel.add(createButtonForOperation(new Erode(view, this, mapDragControl), 'm'));
         toolPanel.add(createButtonForOperation(new SetSpawnPoint(view)));
@@ -3090,7 +3129,7 @@ public final class App extends JFrame implements RadiusControl,
 
         final AbstractButton copySelectionButton = createButtonForOperation(new CopySelectionOperation(view));
         copySelectionButton.setEnabled(selectionState.getValue());
-        toolPanel.add(createButtonForOperation(new EditSelectionOperation(view, this, mapDragControl, selectionState)));
+        toolPanel.add(createButtonForOperation(new EditSelectionOperation(view, selectionState)));
         toolPanel.add(copySelectionButton);
         final JButton clearSelectionButton = new JButton(loadScaledIcon("clear_selection"));
         clearSelectionButton.setEnabled(selectionState.getValue());
@@ -3329,6 +3368,8 @@ public final class App extends JFrame implements RadiusControl,
             };
             paintUpdater.updatePaint();
         }, paintButtonGroup);
+        constraints.weightx = 1.0;
+        constraints.fill = HORIZONTAL;
         biomesPanelContainer.add(biomesPanel, constraints);
 
         layerControls.put(Biome.INSTANCE, new LayerControls(Biome.INSTANCE, checkBox, soloCheckBox, null));
@@ -3408,11 +3449,14 @@ public final class App extends JFrame implements RadiusControl,
 
     @Nullable
     Function<Layer, Boolean> getLayerFilterForCurrentDimension() {
-        if ((dimension != null) && (dimension.getAnchor().role == CAVE_FLOOR)) {
-            return TunnelLayer::isLayerSupportedForFloorDimension;
-        } else {
-            return null;
+        if (dimension != null) {
+            if (dimension.getAnchor().role == CAVE_FLOOR) {
+                return TunnelLayer::isLayerSupportedForCaveFloorDimension;
+            } else if (dimension.getAnchor().role == FLOATING_FLOOR) {
+                return TunnelLayer::isLayerSupportedForFloatingFloorDimension;
+            }
         }
+        return null;
     }
 
     private JPanel createTerrainPanel() {
@@ -3461,7 +3505,7 @@ public final class App extends JFrame implements RadiusControl,
         buttonPanel.add(createTerrainButton(TUFF));
         buttonPanel.add(createTerrainButton(BEDROCK));
         buttonPanel.add(createTerrainButton(MYCELIUM));
-        buttonPanel.add(Box.createGlue());
+        buttonPanel.add(createTerrainButton(PALE_MOSS));
         buttonPanel.add(Box.createGlue());
 
         buttonPanel.add(createTerrainButton(OBSIDIAN));
@@ -3662,7 +3706,7 @@ public final class App extends JFrame implements RadiusControl,
         brushRotationLabel = new JLabel("Rotation: 0°");
         brushSettingsPanel.add(brushRotationLabel, constraints);
         
-        constraints.fill = GridBagConstraints.HORIZONTAL;
+        constraints.fill = HORIZONTAL;
         constraints.insets = new Insets(1, 1, 1, 1);
         // The preferred width of the slider is way too much. Make it smaller, and
         // then fill the available width created by the buttons
@@ -3676,7 +3720,7 @@ public final class App extends JFrame implements RadiusControl,
         levelLabel = new JLabel("Intensity: 50 %");
         brushSettingsPanel.add(levelLabel, constraints);
         
-        constraints.fill = GridBagConstraints.HORIZONTAL;
+        constraints.fill = HORIZONTAL;
         constraints.insets = new Insets(1, 1, 1, 1);
         // The preferred width of the slider is way too much. Make it smaller, and
         // then fill the available width created by the buttons
@@ -4637,7 +4681,7 @@ public final class App extends JFrame implements RadiusControl,
             }
             world.addDimension(nether);
             setDimension(nether);
-            DimensionPropertiesDialog propertiesDialog = new DimensionPropertiesDialog(this, nether, selectedColourScheme);
+            DimensionPropertiesDialog propertiesDialog = new DimensionPropertiesDialog(this, nether, selectedColourScheme, customBiomeManager);
             propertiesDialog.setVisible(true);
         }
     }
@@ -4855,7 +4899,7 @@ public final class App extends JFrame implements RadiusControl,
             button.addItemListener(event -> {
                 boolean refreshOptionsPanel = false;
                 if (event.getStateChange() == ItemEvent.DESELECTED) {
-                    if (operation instanceof RadiusOperation) {
+                    if (operation instanceof BrushOperation) {
                         view.setDrawBrush(false);
                     }
                     try {
@@ -4875,8 +4919,8 @@ public final class App extends JFrame implements RadiusControl,
                         try {
                             if (operation instanceof MouseOrTabletOperation) {
                                 ((MouseOrTabletOperation) operation).setLevel(level);
-                                if (operation instanceof RadiusOperation) {
-                                    ((RadiusOperation) operation).setFilter(filter);
+                                if (operation instanceof FilteredOperation) {
+                                    ((FilteredOperation) operation).setFilter(filter);
                                 }
                                 if (operation instanceof BrushOperation) {
                                     ((BrushOperation) operation).setBrush(brushRotation == 0 ? brush : RotatedBrush.rotate(brush, brushRotation));
@@ -4901,8 +4945,8 @@ public final class App extends JFrame implements RadiusControl,
                         try {
                             if (operation instanceof MouseOrTabletOperation) {
                                 ((MouseOrTabletOperation) operation).setLevel(toolLevel);
-                                if (operation instanceof RadiusOperation) {
-                                    ((RadiusOperation) operation).setFilter(toolFilter);
+                                if (operation instanceof FilteredOperation) {
+                                    ((FilteredOperation) operation).setFilter(toolFilter);
                                 }
                                 if (operation instanceof BrushOperation) {
                                     ((BrushOperation) operation).setBrush(toolBrushRotation == 0 ? toolBrush : RotatedBrush.rotate(toolBrush, toolBrushRotation));
@@ -4922,10 +4966,10 @@ public final class App extends JFrame implements RadiusControl,
                             programmaticChange = false;
                         }
                     }
-                    if (operation instanceof RadiusOperation) {
+                    if (operation instanceof BrushOperation) {
                         view.setDrawBrush(true);
                         view.setRadius(radius);
-                        ((RadiusOperation) operation).setRadius(radius);
+                        ((BrushOperation) operation).setRadius(radius);
                     }
                     activeOperation = operation;
                     updateLayerVisibility();
@@ -4940,12 +4984,12 @@ public final class App extends JFrame implements RadiusControl,
                     if (closeCallout("callout_1")) {
                         // If the user picked an operation which doesn't need a
                         // brush, close the "select brush" callout too
-                        if (!(operation instanceof RadiusOperation)) {
+                        if (! (operation instanceof BrushOperation)) {
                             closeCallout("callout_2");
                         }
                         // If the user picked an operation which doesn't use paint,
                         // close the "select paint" callout too
-                        if (!(operation instanceof PaintOperation)) {
+                        if (! (operation instanceof PaintOperation)) {
                             closeCallout("callout_3");
                         }
                     }
@@ -5064,8 +5108,8 @@ public final class App extends JFrame implements RadiusControl,
     private JToggleButton createTerrainButton(final Terrain terrain) {
         final JToggleButton button = new JToggleButton();
         button.putClientProperty(KEY_PAINT_ID, createTerrainPaintId(terrain));
-        button.setMargin(App.BUTTON_INSETS);
-        button.setIcon(new ImageIcon(terrain.getScaledIcon(16, selectedColourScheme)));
+        button.setMargin(App.SMALLER_BUTTON_INSETS);
+        button.setIcon(new ImageIcon(terrain.getScaledIcon(18, selectedColourScheme)));
         button.setToolTipText(terrain.getName() + ": " + terrain.getDescription());
         button.addItemListener(event -> {
             if (event.getStateChange() == ItemEvent.SELECTED) {
@@ -5268,7 +5312,7 @@ public final class App extends JFrame implements RadiusControl,
         setEnabled(Biome.INSTANCE, biomesSupported, "Biomes not supported by format " + platform);
         setEnabled(biomesPanelFrame, biomesSupported);
         // TODO deselect biomes panel if it was selected
-        if (anchor.equals(NORMAL_DETAIL)) {
+        if ((anchor.dim == DIM_NORMAL) && (anchor.role != MASTER)) {
             setEnabled(setSpawnPointToggleButton, platform.capabilities.contains(SET_SPAWN_POINT));
             setEnabled(ACTION_MOVE_TO_SPAWN, platform.capabilities.contains(SET_SPAWN_POINT));
         } else {
@@ -5278,16 +5322,16 @@ public final class App extends JFrame implements RadiusControl,
             setEnabled(setSpawnPointToggleButton, false);
             setEnabled(ACTION_MOVE_TO_SPAWN, false);
         }
-        setEnabled(Populate.INSTANCE, (anchor.role != CAVE_FLOOR) && (! anchor.invert) && platform.capabilities.contains(POPULATE), "Automatic population not supported or not applicable");
+        final boolean caveFloor = anchor.role == CAVE_FLOOR, floatingFloor = anchor.role == FLOATING_FLOOR;
+        setEnabled(Populate.INSTANCE, (! caveFloor) && (! floatingFloor) && (! anchor.invert) && platform.capabilities.contains(POPULATE), "Automatic population not supported or not applicable");
         biomesPanel.loadBiomes(platform, selectedColourScheme);
         setEnabled(extendedBlockIdsMenuItem, (! platform.capabilities.contains(NAME_BASED)) && (platform != JAVA_MCREGION));
         brushOptions.setPlatform(platform);
         infoPanel.setPlatform(platform);
         // TODO actually why not support these:
-        setEnabled(Caves.INSTANCE, anchor.role != CAVE_FLOOR, "Caves not supported in Custom Cave/Tunnel floor dimensions");
-        setEnabled(Caverns.INSTANCE, anchor.role != CAVE_FLOOR, "Caverns not supported in Custom Cave/Tunnel floor dimensions");
-        setEnabled(Chasms.INSTANCE, anchor.role != CAVE_FLOOR, "Chasms not supported in Custom Cave/Tunnel floor dimensions");
-        setEnabled(Resources.INSTANCE, anchor.role != CAVE_FLOOR, "Resources not supported in Custom Cave/Tunnel floor dimensions");
+        setEnabled(Caves.INSTANCE, (! caveFloor) && (! floatingFloor), "Caves not supported in Custom Cave/Tunnel floor dimensions");
+        setEnabled(Caverns.INSTANCE, (! caveFloor) && (! floatingFloor), "Caverns not supported in Custom Cave/Tunnel floor dimensions");
+        setEnabled(Chasms.INSTANCE, (! caveFloor) && (! floatingFloor), "Chasms not supported in Custom Cave/Tunnel floor dimensions");
         setEnabled(ReadOnly.INSTANCE, anchor.equals(NORMAL_DETAIL), "Read Only layer not applicable");
     }
 
@@ -5943,121 +5987,6 @@ public final class App extends JFrame implements RadiusControl,
         }
     }
 
-    public static class DockableFrameBuilder {
-        public DockableFrameBuilder(Component component, String title, int side, int index) {
-            this.component = component;
-            this.title = title;
-            this.side = side;
-            this.index = index;
-            id = (Character.toLowerCase(title.charAt(0)) + title.substring(1)).replaceAll("\\s", "");
-        }
-
-        DockableFrameBuilder withId(String id) {
-            this.id = id;
-            return this;
-        }
-
-        DockableFrameBuilder expand() {
-            expand = true;
-            return this;
-        }
-
-        public DockableFrameBuilder withIcon(Icon icon) {
-            this.icon = icon;
-            return this;
-        }
-
-        DockableFrameBuilder withMargin(int margin) {
-            this.margin = margin;
-            return this;
-        }
-
-        public DockableFrame build() {
-            DockableFrame dockableFrame = new DockableFrame(id);
-
-            JPanel panel = new JPanel(new GridBagLayout());
-            if (margin > 0) {
-                panel.setBorder(new EmptyBorder(margin, margin, margin, margin));
-            }
-            GridBagConstraints constraints = new GridBagConstraints();
-            constraints.gridwidth = GridBagConstraints.REMAINDER;
-            constraints.weightx = 1.0;
-            if (expand) {
-                constraints.fill = GridBagConstraints.BOTH;
-                constraints.weighty = 1.0;
-                panel.add(component, constraints);
-            } else {
-                constraints.fill = GridBagConstraints.HORIZONTAL;
-                panel.add(component, constraints);
-                constraints.weighty = 1.0;
-                panel.add(new JPanel(), constraints);
-            }
-            dockableFrame.add(panel, BorderLayout.CENTER);
-
-            // Use title everywhere
-            dockableFrame.setTitle(title);
-            dockableFrame.setSideTitle(title);
-            dockableFrame.setTabTitle(title);
-            dockableFrame.setToolTipText(title);
-
-            // Try to find an icon to use for the tab
-            if ((icon == null) && (component instanceof Container)) {
-                icon = findIcon((Container) component);
-                if (icon != null) {
-                    final int desiredSize = Math.round(16 * getUIScale());
-                    if (((icon.getIconHeight() > desiredSize) || (icon.getIconWidth() > desiredSize))
-                            && (icon instanceof ImageIcon)
-                            && (((ImageIcon) icon).getImage() instanceof BufferedImage)) {
-                        float s;
-                        if (icon.getIconWidth() > icon.getIconHeight()) {
-                            // Wide icon
-                            s = (float) desiredSize / icon.getIconWidth();
-                        } else {
-                            // Tall (or square) icon
-                            s = (float) desiredSize / icon.getIconHeight();
-                        }
-                        BufferedImageOp op = new AffineTransformOp(AffineTransform.getScaleInstance(s, s), AffineTransformOp.TYPE_BICUBIC);
-                        BufferedImage iconImage = op.filter((BufferedImage) ((ImageIcon) icon).getImage(), null);
-                        icon = new ImageIcon(iconImage);
-                    }
-                }
-            }
-            dockableFrame.setFrameIcon((icon != null) ? icon : ICON_UNKNOWN_PATTERN);
-
-            // Use preferred size of component as much as possible
-            final java.awt.Dimension preferredSize = component.getPreferredSize();
-            dockableFrame.setAutohideWidth(preferredSize.width);
-            dockableFrame.setDockedWidth(preferredSize.width);
-            dockableFrame.setDockedHeight(preferredSize.height);
-            dockableFrame.setUndockedBounds(new Rectangle(-1, -1, preferredSize.width, preferredSize.height));
-
-            // Make hidable, but don't display hide button, so incidental panels can
-            // be hidden on the fly
-            dockableFrame.setHidable(true);
-            dockableFrame.setAvailableButtons(BUTTON_FLOATING | BUTTON_AUTOHIDE | BUTTON_HIDE_AUTOHIDE);
-            dockableFrame.setShowContextMenu(false); // Disable the context menu because it contains the Close option with no way to hide it
-
-            // Initial location of panel
-            dockableFrame.setInitMode(DockContext.STATE_FRAMEDOCKED);
-            dockableFrame.setInitSide(side);
-            dockableFrame.setInitIndex(index);
-
-            // Other flags
-            dockableFrame.setAutohideWhenActive(true);
-            dockableFrame.setMaximizable(false);
-
-            //Help key
-            dockableFrame.putClientProperty(KEY_HELP_KEY, "Panel/" + id);
-            return dockableFrame;
-        }
-
-        String id, title;
-        boolean expand;
-        Icon icon;
-        int side, index, margin = 2;
-        Component component;
-    }
-
     private void showHelpPicker() {
         Component glassPane = getGlassPane();
         MouseListener mouseListener = new java.awt.event.MouseAdapter() {
@@ -6083,32 +6012,12 @@ public final class App extends JFrame implements RadiusControl,
     }
 
     private void exitDimension() {
-        if ((dimension != null) && (dimension.getAnchor().role == CAVE_FLOOR)) {
+        if ((dimension != null) && ((dimension.getAnchor().role == CAVE_FLOOR) || (dimension.getAnchor().role == FLOATING_FLOOR))) {
             final Anchor anchor = dimension.getAnchor();
             setDimension(world.getDimension(new Anchor(anchor.dim, DETAIL, anchor.invert, 0)));
         } else {
             DesktopUtils.beep();
         }
-    }
-
-    static Icon findIcon(Container container) {
-        if (container instanceof JComponent) {
-            Icon icon = (Icon) ((JComponent) container).getClientProperty(KEY_ICON);
-            if (icon != null) {
-                return icon;
-            }
-        }
-        for (Component component: container.getComponents()) {
-            if ((component instanceof AbstractButton) && (((AbstractButton) component).getIcon() != null)) {
-                return ((AbstractButton) component).getIcon();
-            } else if (component instanceof Container) {
-                Icon icon = findIcon((Container) component);
-                if (icon != null) {
-                    return icon;
-                }
-            }
-        }
-        return null;
     }
 
     static File getAutosaveFile() {
@@ -6136,8 +6045,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             newWorld();
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_OPEN_WORLD = new BetterAction("openWorld", strings.getString("open.world") + "...", ICON_OPEN_WORLD, false) {
@@ -6150,8 +6057,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             open();
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_SAVE_WORLD = new BetterAction("saveWorld", strings.getString("save.world") + "...", ICON_SAVE_WORLD, false) {
@@ -6164,8 +6069,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             save();
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_SAVE_WORLD_AS = new BetterAction("saveWorldAs", strings.getString("save.world.as") + "...", ICON_SAVE_WORLD, false) {
@@ -6178,8 +6081,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             saveAs();
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_EXPORT_WORLD = new BetterAction("exportAsMinecraftMap", strings.getString("export.as.minecraft.map") + "...", ICON_EXPORT_WORLD, false) {
@@ -6215,8 +6116,6 @@ public final class App extends JFrame implements RadiusControl,
                 resumeAutosave();
             }
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_IMPORT_MAP = new BetterAction("importMinecraftMap", strings.getString("existing.minecraft.map") + "...", false) {
@@ -6229,8 +6128,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             importWorld();
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_MERGE_WORLD = new BetterAction("mergeWorld", strings.getString("merge.world") + "...", false) {
@@ -6247,8 +6144,6 @@ public final class App extends JFrame implements RadiusControl,
             }
             merge();
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_EXIT = new BetterAction("exit", strings.getString("exit") + "...", ICON_EXIT) {
@@ -6260,8 +6155,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             exit();
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_ZOOM_IN = new BetterAction("zoomIn", strings.getString("zoom.in"), ICON_ZOOM_IN) {
@@ -6283,8 +6176,6 @@ public final class App extends JFrame implements RadiusControl,
             ACTION_ZOOM_OUT.setEnabled(true);
             ACTION_ZOOM_RESET.setEnabled(zoom != 0);
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_ZOOM_RESET = new BetterAction("resetZoom", strings.getString("reset.zoom"), ICON_ZOOM_RESET) {
@@ -6323,8 +6214,6 @@ public final class App extends JFrame implements RadiusControl,
             ACTION_ZOOM_OUT.setEnabled(true);
             setEnabled(false);
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_ZOOM_OUT = new BetterAction("zoomOut", strings.getString("zoom.out"), ICON_ZOOM_OUT) {
@@ -6346,8 +6235,6 @@ public final class App extends JFrame implements RadiusControl,
             ACTION_ZOOM_IN.setEnabled(true);
             ACTION_ZOOM_RESET.setEnabled(zoom != 0);
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_GRID = new BetterAction("grid", strings.getString("grid"), ICON_GRID) {
@@ -6366,8 +6253,6 @@ public final class App extends JFrame implements RadiusControl,
             dimension.setGridEnabled(view.isPaintGrid());
             setSelected(view.isPaintGrid());
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_CONTOURS = new BetterAction("contours", strings.getString("contours"), ICON_CONTOURS) {
@@ -6386,8 +6271,6 @@ public final class App extends JFrame implements RadiusControl,
             dimension.setContoursEnabled(view.isDrawContours());
             setSelected(view.isDrawContours());
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_OVERLAYS = new BetterAction("overlay", strings.getString("overlay"), ICON_OVERLAY) {
@@ -6423,9 +6306,7 @@ public final class App extends JFrame implements RadiusControl,
                 ACTION_GRID.setSelected(view.isPaintGrid());
                 ACTION_CONTOURS.setSelected(view.isDrawContours());
             }
-        }
-        private static final long serialVersionUID = 1L;
-    };
+        }    };
     
     private final BetterAction ACTION_UNDO = new BetterAction("undo", strings.getString("undo"), ICON_UNDO) {
         {
@@ -6435,14 +6316,10 @@ public final class App extends JFrame implements RadiusControl,
         
         @Override
         public void performAction(ActionEvent e) {
-            if ((currentUndoManager != null) && currentUndoManager.undo()) {
-                currentUndoManager.armSavePoint();
-            } else {
+            if (! performUndo()) {
                 DesktopUtils.beep();
             }
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_REDO = new BetterAction("redo", strings.getString("redo"), ICON_REDO) {
@@ -6453,14 +6330,10 @@ public final class App extends JFrame implements RadiusControl,
         
         @Override
         public void performAction(ActionEvent e) {
-            if ((currentUndoManager != null) && currentUndoManager.redo()) {
-                currentUndoManager.armSavePoint();
-            } else {
+            if (! performRedo()) {
                 DesktopUtils.beep();
             }
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_EDIT_TILES = new BetterAction("editTiles", strings.getString("add.remove.tiles") + "...", ICON_EDIT_TILES) {
@@ -6477,8 +6350,6 @@ public final class App extends JFrame implements RadiusControl,
             }
             addRemoveTiles();
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_CHANGE_HEIGHT = new BetterAction("changeHeight", strings.getString("change.height") + "...", ICON_CHANGE_HEIGHT) {
@@ -6490,8 +6361,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             changeWorldHeight(App.this);
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_ROTATE_WORLD = new BetterAction("rotate", strings.getString("rotate") + "...", ICON_ROTATE_WORLD) {
@@ -6503,8 +6372,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             rotateWorld(App.this);
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_SHIFT_WORLD = new BetterAction("shift", "Shift...", ICON_SHIFT_WORLD) {
@@ -6516,8 +6383,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             shiftWorld(App.this);
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_SCALE_WORLD = new BetterAction("scale", "Scale...", ICON_SCALE_WORLD) {
@@ -6529,8 +6394,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             scaleWorld(App.this);
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_DIMENSION_PROPERTIES = new BetterAction("dimensionProperties", strings.getString("dimension.properties") + "...", ICON_DIMENSION_PROPERTIES) {
@@ -6556,7 +6419,7 @@ public final class App extends JFrame implements RadiusControl,
             final BorderSettings previousBorderSettings = (dimension.getWorld() != null) ? dimension.getWorld().getBorderSettings().clone() : null;
             final Dimension.LayerAnchor previousTopLayerAnchor = dimension.getTopLayerAnchor();
             final boolean previousAnnotationsExport = (dimension.getLayerSettings(Annotations.INSTANCE) != null) && ((AnnotationsExporter.AnnotationsSettings) dimension.getLayerSettings(Annotations.INSTANCE)).isExport();
-            final DimensionPropertiesDialog dialog = new DimensionPropertiesDialog(App.this, dimension, selectedColourScheme);
+            final DimensionPropertiesDialog dialog = new DimensionPropertiesDialog(App.this, dimension, selectedColourScheme, customBiomeManager);
             dialog.setVisible(true);
             if (! dialog.isCancelled()) {
                 if (threeDeeFrame != null) {
@@ -6582,8 +6445,6 @@ public final class App extends JFrame implements RadiusControl,
                 }
             }
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_VIEW_DISTANCE = new BetterAction("viewDistance", strings.getString("view.distance"), ICON_VIEW_DISTANCE) {
@@ -6597,8 +6458,6 @@ public final class App extends JFrame implements RadiusControl,
             view.setDrawViewDistance(! view.isDrawViewDistance());
             setSelected(view.isDrawViewDistance());
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_WALKING_DISTANCE = new BetterAction("walkingDistances", strings.getString("walking.distances"), ICON_WALKING_DISTANCE) {
@@ -6612,8 +6471,6 @@ public final class App extends JFrame implements RadiusControl,
             view.setDrawWalkingDistance(! view.isDrawWalkingDistance());
             setSelected(view.isDrawWalkingDistance());
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_ROTATE_LIGHT_RIGHT = new BetterAction("rotateLightClockwise", strings.getString("rotate.light.clockwise"), ICON_ROTATE_LIGHT_RIGHT) {
@@ -6626,8 +6483,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             view.rotateLightRight();
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_ROTATE_LIGHT_LEFT = new BetterAction("rotateLightAnticlockwise", strings.getString("rotate.light.anticlockwise"), ICON_ROTATE_LIGHT_LEFT) {
@@ -6640,8 +6495,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             view.rotateLightLeft();
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_MOVE_TO_SPAWN = new BetterAction("moveToSpawn", strings.getString("move.to.spawn"), ICON_MOVE_TO_SPAWN) {
@@ -6653,8 +6506,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             view.moveToSpawn();
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_MOVE_TO_ORIGIN = new BetterAction("moveToOrigin", strings.getString("move.to.origin"), ICON_MOVE_TO_ORIGIN) {
@@ -6666,8 +6517,6 @@ public final class App extends JFrame implements RadiusControl,
         public void performAction(ActionEvent e) {
             view.moveToOrigin();
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_OPEN_DOCUMENTATION = new BetterAction("browseDocumentation", strings.getString("browse.documentation")) {
@@ -6683,8 +6532,6 @@ public final class App extends JFrame implements RadiusControl,
                 throw new RuntimeException(e);
             }
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_IMPORT_LAYER = new BetterAction("importLayer", "Import custom layer(s)") {
@@ -6692,107 +6539,47 @@ public final class App extends JFrame implements RadiusControl,
         protected void performAction(ActionEvent e) {
             importLayers(null, getLayerFilterForCurrentDimension());
         }
-
-        private static final long serialVersionUID = 1L;
     };
     
     private final BetterAction ACTION_ROTATE_BRUSH_LEFT = new BetterAction("rotateBrushLeft", "Rotate brush counterclockwise fifteen degrees") {
         @Override
         protected void performAction(ActionEvent e) {
-            int rotation = brushRotationSlider.getValue() - 15;
-            if (rotation < -180) {
-                rotation += 360;
-            }
-            brushRotationSlider.setValue(rotation);
-            if (activeOperation instanceof PaintOperation) {
-                brushRotation = rotation;
-            } else {
-                toolBrushRotation = rotation;
-            }
-            updateBrushRotation();
+            setRotation(brushRotationSlider.getValue() - 15);
         }
     };
     
     private final BetterAction ACTION_ROTATE_BRUSH_RIGHT = new BetterAction("rotateBrushRight", "Rotate brush clockwise fifteen degrees") {
         @Override
         protected void performAction(ActionEvent e) {
-            int rotation = brushRotationSlider.getValue() + 15;
-            if (rotation > 180) {
-                rotation -= 360;
-            }
-            brushRotationSlider.setValue(rotation);
-            if (activeOperation instanceof PaintOperation) {
-                brushRotation = rotation;
-            } else {
-                toolBrushRotation = rotation;
-            }
-            updateBrushRotation();
+            setRotation(brushRotationSlider.getValue() + 15);
         }
     };
     
     private final BetterAction ACTION_ROTATE_BRUSH_RESET = new BetterAction("rotateBrushReset", "Reset brush rotation to zero degrees") {
         @Override
         protected void performAction(ActionEvent e) {
-            if (brushRotationSlider.getValue() != 0) {
-                brushRotationSlider.setValue(0);
-                if (activeOperation instanceof PaintOperation) {
-                    brushRotation = 0;
-                } else {
-                    toolBrushRotation = 0;
-                }
-                updateBrushRotation();
-            }
+            setRotation(0);
         }
     };
 
     private final BetterAction ACTION_ROTATE_BRUSH_RIGHT_30_DEGREES = new BetterAction("rotateBrushRight30Degrees", "Rotate brush clockwise 30 degrees") {
         @Override
         protected void performAction(ActionEvent e) {
-            int rotation = brushRotationSlider.getValue() + 30;
-            if (rotation > 180) {
-                rotation -= 360;
-            }
-            brushRotationSlider.setValue(rotation);
-            if (activeOperation instanceof PaintOperation) {
-                brushRotation = rotation;
-            } else {
-                toolBrushRotation = rotation;
-            }
-            updateBrushRotation();
+            setRotation(brushRotationSlider.getValue() + 30);
         }
     };
 
     private final BetterAction ACTION_ROTATE_BRUSH_RIGHT_45_DEGREES = new BetterAction("rotateBrushRight45Degrees", "Rotate brush clockwise 45 degrees") {
         @Override
         protected void performAction(ActionEvent e) {
-            int rotation = brushRotationSlider.getValue() + 45;
-            if (rotation > 180) {
-                rotation -= 360;
-            }
-            brushRotationSlider.setValue(rotation);
-            if (activeOperation instanceof PaintOperation) {
-                brushRotation = rotation;
-            } else {
-                toolBrushRotation = rotation;
-            }
-            updateBrushRotation();
+            setRotation(brushRotationSlider.getValue() + 45);
         }
     };
     
     private final BetterAction ACTION_ROTATE_BRUSH_RIGHT_90_DEGREES = new BetterAction("rotateBrushRight90Degrees", "Rotate brush clockwise 90 degrees") {
         @Override
         protected void performAction(ActionEvent e) {
-            int rotation = brushRotationSlider.getValue() + 90;
-            if (rotation > 180) {
-                rotation -= 360;
-            }
-            brushRotationSlider.setValue(rotation);
-            if (activeOperation instanceof PaintOperation) {
-                brushRotation = rotation;
-            } else {
-                toolBrushRotation = rotation;
-            }
-            updateBrushRotation();
+            setRotation(brushRotationSlider.getValue() + 90);
         }
     };
     
@@ -6860,8 +6647,6 @@ public final class App extends JFrame implements RadiusControl,
             }
             DesktopUtils.beep();
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_SWITCH_TO_FROM_MASTER = new BetterAction("switchMaster", "Switch to/from Master") {
@@ -6881,8 +6666,6 @@ public final class App extends JFrame implements RadiusControl,
             }
             DesktopUtils.beep();
         }
-
-        private static final long serialVersionUID = 1L;
     };
 
     private final BetterAction ACTION_SHOW_CUSTOM_TERRAIN_POPUP = new BetterAction("showCustomTerrainMenu", null, loadScaledIcon("plus")) {
@@ -6932,6 +6715,7 @@ public final class App extends JFrame implements RadiusControl,
     Paint paint = PaintFactory.NULL_PAINT;
     Set<Layer> hiddenLayers = new HashSet<>();
     Layer soloLayer;
+    GlassPane glassPane;
 
     private final ButtonGroup toolButtonGroup = new ButtonGroup(), brushButtonGroup = new ButtonGroup(), paintButtonGroup = new ButtonGroup();
     private final Map<Brush, JToggleButton> brushButtons = new HashMap<>();
@@ -6947,6 +6731,7 @@ public final class App extends JFrame implements RadiusControl,
     private final boolean darkMode;
     private final MapSelectionController mapSelectionController;
     private final CustomLayerController customLayerController = new CustomLayerController(this);
+    private final ScrollController scrollController = new ScrollController(this);
 
     private World2 world;
     private long lastSavedState = -1, lastAutosavedState = -1, lastSaveTimestamp = -1;
@@ -6964,7 +6749,6 @@ public final class App extends JFrame implements RadiusControl,
     private JSlider levelSlider, brushRotationSlider;
     private float level = 0.51f, toolLevel = 0.51f;
     private int maxRadius = DEFAULT_MAX_RADIUS, brushRotation = 0, toolBrushRotation = 0, previousBrushRotation = 0;
-    private GlassPane glassPane;
     private JComboBox<TerrainMode> terrainModeComboBox;
     private JCheckBox terrainSoloCheckBox;
     private JToggleButton setSpawnPointToggleButton, eyedropperToggleButton;
@@ -6975,7 +6759,6 @@ public final class App extends JFrame implements RadiusControl,
     private SortedMap<String, BrushGroup> customBrushes;
     private ThreeDeeFrame threeDeeFrame;
     private BiomesViewerFrame biomesViewerFrame;
-    private MapDragControl mapDragControl;
     private BiomesPanel biomesPanel;
     private DockableFrame biomesPanelFrame;
     private Filter filter, toolFilter;
@@ -7007,11 +6790,16 @@ public final class App extends JFrame implements RadiusControl,
             throw new UnsupportedOperationException();
         }
     };
+    public static final Insets SMALLER_BUTTON_INSETS = new Insets(2, 4, 2, 4) {
+        @Override
+        public void set(int top, int left, int bottom, int right) {
+            throw new UnsupportedOperationException();
+        }
+    };
 
     public static final NumberFormat INT_NUMBER_FORMAT = NumberFormat.getIntegerInstance();
     public static final NumberFormat FLOAT_NUMBER_FORMAT = NumberFormat.getNumberInstance();
 
-    private static final int PLATFORM_COMMAND_MASK = Toolkit.getDefaultToolkit().getMenuShortcutKeyMask();
     static final String COMMAND_KEY_NAME = (PLATFORM_COMMAND_MASK == META_DOWN_MASK) ? "⌘" : "Ctrl";
 
     private static Mode mode = Mode.WORLDPAINTER;
@@ -7051,7 +6839,6 @@ public final class App extends JFrame implements RadiusControl,
     private static final Icon ICON_ROTATE_LIGHT_LEFT    = IconUtils.loadScaledIcon("org/pepsoft/worldpainter/icons/arrow_rotate_lightbulb_anticlockwise.png");
     private static final Icon ICON_MOVE_TO_SPAWN        = IconUtils.loadScaledIcon("org/pepsoft/worldpainter/icons/spawn_red.png");
     private static final Icon ICON_MOVE_TO_ORIGIN       = IconUtils.loadScaledIcon("org/pepsoft/worldpainter/icons/arrow_in.png");
-    private static final Icon ICON_UNKNOWN_PATTERN      = IconUtils.loadScaledIcon("org/pepsoft/worldpainter/icons/unknown_pattern.png");
     private static final Icon ICON_SHIFT_WORLD          = IconUtils.loadScaledIcon("org/pepsoft/worldpainter/icons/arrow_cross.png");
     private static final Icon ICON_SCALE_WORLD          = IconUtils.loadScaledIcon("org/pepsoft/worldpainter/icons/arrow_out.png");
     private static final Icon ICON_SETTINGS             = IconUtils.loadScaledIcon("org/pepsoft/worldpainter/icons/wrench.png");
@@ -7068,10 +6855,12 @@ public final class App extends JFrame implements RadiusControl,
 
     private static final ResourceBundle strings = ResourceBundle.getBundle("org.pepsoft.worldpainter.resources.strings"); // NOI18N
 
-    private static final String IMPORT_WARNING_KEY          = "org.pepsoft.worldpainter.importWarning";
+    private static final String IMPORT_WARNING_KEY = "org.pepsoft.worldpainter.importWarning";
+    private static final String BRUSH_FOLDER_TIP_KEY = "org.pepsoft.worldpainter.brushFolderTip";
 
     static final String MERGE_WARNING_KEY = "org.pepsoft.worldpainter.mergeWarning";
 
+    @Serial
     private static final long serialVersionUID = 1L;
     
     public class IntensityAction extends BetterAction {
@@ -7087,156 +6876,7 @@ public final class App extends JFrame implements RadiusControl,
         }
         
         private final int percentage;
-        
-        private static final long serialVersionUID = 1L;
-    }
-    
-    class ScrollController extends MouseAdapter implements KeyEventDispatcher {
-        ScrollController() {
-            timer.setRepeats(false);
-        }
-        
-        void install() {
-            view.addMouseListener(this);
-            view.addMouseMotionListener(this);
-            KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(this);
-        }
-
-        void uninstall() {
-            if (keyDragging || mouseDragging) {
-                glassPane.setCursor(previousCursor);
             }
-            mouseDragging = false;
-            keyDragging = false;
-            KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(this);
-            view.removeMouseMotionListener(this);
-            view.removeMouseListener(this);
-        }
-        
-        // MouseListener / MouseMotionListener
-        
-        @Override
-        public void mousePressed(MouseEvent e) {
-            if ((e.getButton() == MouseEvent.BUTTON2) && (! mouseDragging)) {
-                if (! keyDragging) {
-                    Point viewLocOnScreen = view.getLocationOnScreen();
-                    e.translatePoint(viewLocOnScreen.x, viewLocOnScreen.y);
-                    previousLocation = e.getPoint();
-
-                    previousCursor = glassPane.getCursor();
-                    glassPane.setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
-                }
-                
-                mouseDragging = true;
-            }
-        }
-
-        @Override
-        public void mouseMoved(MouseEvent e) {
-            if (mouseDragging || keyDragging) {
-                Point viewLocOnScreen = view.getLocationOnScreen();
-                e.translatePoint(viewLocOnScreen.x, viewLocOnScreen.y);
-                Point location = e.getPoint();
-                if (previousLocation != null) {
-                    // No idea how previousLocation could be null (it
-                    // implies that the mouse pressed event was never
-                    // received or handled), but we have a report from the
-                    // wild that it happened, so check for it
-                    int dx = location.x - previousLocation.x;
-                    int dy = location.y - previousLocation.y;
-                    view.moveBy(-dx, -dy);
-                }
-                previousLocation = location;
-            }
-        }
-        
-        @Override
-        public void mouseDragged(MouseEvent e) {
-            if (mouseDragging || keyDragging) {
-                Point viewLocOnScreen = view.getLocationOnScreen();
-                e.translatePoint(viewLocOnScreen.x, viewLocOnScreen.y);
-                Point location = e.getPoint();
-                if (previousLocation != null) {
-                    // No idea how previousLocation could be null (it
-                    // implies that the mouse pressed event was never
-                    // received or handled), but we have a report from the
-                    // wild that it happened, so check for it
-                    int dx = location.x - previousLocation.x;
-                    int dy = location.y - previousLocation.y;
-                    view.moveBy(-dx, -dy);
-                }
-                previousLocation = location;
-            }
-        }
-
-        @Override
-        public void mouseReleased(MouseEvent e) {
-            if ((e.getButton() == MouseEvent.BUTTON2) && mouseDragging) {
-                mouseDragging = false;
-                if (! keyDragging) {
-                    glassPane.setCursor(previousCursor);
-                }
-            }
-        }
-
-        // KeyEventDispatcher
-        
-        @Override
-        public boolean dispatchKeyEvent(KeyEvent e) {
-            if ((e.getKeyCode() == KeyEvent.VK_SPACE) && App.this.isFocused()) {
-                if (e.getID() == KeyEvent.KEY_PRESSED) {
-                    if ((e.getWhen() - lastReleased) < KEY_REPEAT_GUARD_TIME) {
-                        timer.stop();
-                        return true;
-                    } else if (! keyDragging) {
-                        Point mouseLocOnScreen = MouseInfo.getPointerInfo().getLocation();
-                        Point scrollPaneLocOnScreen = view.getLocationOnScreen();
-                        Rectangle viewBoundsOnScreen = view.getBounds();
-                        viewBoundsOnScreen.translate(scrollPaneLocOnScreen.x, scrollPaneLocOnScreen.y);
-                        if (! viewBoundsOnScreen.contains(mouseLocOnScreen)) {
-                            // The mouse cursor is not over the view
-                            return false;
-                        }
-
-                        if (! mouseDragging) {
-                            previousLocation = mouseLocOnScreen;
-
-                            previousCursor = glassPane.getCursor();
-                            glassPane.setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
-                        }
-
-                        keyDragging = true;
-                        return true;
-                    }
-                } else if ((e.getID() == KeyEvent.KEY_RELEASED) && keyDragging) {
-                    lastReleased = e.getWhen();
-                    timer.start();
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private Point previousLocation;
-        private boolean mouseDragging, keyDragging;
-        private Cursor previousCursor;
-        private long lastReleased;
-        private final Timer timer = new Timer(KEY_REPEAT_GUARD_TIME, new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    keyDragging = false;
-                    if (! mouseDragging) {
-                        glassPane.setCursor(previousCursor);
-                    }
-                }
-            });
-        
-        /**
-         * The number of milliseconds between key press and release events below
-         * which they will be considered automatic repeats
-         */
-        private static final int KEY_REPEAT_GUARD_TIME = 10;
-    }
 
     interface PaintUpdater {
         void updatePaint();

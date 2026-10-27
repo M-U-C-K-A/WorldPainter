@@ -4,10 +4,11 @@
     <parent>
         <groupId>org.pepsoft.worldpainter</groupId>
         <artifactId>WorldPainter</artifactId>
-        <version>2.21.4-SNAPSHOT</version>
+        <version>2.27.2-SNAPSHOT</version>
     </parent>
 
     <artifactId>WPGUI</artifactId>
+    <name>WPGUI</name>
 
     <dependencies>
         <dependency>
@@ -24,12 +25,6 @@
             <groupId>org.pepsoft.worldpainter</groupId>
             <artifactId>WPDynmapPreviewer</artifactId>
             <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.pepsoft.worldpainter</groupId>
-            <artifactId>WPJava9Support</artifactId>
-            <version>${project.version}</version>
-            <scope>runtime</scope>
         </dependency>
 
         <dependency>
@@ -82,18 +77,6 @@
             <artifactId>laf-dark</artifactId>
             <version>${laf-dark.version}</version>
             <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.nativelibs4java</groupId>
-            <artifactId>bridj</artifactId>
-            <version>${bridj.version}</version>
-            <scope>runtime</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.google.android.tools</groupId>
-                    <artifactId>dx</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <dependency>
@@ -169,7 +152,6 @@
                 <version>${maven-failsafe-plugin.version}</version>
                 <configuration>
                     <reuseForks>false</reuseForks>
-                    <jvm>${jdk11.exec.path}</jvm>
                 </configuration>
             </plugin>
         </plugins>

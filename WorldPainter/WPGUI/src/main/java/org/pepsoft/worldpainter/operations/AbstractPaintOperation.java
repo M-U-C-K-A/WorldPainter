@@ -18,8 +18,6 @@
 
 package org.pepsoft.worldpainter.operations;
 
-import org.pepsoft.worldpainter.MapDragControl;
-import org.pepsoft.worldpainter.RadiusControl;
 import org.pepsoft.worldpainter.WorldPainterView;
 import org.pepsoft.worldpainter.brushes.Brush;
 import org.pepsoft.worldpainter.painting.Paint;
@@ -29,9 +27,17 @@ import org.pepsoft.worldpainter.painting.Paint;
  *
  * Created by pepijn on 20-05-15.
  */
-public abstract class AbstractPaintOperation extends RadiusOperation implements PaintOperation {
-    protected AbstractPaintOperation(String name, String description, WorldPainterView view, RadiusControl radiusControl, MapDragControl mapDragControl, int delay, String statisticsKey) {
-        super(name, description, view, radiusControl, mapDragControl, delay, statisticsKey);
+public abstract class AbstractPaintOperation extends AbstractBrushOperation implements PaintOperation {
+    protected AbstractPaintOperation(String name, String description, int delay, String statisticsKey) {
+        super(name, description, delay, statisticsKey);
+    }
+
+    /**
+     * @deprecated Use {@link #AbstractPaintOperation(String, String, int, String)}
+     */
+    @Deprecated
+    protected AbstractPaintOperation(String name, String description, WorldPainterView view, int delay, String statisticsKey) {
+        super(name, description, view, delay, statisticsKey);
     }
 
     @Override

@@ -13,13 +13,16 @@ import org.pepsoft.util.MathUtils;
 import org.pepsoft.util.PerlinNoise;
 import org.pepsoft.util.ProgressReceiver;
 import org.pepsoft.util.ProgressReceiver.OperationCancelled;
+import org.pepsoft.util.mdc.MDCCapturingRuntimeException;
+import org.pepsoft.util.mdc.MDCThreadPoolExecutor;
+import org.pepsoft.util.undo.BufferKey;
+import org.pepsoft.util.undo.UndoListener;
 import org.pepsoft.util.undo.UndoManager;
 import org.pepsoft.worldpainter.biomeschemes.CustomBiome;
 import org.pepsoft.worldpainter.brushes.Brush;
 import org.pepsoft.worldpainter.exporting.ExportSettings;
 import org.pepsoft.worldpainter.gardenofeden.Garden;
 import org.pepsoft.worldpainter.gardenofeden.Seed;
-import org.pepsoft.worldpainter.heightMaps.AbstractHeightMap;
 import org.pepsoft.worldpainter.heightMaps.ConstantHeightMap;
 import org.pepsoft.worldpainter.layers.*;
 import org.pepsoft.worldpainter.layers.exporters.ExporterSettings;
@@ -34,14 +37,15 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.FileImageInputStream;
 import javax.imageio.stream.ImageInputStream;
-import javax.swing.*;
 import javax.vecmath.Point3i;
 import java.awt.*;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.io.*;
-import java.util.List;
 import java.util.*;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -50,9 +54,10 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import static java.lang.Math.ceil;
 import static java.util.Arrays.fill;
-import static java.util.Collections.emptySet;
-import static java.util.Collections.unmodifiableList;
+import static java.util.Collections.*;
+import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.stream.Collectors.toSet;
 import static org.pepsoft.minecraft.Constants.DEFAULT_WATER_LEVEL;
 import static org.pepsoft.minecraft.Material.*;
@@ -60,19 +65,21 @@ import static org.pepsoft.util.CollectionUtils.copyOf;
 import static org.pepsoft.worldpainter.Constants.*;
 import static org.pepsoft.worldpainter.DefaultPlugin.JAVA_ANVIL;
 import static org.pepsoft.worldpainter.Dimension.Anchor.*;
-import static org.pepsoft.worldpainter.Dimension.Role.DETAIL;
-import static org.pepsoft.worldpainter.Dimension.Role.MASTER;
+import static org.pepsoft.worldpainter.Dimension.Role.*;
 import static org.pepsoft.worldpainter.Dimension.WallType.BEDROCK;
 import static org.pepsoft.worldpainter.Generator.*;
-import static org.pepsoft.worldpainter.biomeschemes.Minecraft1_20Biomes.*;
+import static org.pepsoft.worldpainter.biomeschemes.Minecraft1_21Biomes.*;
+import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.LayerMode.CAVE;
 import static org.pepsoft.worldpainter.panels.DefaultFilter.buildForDimension;
 import static org.pepsoft.worldpainter.util.GeometryUtil.getDistancesToCentre;
+import static org.pepsoft.worldpainter.util.GeometryUtil.visitFilledCircle;
+import static org.pepsoft.worldpainter.util.ThreadUtils.chooseThreadCount;
 
 /**
  *
  * @author pepijn
  */
-public class Dimension extends InstanceKeeper implements TileProvider, Serializable, Tile.Listener, Cloneable {
+public class Dimension extends InstanceKeeper implements TileProvider, Serializable, Tile.Listener, Cloneable, UndoListener {
     public Dimension(World2 world, String name, long minecraftSeed, TileFactory tileFactory, Anchor anchor) {
         this(world, name, minecraftSeed, tileFactory, anchor, true);
     }
@@ -392,7 +399,7 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
     public Set<Point> getTileCoords() {
         readLock.lock();
         try {
-            return Collections.unmodifiableSet(tiles.keySet());
+            return unmodifiableSet(tiles.keySet());
         } finally {
             readLock.unlock();
         }
@@ -434,12 +441,12 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
         }
     }
 
-    public void removeTile(int tileX, int tileY) {
+    public final void removeTile(int tileX, int tileY) {
         removeTile(new Point(tileX, tileY));
     }
 
-    public void removeTile(Tile tile) {
-        removeTile(tile.getX(), tile.getY());
+    public final void removeTile(Tile tile) {
+        removeTile(new Point(tile.getX(), tile.getY()));
     }
 
     public void removeTile(Point coords) {
@@ -477,6 +484,53 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
                 }
             }
             fireTileRemoved(tile);
+            changeNo++;
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    public void removeTiles(Collection<Point> coords) {
+        writeLock.lock();
+        try {
+            boolean updateBounds = false;
+            for (Point tileCoords: coords) {
+                if (! tiles.containsKey(tileCoords)) {
+                    throw new IllegalStateException("Tile not set");
+                }
+                final Tile tile = tiles.remove(tileCoords);
+                if (undoManager != null) {
+                    tile.unregister();
+                }
+                tile.removeListener(this);
+                // If the tile lies at the edge of the world it's possible the low and
+                // high coordinate marks should change; so recalculate them in that case
+                if ((tileCoords.x == lowestX) || (tileCoords.x == highestX) || (tileCoords.y == lowestY) || (tileCoords.y == highestY)) {
+                    updateBounds = true;
+                }
+                fireTileRemoved(tile);
+            }
+            if (updateBounds) {
+                lowestX = Integer.MAX_VALUE;
+                highestX = Integer.MIN_VALUE;
+                lowestY = Integer.MAX_VALUE;
+                highestY = Integer.MIN_VALUE;
+                for (Tile myTile: tiles.values()) {
+                    int myTileX = myTile.getX(), myTileY = myTile.getY();
+                    if (myTileX < lowestX) {
+                        lowestX = myTileX;
+                    }
+                    if (myTileX > highestX) {
+                        highestX = myTileX;
+                    }
+                    if (myTileY < lowestY) {
+                        lowestY = myTileY;
+                    }
+                    if (myTileY > highestY) {
+                        highestY = myTileY;
+                    }
+                }
+            }
             changeNo++;
         } finally {
             writeLock.unlock();
@@ -1023,7 +1077,7 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
         // TODO: don't do this separately for every exported region
 
         // Now find all edge pixels and adjust the distances in the cache for the pixels around each one
-        final int r = (int) Math.ceil(maxDistance), d = 2 * r + 1;
+        final int r = (int) ceil(maxDistance);
         for (Point tileCoords: tileCoordsToProcess) {
             for (int x = 0; x < TILE_SIZE; x++) {
                 for (int y = 0; y < TILE_SIZE; y++) {
@@ -1046,36 +1100,113 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
         }
 
         // Return a HeightMap that will return values from the distance cache
-        return new AbstractHeightMap() {
-            @Override
-            public Icon getIcon() {
-                return null;
-            }
+        return new TileCacheHeightMap(distanceCache, tileXOffset, tileYOffset, 0.0f, maxDistance);
+    }
 
-            @Override
-            public double[] getRange() {
-                return new double[] {0.0f, maxDistance};
+    /**
+     * Bake the highest edge heights within {@code maxDistance} pixels for the edges of an entire painted layer and
+     * return them as a {@link HeightMap}. The information is static and does not update when the
+     * dimension is updated.
+     *
+     * <p><strong>Note</strong> that the information in the height map is only valid for pixels where the layer is set
+     * in the dimension! For other pixels the value is undefined.
+     *
+     * @param layer       The layer for which to bake the edge heights.
+     * @param maxDistance The maximum edge distance to which to calculate the highest edge heights. Pixels where the
+     *                    layer is set and the distance to the nearest edge is higher will have undefined values.
+     * @return A {@link HeightMap} returning the highest edge height within {@code maxDistance} distance for every pixel
+     * where the specified layer is set in this dimension and that is within {@code maxDistance} of the layer's edge.
+     */
+    @SuppressWarnings("UnnecessaryLocalVariable") // Clarity
+    public HeightMap getEdgeHeights(final TunnelLayer layer, final float maxDistance) {
+        // Gather all the tiles that contain the layer so we can work on them directly rather than looking up tiles
+        // continuously. visitTiles() will do the read locking
+        final int[] coords = {Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE};
+        final Set<Tile> tilesToProcess = new HashSet<>();
+        final Set<Point> tileCoordsToProcess = new HashSet<>();
+        visitTiles().forFilter(buildForDimension(this).onlyOn(layer).build()).andDo(tile -> {
+            final int tileX = tile.getX(), tileY = tile.getY();
+            if (tileX < coords[0]) {
+                coords[0] = tileX;
             }
+            if (tileX > coords[1]) {
+                coords[1] = tileX;
+            }
+            if (tileY < coords[2]) {
+                coords[2] = tileY;
+            }
+            if (tileY > coords[3]) {
+                coords[3] = tileY;
+            }
+            tilesToProcess.add(tile);
+            tileCoordsToProcess.add(new Point(tileX, tileY));
+        });
 
-            @Override
-            public double getHeight(int x, int y) {
-                final int tileX = (x >> TILE_SIZE_BITS) - tileXOffset, tileY = (y >> TILE_SIZE_BITS) - tileYOffset;
-                if ((tileX < 0) || (tileX >= distanceCache.length) || (tileY < 0) || (tileY >= distanceCache[0].length) || (distanceCache[tileX][tileY] == null)) {
-                    return 0.0f;
+        // If there are no tiles with the layer we're done
+        if (tilesToProcess.isEmpty()) {
+            return new ConstantHeightMap(minHeight);
+        }
+
+        // Also add the coordinates of all adjacent tiles, otherwise we can't detect edges that lie on a tile boundary
+        final int[] deltas = {0, -1, 1, 0, 0, 1, -1, 0};
+        for (Tile tile: tilesToProcess) {
+            for (int i = 0; i < 4; i++) {
+                final Point adjacentCoords = new Point(tile.getX() + deltas[i * 2], tile.getY() + deltas[i * 2 + 1]);
+                if (tileCoordsToProcess.contains(adjacentCoords)) {
+                    continue;
                 }
-                return distanceCache[tileX][tileY][x & TILE_SIZE_MASK][y & TILE_SIZE_MASK];
+                tileCoordsToProcess.add(adjacentCoords);
             }
+        }
 
-            private void writeObject(ObjectOutputStream out) throws IOException {
-                throw new NotSerializableException();
+        // Store the tiles in a 2D array for fast access; also create the cache that will hold the distance values
+        final int tileX1 = coords[0], tileX2 = coords[1], tileY1 = coords[2], tileY2 = coords[3];
+        final Tile[][] tileCache = new Tile[tileX2 - tileX1 + 1][tileY2 - tileY1 + 1];
+        final float[][][][] heightCache = new float[tileX2 - tileX1 + 1][tileY2 - tileY1 + 1][][];
+        final int tileXOffset = tileX1, tileYOffset = tileY1;
+        for (Tile tile: tilesToProcess) {
+            tileCache[tile.getX() - tileXOffset][tile.getY() - tileYOffset] = tile;
+            // Initialise the entire cache to minHeight. It is the caller's responsibility to consult it only
+            // where the layer is actually set
+            final float[][] cacheForTile = new float[TILE_SIZE][TILE_SIZE];
+            for (float[] column: cacheForTile) {
+                fill(column, minHeight);
             }
-        };
+            heightCache[tile.getX() - tileXOffset][tile.getY() - tileYOffset] = cacheForTile;
+        }
+
+        // TODO: don't do this separately for every exported region
+
+        // Now find all edge pixels and adjust the distances in the cache for the pixels around each one
+        final Dimension floorDimension = world.getDimension(new Anchor(anchor.dim, (layer.getLayerMode() == CAVE) ? CAVE_FLOOR : FLOATING_FLOOR, anchor.invert, layer.getFloorDimensionId()));
+        for (Point tileCoords: tileCoordsToProcess) {
+            for (int x = 0; x < TILE_SIZE; x++) {
+                for (int y = 0; y < TILE_SIZE; y++) {
+                    final int worldX = (tileCoords.x << TILE_SIZE_BITS) | x, worldY = (tileCoords.y << TILE_SIZE_BITS) | y;
+                    if (getBitLayerValueAt(tileCache, tileXOffset, tileYOffset, layer, worldX, worldY)
+                            && ((! getBitLayerValueAt(tileCache, tileXOffset, tileYOffset, layer, worldX - 1, worldY))
+                            || (! getBitLayerValueAt(tileCache, tileXOffset, tileYOffset, layer, worldX, worldY - 1))
+                            || (! getBitLayerValueAt(tileCache, tileXOffset, tileYOffset, layer, worldX + 1, worldY))
+                            || (! getBitLayerValueAt(tileCache, tileXOffset, tileYOffset, layer, worldX, worldY + 1)))) {
+                        // This pixel is on the edge of the layer's painted area; adjust the pixels around it in the
+                        // height cache
+                        visitFilledCircle((int) ceil(maxDistance), (dx, dy, d) -> {
+                            setCachedValueIfHigher(heightCache, tileXOffset, tileYOffset, worldX + dx, worldY + dy, floorDimension.getHeightAt(worldX, worldY));
+                            return true;
+                        });
+                    }
+                }
+            }
+        }
+
+        // Return a HeightMap that will return values from the height cache
+        return new TileCacheHeightMap(heightCache, tileXOffset, tileYOffset, 0.0f, maxDistance);
     }
 
     protected final float doGetDistanceToEdge(final Layer layer, final int x, final int y, final float maxDistance) {
         readLock.lock();
         try {
-            final int r = (int) Math.ceil(maxDistance);
+            final int r = (int) ceil(maxDistance);
             final int tileX1 = (x - r) >> TILE_SIZE_BITS, tileX2 = (x + r) >> TILE_SIZE_BITS, tileY1 = (y - r) >> TILE_SIZE_BITS, tileY2 = (y + r) >> TILE_SIZE_BITS;
             if ((tileX1 == tileX2) && (tileY1 == tileY2)) {
                 // The requested area is completely contained in one tile, optimise by delegating to the tile
@@ -1275,6 +1406,9 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
         }
     }
 
+    /**
+     * Get the <em>inclusive</em> lower bound of the terrain height range for this dimension.
+     */
     public int getMinHeight() {
         return minHeight;
     }
@@ -1288,6 +1422,9 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
         }
     }
 
+    /**
+     * Get the <em>exclusive</em> upper bound of the terrain height range for this dimension.
+     */
     public int getMaxHeight() {
         return maxHeight;
     }
@@ -1411,6 +1548,19 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
 
     public void setFixOverlayCoords(boolean fixOverlayCoords) {
         this.fixOverlayCoords = fixOverlayCoords;
+    }
+
+    public Integer getUndergroundBiome() {
+        return undergroundBiome;
+    }
+
+    public void setUndergroundBiome(Integer undergroundBiome) {
+        if (! Objects.equals(undergroundBiome, this.undergroundBiome)) {
+            final Integer oldUndergroundBiome = this.undergroundBiome;
+            this.undergroundBiome = undergroundBiome;
+            changeNo++;
+            propertyChangeSupport.firePropertyChange("undergroundBiome", oldUndergroundBiome, undergroundBiome);
+        }
     }
 
     public Garden getGarden() {
@@ -1636,6 +1786,8 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
 
     public void registerUndoManager(UndoManager undoManager) {
         this.undoManager = undoManager;
+        undoManager.addBuffer(BUFFER_KEY_MANAGED_ATTRIBUTES, managedAttributes, this);
+        undoManager.addListener(this);
         for (Tile tile: tiles.values()) {
             tile.register(undoManager);
         }
@@ -1688,7 +1840,12 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
         for (Tile tile: tiles.values()) {
             tile.unregister();
         }
-        undoManager = null;
+        if (undoManager != null) {
+            undoManager.removeListener(this);
+            ensureManagedAttributesReadable();
+            undoManager.removeBuffer(BUFFER_KEY_MANAGED_ATTRIBUTES);
+            undoManager = null;
+        }
     }
 
     public final int getAutoBiome(int x, int y) {
@@ -1811,7 +1968,8 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
         return topLayerMinDepth + Math.round((topLayerDepthNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) + 0.5f) * topLayerVariation);
     }
 
-    void ensureAllReadable() {
+    synchronized void ensureAllReadable() {
+        ensureManagedAttributesReadable();
         tiles.values().forEach(Tile::ensureAllReadable);
     }
 
@@ -1877,8 +2035,9 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
                 writeLock.unlock();
             }
             clearUndo();
+            final Set<Tile> unmodifiableRemovedTiles = unmodifiableSet(removedTiles);
             for (Listener listener: listeners) {
-                listener.tilesRemoved(this, removedTiles);
+                listener.tilesRemoved(this, unmodifiableRemovedTiles);
             }
 
             // Add them all back, in their transformed locations
@@ -1912,44 +2071,79 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
                     }
                 }
             } else {
-                int tileCount = removedTiles.size(), tileNo = 0;
-                for (Iterator<Tile> i = removedTiles.iterator(); i.hasNext(); ) {
-                    final Tile tile = i.next();
-                    addTile(tile.transform(transform));
-                    i.remove(); // Remove each tile as we're done with it so it can be garbage collected
-                    tileNo++;
-                    if (progressReceiver != null) {
-                        progressReceiver.setProgress((float) tileNo / tileCount);
+                final int tileCount = removedTiles.size();
+                final AtomicLong tileNo = new AtomicLong();
+                final ExecutorService executor = MDCThreadPoolExecutor.newFixedThreadPool(chooseThreadCount("transforming", tileCount));
+                final Throwable[] exception = new Throwable[1];
+                for (Tile tile: removedTiles) {
+                    executor.submit(() -> {
+                        if (exception[0] != null) {
+                            return;
+                        }
+                        try {
+                            addTile(tile.transform(transform));
+                            if (progressReceiver != null) {
+                                progressReceiver.setProgress((float) tileNo.incrementAndGet() / tileCount);
+                            }
+                        } catch (Throwable t) {
+                            if (exception[0] == null) {
+                                exception[0] = t;
+                            }
+                        }
+                    });
+                }
+                removedTiles.clear(); // Throw away all our references to the tiles so they can be garbage collected as we're done with them (they are till referenced by the jobs on the executor queue)
+                executor.shutdown();
+                try {
+                    if (! executor.awaitTermination(365, DAYS)) {
+                        throw new MDCCapturingRuntimeException("Transformation operation did not complete within one year");
+                    }
+                } catch (InterruptedException e) {
+                    throw new MDCCapturingRuntimeException("Thread interrupted while waiting for completion of scaling operation", e);
+                }
+                if (exception[0] != null) {
+                    if (exception[0] instanceof OperationCancelled) {
+                        throw (OperationCancelled) exception[0];
+                    } else {
+                        throw new MDCCapturingRuntimeException("Exception while scaling tiles", exception[0]);
                     }
                 }
             }
 
             tileFactory.transform(transform);
 
-            for (Overlay overlay: overlays) {
-                if (overlay.getFile().canRead()) {
-                    try {
-                        final java.awt.Dimension overlaySize = getImageSize(overlay.getFile());
-                        if (overlaySize != null) {
-                            final float overlayScale = overlay.getScale();
-                            final Rectangle overlayCoords = transform.transform(new Rectangle(overlay.getOffsetX(), overlay.getOffsetY(), Math.round(overlaySize.width * overlayScale), Math.round(overlaySize.height * overlayScale)));
-                            overlay.setOffsetX(overlayCoords.x);
-                            overlay.setOffsetY(overlayCoords.y);
-                            overlay.setScale(transform.transformScalar(overlayScale));
-                        } else {
+            if (transform.isScaling() || transform.isRotating()) {
+                for (Overlay overlay: overlays) {
+                    if (overlay.getFile().canRead()) {
+                        try {
+                            final java.awt.Dimension overlaySize = getImageSize(overlay.getFile());
+                            if (overlaySize != null) {
+                                final float overlayScale = overlay.getScale();
+                                final Rectangle overlayCoords = transform.transform(new Rectangle(overlay.getOffsetX(), overlay.getOffsetY(), Math.round(overlaySize.width * overlayScale), Math.round(overlaySize.height * overlayScale)));
+                                overlay.setOffsetX(overlayCoords.x);
+                                overlay.setOffsetY(overlayCoords.y);
+                                overlay.setScale(transform.transformScalar(overlayScale));
+                            } else {
+                                // Don't bother user with it, just clear the overlay
+                                logger.error("Size of " + overlay.getFile() + " could not be determined; overlay will not be adjusted");
+                                overlay.setEnabled(false);
+                            }
+                        } catch (IOException e) {
                             // Don't bother user with it, just clear the overlay
-                            logger.error("Size of " + overlay.getFile() + " could not be determined; overlay will not be adjusted");
+                            logger.error("I/O error while trying to determine size of " + overlay.getFile() + "; overlay will not be adjusted", e);
                             overlay.setEnabled(false);
                         }
-                    } catch (IOException e) {
+                    } else {
                         // Don't bother user with it, just clear the overlay
-                        logger.error("I/O error while trying to determine size of " + overlay.getFile() + "; overlay will not be adjusted", e);
+                        logger.error("Overlay " + overlay.getFile() + " could not be read; overlay will not be adjusted");
                         overlay.setEnabled(false);
                     }
-                } else {
-                    // Don't bother user with it, just clear the overlay
-                    logger.error("Overlay " + overlay.getFile() + " could not be read; overlay will not be adjusted");
-                    overlay.setEnabled(false);
+                }
+            } else {
+                for (Overlay overlay: overlays) {
+                    final Point newCoords = transform.transform(overlay.getOffsetX(), overlay.getOffsetY());
+                    overlay.setOffsetX(newCoords.x);
+                    overlay.setOffsetY(newCoords.y);
                 }
             }
         } finally {
@@ -2025,26 +2219,63 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
         return new TileVisitationBuilder(true);
     }
 
+    @SuppressWarnings("unchecked") // Responsibility of client
     public <T> T getAttribute(AttributeKey<T> key) {
-        if (attributes != null) {
+        ensureManagedAttributesReadable();
+        if (managedAttributes.containsKey(key.key)) {
+            return (T) managedAttributes.get(key.key);
+        } else if (attributes != null) {
             return attributes.containsKey(key.key) ? (T) attributes.get(key.key) : key.defaultValue;
         } else {
             return key.defaultValue;
         }
     }
 
+    /**
+     * Set an attribute, without undo support.
+     *
+     * @param key        The key of the attribute to set.
+     * @param value      The value to which to set the attribute.
+     * @param <T>        The value type of the attribute.
+     */
     public <T> void setAttribute(AttributeKey<T> key, T value) {
-        if ((value != null) ? value.equals(key.defaultValue) : (key.defaultValue == null)) {
-            // Setting value to default
-            attributes.remove(key.key);
-            if (attributes.isEmpty()) {
-                attributes = null;
+        setAttribute(key, value, false);
+    }
+
+    /**
+     * Set an attribute, with or without undo support.
+     *
+     * @param key        The key of the attribute to set.
+     * @param value      The value to which to set the attribute.
+     * @param enableUndo Whether the value should track undo and redo.
+     * @param <T>        The value type of the attribute.
+     */
+    public <T> void setAttribute(AttributeKey<T> key, T value, boolean enableUndo) {
+        if (enableUndo) {
+            ensureManagedAttributesWritable();
+            managedAttributes.put(key.key, value);
+            // If this attribute was previously set but not undo-managed, make sure to remove it from the unmanaged
+            // attributes map. It's faster to just call remove() than to check first with containsKey():
+            if (attributes != null) {
+                attributes.remove(key.key);
             }
         } else {
-            if (attributes == null) {
-                attributes = new HashMap<>();
+            ensureManagedAttributesReadable();
+            if (managedAttributes.containsKey(key.key)) {
+                throw new IllegalStateException("Attribute " + key.key + " was previously added with undo support");
             }
-            attributes.put(key.key, value);
+            if ((value != null) ? value.equals(key.defaultValue) : (key.defaultValue == null)) {
+                // Setting value to default
+                attributes.remove(key.key);
+                if (attributes.isEmpty()) {
+                    attributes = null;
+                }
+            } else {
+                if (attributes == null) {
+                    attributes = new HashMap<>();
+                }
+                attributes.put(key.key, value);
+            }
         }
         changeNo++;
     }
@@ -2185,6 +2416,41 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
         changeNo++;
     }
 
+    // UndoListener
+
+    @Override
+    public synchronized void savePointArmed() {
+        managedAttributesWritable = false;
+    }
+
+    @Override
+    public synchronized void savePointCreated() {
+        managedAttributesWritable = false;
+    }
+
+    @Override
+    public void undoPerformed() {
+        // Do nothing
+    }
+
+    @Override
+    public void redoPerformed() {
+        // Do nothing
+    }
+
+    @Override
+    public void bufferChanged(BufferKey<?> key) {
+        managedAttributesReadable = false;
+        managedAttributesWritable = false;
+    }
+
+    void changeAnchorToFloatingFloor() {
+        if (anchor.role != CAVE_FLOOR) {
+            throw new IllegalStateException();
+        }
+        anchor = new Anchor(anchor.dim, FLOATING_FLOOR, anchor.invert, anchor.id);
+    }
+
     /**
      * Optimised version of {@link #getBitLayerValueAt(Layer, int, int)} which gets the information from a 2D array
      * cache of {@link Tile}s rather than looking up the tile each time.
@@ -2209,6 +2475,21 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
         }
         final int xInTile = x & TILE_SIZE_MASK, yInTile = y & TILE_SIZE_MASK;
         if (value < cache[tileX][tileY][xInTile][yInTile]) {
+            cache[tileX][tileY][xInTile][yInTile] = value;
+        }
+    }
+
+    /**
+     * Updates the value in a 4D cache of {@code float}s (2D arrays of pixels per tile, arranged in a 2D array of tiles)
+     * if the current value is lower.
+     */
+    private void setCachedValueIfHigher(float[][][][] cache, int tileXOffset, int tileYOffset, int x, int y, float value) {
+        final int tileX = (x >> TILE_SIZE_BITS) - tileXOffset, tileY = (y >> TILE_SIZE_BITS) - tileYOffset;
+        if ((tileX < 0) || (tileX >= cache.length) || (tileY < 0) || (tileY >= cache[0].length) || (cache[tileX][tileY] == null)) {
+            return;
+        }
+        final int xInTile = x & TILE_SIZE_MASK, yInTile = y & TILE_SIZE_MASK;
+        if (value > cache[tileX][tileY][xInTile][yInTile]) {
             cache[tileX][tileY][xInTile][yInTile] = value;
         }
     }
@@ -2280,6 +2561,27 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
         }
     }
 
+    private synchronized void ensureManagedAttributesReadable() {
+        if ((undoManager != null) && (! managedAttributesReadable)) {
+            managedAttributes = undoManager.getBuffer(BUFFER_KEY_MANAGED_ATTRIBUTES);
+            managedAttributesReadable = true;
+        }
+    }
+
+    private synchronized void ensureManagedAttributesWritable() {
+        if ((undoManager != null) && (! managedAttributesWritable)) {
+            managedAttributes = undoManager.getBufferForEditing(BUFFER_KEY_MANAGED_ATTRIBUTES);
+            managedAttributesReadable = true;
+            managedAttributesWritable = true;
+        }
+    }
+
+    private synchronized void prepareForSaving() {
+        // Make sure all buffers are current, otherwise we may save out of date data to disk
+        ensureAllReadable();
+    }
+
+    @Serial
     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
         in.defaultReadObject();
 
@@ -2459,6 +2761,9 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
                 overlayTransparency = 0.0f;
             }
         }
+        if (wpVersion < 10) {
+            managedAttributes = new HashMap<>();
+        }
         wpVersion = CURRENT_WP_VERSION;
 
         // Make sure customLayers isn't some weird read-only list
@@ -2497,6 +2802,12 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
         }
     }
 
+    @Serial
+    private void writeObject(ObjectOutputStream out) throws IOException {
+        prepareForSaving();
+        out.defaultWriteObject();
+    }
+
     private World2 world;
     private final long seed;
     @Deprecated
@@ -2531,7 +2842,7 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
     private int wpVersion = CURRENT_WP_VERSION;
     private boolean fixOverlayCoords;
     private int ceilingHeight;
-    private Map<String, Object> attributes;
+    private Map<String, Object> attributes, managedAttributes = new HashMap<>();
     private LayerAnchor subsurfaceLayerAnchor = LayerAnchor.BEDROCK, topLayerAnchor = LayerAnchor.BEDROCK;
     private ExportSettings exportSettings;
     private MapGenerator generator;
@@ -2543,6 +2854,10 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
     private String soloedPalette;
     private UUID id = UUID.randomUUID();
     private List<Overlay> overlays = new ArrayList<>();
+    /**
+     * Index of the underground biome, or {@code null} for "same as surface".
+     */
+    private Integer undergroundBiome;
     private transient List<Listener> listeners = new ArrayList<>();
     private transient boolean eventsInhibited;
     private transient Set<Tile> dirtyTiles = new HashSet<>();
@@ -2556,6 +2871,7 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
     private transient ThreadLocal<int[]> biomeHistogramRef = ThreadLocal.withInitial(() -> new int[255]);
     private transient ReadWriteLock lock = new ReentrantReadWriteLock();
     private transient Lock readLock = lock.readLock(), writeLock = lock.writeLock();
+    private transient boolean managedAttributesReadable, managedAttributesWritable;
 
     public static final int[] POSSIBLE_AUTO_BIOMES = {BIOME_PLAINS, BIOME_FOREST,
         BIOME_SWAMPLAND, BIOME_JUNGLE, BIOME_MESA, BIOME_DESERT, BIOME_BEACH,
@@ -2565,8 +2881,10 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
 
     private static final long TOP_LAYER_DEPTH_SEED_OFFSET = 180728193;
     private static final float ROOT_EIGHT = (float) Math.sqrt(8.0);
-    private static final int CURRENT_WP_VERSION = 9;
+    private static final int CURRENT_WP_VERSION = 10;
+    private static final BufferKey<Map<String, Object>> BUFFER_KEY_MANAGED_ATTRIBUTES = new BufferKey<>() {};
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(Dimension.class);
+    @Serial
     private static final long serialVersionUID = 2011062401L;
 
     public interface Listener {
@@ -2603,6 +2921,15 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
             this.readOnly = readOnly;
         }
 
+        /**
+         * Visit tiles for a specific filter. This allows potential optimisation by skipping tiles on which the filter
+         * does not apply.
+         *
+         * <p><strong>Please note:</strong> the only guarantee is that <em>some</em> tiles to which
+         * the filter does not apply <em>may</em> be skipped. You still need to apply the entire filter to each tile
+         * yourself, as there is no guarantee the filter applies at all to each tile. This method exists only for
+         * potential (perhaps future) performance optimisation.
+         */
         public TileVisitationBuilder forFilter(Filter filter) {
             this.filter = filter;
             return this;
@@ -2639,22 +2966,15 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
             int tileX1 = Integer.MIN_VALUE, tileX2 = Integer.MAX_VALUE;
             int tileY1 = Integer.MIN_VALUE, tileY2 = Integer.MAX_VALUE;
             if (brush != null) {
-                final int effectiveRadius = brush.getEffectiveRadius();
-                final int x1 = x - effectiveRadius, x2 = x + effectiveRadius;
-                final int y1 = y - effectiveRadius, y2 = y + effectiveRadius;
+                final Rectangle boundingBox = brush.getBoundingBox();
+                final int x1 = x + boundingBox.x, x2 = x1 + boundingBox.width - 1;
+                final int y1 = y + boundingBox.y, y2 = y1 + boundingBox.height - 1;
                 tileX1 = x1 >> TILE_SIZE_BITS;
                 tileX2 = x2 >> TILE_SIZE_BITS;
                 tileY1 = y1 >> TILE_SIZE_BITS;
                 tileY2 = y2 >> TILE_SIZE_BITS;
             }
-            final Set<Point> tileCoords;
-            readLock.lock();
-            try {
-                tileCoords = getTileCoords();
-            } finally {
-                readLock.unlock();
-            }
-            for (Point coords: tileCoords) {
+            for (Point coords: new HashSet<>(getTileCoords())) {
                 final Tile tile = readOnly ? getTile(coords) : getTileForEditing(coords);
                 final int tileX = tile.getX(), tileY = tile.getY();
                 if ((tileX >= tileX1) && (tileX <= tileX2) && (tileY >= tileY1) && (tileY <= tileY2)
@@ -2886,6 +3206,9 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
                 case CAVE_FLOOR:
                     sb.append(" Cave Floor");
                     break;
+                case FLOATING_FLOOR:
+                    sb.append(" Floating Floor");
+                    break;
             }
             if (invert) {
                 sb.append(" Ceiling");
@@ -3004,6 +3327,7 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
                 .thenComparing(a -> a.role)
                 .thenComparing(a -> a.invert)
                 .thenComparing(a -> a.id);
+        @Serial
         private static final long serialVersionUID = 1L;
     }
 
@@ -3022,9 +3346,15 @@ public class Dimension extends InstanceKeeper implements TileProvider, Serializa
         MASTER,
 
         /**
-         * A dimension associated with a {@link TunnelLayer} floor. The {@link Anchor#id} field is used to associate
-         * it with a particular layer.
+         * A dimension associated with a {@link TunnelLayer} floor in cave mode. The {@link Anchor#id} field is used to
+         * associate it with a particular layer.
          */
-        CAVE_FLOOR
+        CAVE_FLOOR,
+
+        /**
+         * A dimension associated with a {@link TunnelLayer} floor in floating dimension mode. The {@link Anchor#id}
+         * field is used to associate it with a particular layer.
+         */
+        FLOATING_FLOOR
     }
 }

@@ -10,9 +10,9 @@ import com.jidesoft.docking.DockableFrame;
 import com.jidesoft.swing.JideLabel;
 import org.jetbrains.annotations.NotNull;
 import org.pepsoft.util.IconUtils;
-import org.pepsoft.worldpainter.App;
 import org.pepsoft.worldpainter.layers.CustomLayer;
 import org.pepsoft.worldpainter.layers.Layer;
+import org.pepsoft.worldpainter.util.DockableFrameBuilder;
 import org.pepsoft.worldpainter.util.LayoutUtils;
 
 import javax.swing.*;
@@ -20,8 +20,8 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-import java.util.List;
 import java.util.*;
+import java.util.List;
 
 import static java.util.Arrays.asList;
 import static javax.swing.SwingUtilities.getWindowAncestor;
@@ -76,7 +76,7 @@ public class Palette {
         // Row: components provided to constructor
         LayoutUtils.addRowOfComponents(panel, constraints, buttonComponents);
 
-        dockableFrame = new App.DockableFrameBuilder(panel, name, DockContext.DOCK_SIDE_WEST, 3).withIcon(ICON_LAYERS).build();
+        dockableFrame = new DockableFrameBuilder(panel, name, DockContext.DOCK_SIDE_WEST, 3).withIcon(ICON_LAYERS).scrollable().build();
         dockableFrame.setKey("customLayerPalette." + name);
     }
 

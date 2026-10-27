@@ -32,6 +32,7 @@ import static org.pepsoft.worldpainter.biomeschemes.Minecraft1_17Biomes.*;
 /**
  *
  * @author pepijn
+ * @author <a href="https://github.com/qf200011">qf200011</a> - STONE_MIX performance optimisation
  */
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1097,12 +1098,12 @@ public enum Terrain {
                 andesiteNoise.setSeed(seed + ANDESITE_SEED_OFFSET);
                 RANDOM.setSeed(seed);
             }
-            if (z >= -RANDOM.nextInt(5)) { // TODO this is not stable
+            if ((z >= 0) || ((z >= -4) && (z >= -RANDOM.nextInt(5)))) { // TODO this is not stable
                 if (graniteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > GRANITE_CHANCE) {
                     return Material.GRANITE;
-                } else if(dioriteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > DIORITE_CHANCE) {
+                } else if (dioriteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > DIORITE_CHANCE) {
                     return Material.DIORITE;
-                } else if(andesiteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > ANDESITE_CHANCE) {
+                } else if (andesiteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > ANDESITE_CHANCE) {
                     return Material.ANDESITE;
                 } else {
                     return Material.STONE;
@@ -1110,9 +1111,9 @@ public enum Terrain {
             } else {
                 if (graniteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > GRANITE_CHANCE) {
                     return Material.TUFF;
-                } else if(dioriteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > DIORITE_CHANCE) {
+                } else if (dioriteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > DIORITE_CHANCE) {
                     return Material.DEEPSLATE_X;
-                } else if(andesiteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > ANDESITE_CHANCE) {
+                } else if (andesiteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > ANDESITE_CHANCE) {
                     return Material.DEEPSLATE_Z;
                 } else {
                     return Material.DEEPSLATE_Y;
@@ -2840,7 +2841,8 @@ public enum Terrain {
         private static final long SAND_SEED_OFFSET = 26796036;
         private static final long CLAY_SEED_OFFSET = 161603308;
     },
-    MOSS("Moss", MOSS_BLOCK, MOSS_BLOCK, "moss", BIOME_PLAINS);
+    MOSS("Moss", MOSS_BLOCK, MOSS_BLOCK, "moss", BIOME_PLAINS),
+    PALE_MOSS("Pale Moss", PALE_MOSS_BLOCK, PALE_MOSS_BLOCK, "pale moss", BIOME_PLAINS);
 
     Terrain(String name, String description, int defaultBiome) {
         this(name, Material.STONE, Material.STONE, description, defaultBiome);
@@ -3073,6 +3075,10 @@ public enum Terrain {
     /**
      * This information is now public, so don't change it! Only add new values
      * at the end!
+     *
+     * <p><strong>Note:</strong> the order of this array is not the same as the order of {@link #values()}, and the
+     * {@link #ordinal()}} can therefore not be used as an index in this array. The terrain is stored in the
+     * {@link Tile}s by {@link #ordinal()}.
      */
     public static final Terrain[] VALUES = {
         GRASS,

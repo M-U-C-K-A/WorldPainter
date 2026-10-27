@@ -2,12 +2,10 @@ package org.pepsoft.worldpainter.selection;
 
 import org.pepsoft.util.ObservableBoolean;
 import org.pepsoft.worldpainter.Dimension;
-import org.pepsoft.worldpainter.MapDragControl;
-import org.pepsoft.worldpainter.RadiusControl;
 import org.pepsoft.worldpainter.WorldPainterView;
 import org.pepsoft.worldpainter.brushes.Brush;
 import org.pepsoft.worldpainter.brushes.RotatedBrush;
-import org.pepsoft.worldpainter.operations.RadiusOperation;
+import org.pepsoft.worldpainter.operations.AbstractBrushOperation;
 import org.pepsoft.worldpainter.operations.StandardOptionsPanel;
 
 import javax.swing.*;
@@ -19,9 +17,9 @@ import java.awt.geom.Path2D;
 /**
  * Created by Pepijn Schmitz on 03-11-16.
  */
-public class EditSelectionOperation extends RadiusOperation {
-    public EditSelectionOperation(WorldPainterView view, RadiusControl radiusControl, MapDragControl mapDragControl, ObservableBoolean selectionState) {
-        super("Edit Selection", "Expand or shrink the selection", view, radiusControl, mapDragControl, "operation.selection.edit", "edit_selection");
+public class EditSelectionOperation extends AbstractBrushOperation {
+    public EditSelectionOperation(WorldPainterView view, ObservableBoolean selectionState) {
+        super("Edit Selection", "Expand or shrink the selection", view, "operation.selection.edit", "edit_selection");
         this.selectionState = selectionState;
     }
 

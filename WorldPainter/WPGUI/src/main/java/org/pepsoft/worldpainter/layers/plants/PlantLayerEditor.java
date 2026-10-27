@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Math.max;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
@@ -181,7 +182,11 @@ public class PlantLayerEditor extends AbstractLayerEditor<PlantLayer> {
     private void initPlantControls() {
         JPanel panel = new JPanel(new GridBagLayout());
         panelPlantControls.add(panel);
-        addCategory(panel, PLANTS_AND_FLOWERS);
+        addCategory(panel, "Plants and flowers", 0, 18, false, PLANTS_AND_FLOWERS);
+        addFiller(panel);
+        panel = new JPanel(new GridBagLayout());
+        panelPlantControls.add(panel);
+        addCategory(panel, "", 18, MAX_VALUE, true, PLANTS_AND_FLOWERS);
         addFiller(panel);
         panel = new JPanel(new GridBagLayout());
         panelPlantControls.add(panel);
@@ -199,33 +204,45 @@ public class PlantLayerEditor extends AbstractLayerEditor<PlantLayer> {
     }
 
     private void addCategory(JPanel panel, Category category) {
-        addCategory(panel, m(category), category);
+        addCategory(panel, m(category), null, 0, MAX_VALUE, true, category);
     }
 
     private void addCategory(JPanel panel, String title, Category... categories) {
-        addCategory(panel, title, null, categories);
+        addCategory(panel, title, null, 0, MAX_VALUE, true, categories);
     }
 
     private void addCategory(JPanel panel, String title, String subTitle, Category... categories) {
+        addCategory(panel, title, subTitle, 0, MAX_VALUE, true, categories);
+    }
+
+    private void addCategory(JPanel panel, String title, int firstRow, int rowCount, boolean includeGrowth, Category... categories) {
+        addCategory(panel, title, null, firstRow, rowCount, includeGrowth, categories);
+    }
+
+    private void addCategory(JPanel panel, String title, String subTitle, int firstRow, int rowCount, boolean includeGrowth, Category... categories) {
         final boolean newColumn = panel.getComponentCount() == 0;
         final GridBagConstraints constraints = new GridBagConstraints();
-        constraints.gridwidth = newColumn ? 3 : GridBagConstraints.REMAINDER;
+        constraints.gridwidth = (includeGrowth && newColumn) ? 3 : GridBagConstraints.REMAINDER;
         constraints.anchor = GridBagConstraints.BASELINE_LEADING;
         constraints.insets = new Insets(4, 0, 4, 0);
         panel.add(new JLabel("<html><b>" + title + "</b></html>"), constraints);
         constraints.gridwidth = GridBagConstraints.REMAINDER;
-        if (newColumn) {
+        if (includeGrowth && newColumn) {
             panel.add(new JLabel("Growth:"), constraints);
         }
         if (subTitle != null) {
             panel.add(new JLabel(subTitle), constraints);
         }
         final Platform platform = context.getDimension().getWorld().getPlatform();
+        int row = 0;
         for (Category category: categories) {
             for (int i = 0; i < ALL_PLANTS.length; i++) {
                 final Plant plant = ALL_PLANTS[i];
                 if (plant.getCategories()[0] == category) {
-                    addPlantRow(panel, plant, i, isCompatibleWithPlatform(plant, platform));
+                    if ((row >= firstRow) && ((rowCount == MAX_VALUE) || (row < (firstRow + rowCount)))) {
+                        addPlantRow(panel, plant, i, isCompatibleWithPlatform(plant, platform));
+                    }
+                    row++;
                 }
             }
         }
@@ -247,7 +264,7 @@ public class PlantLayerEditor extends AbstractLayerEditor<PlantLayer> {
         constraints.anchor = GridBagConstraints.BASELINE_LEADING;
         constraints.insets = new Insets(1, 0, 1, 4);
         synchronized (icons) {
-            final BufferedImage icon = icons.get(plant.getIconName());
+            final BufferedImage icon = icons.get(plant.getIconNames()[0]);
             if (icon != null) {
                 plantLabels[index] = new JLabel(plant.getName(), new ImageIcon(icon), JLabel.TRAILING);
             } else {
@@ -328,7 +345,17 @@ public class PlantLayerEditor extends AbstractLayerEditor<PlantLayer> {
                     }
                     try (JarFile jarFile = new JarFile(resourcesJar)) {
                         for (Plant plant: ALL_PLANTS) {
-                            icons.put(plant.getIconName(), findIcon(jarFile, plant.getIconName()));
+                            // Find an icon
+                            final String[] iconNames = plant.getIconNames();
+                            for (String iconName: iconNames) {
+                                final BufferedImage icon = findIcon(jarFile, iconName);
+                                if (icon != null) {
+                                    // Then store it under the first icon name (even if it wasn't actually found under
+                                    // that name) because we use the first icon name for the icon lookups
+                                    icons.put(iconNames[0], icon);
+                                    break;
+                                }
+                            }
                         }
                     } catch (IOException e) {
                         logger.error("I/O error while trying to load plant icons; not loading icons", e);

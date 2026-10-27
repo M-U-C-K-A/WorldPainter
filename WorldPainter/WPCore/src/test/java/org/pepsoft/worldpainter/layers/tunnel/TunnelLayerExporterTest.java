@@ -14,6 +14,7 @@ import static org.junit.Assert.assertTrue;
 import static org.pepsoft.minecraft.Material.*;
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE;
 import static org.pepsoft.worldpainter.TestData.*;
+import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.LayerMode.CAVE;
 import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.Mode.FIXED_HEIGHT;
 
 public class TunnelLayerExporterTest {
@@ -42,11 +43,11 @@ public class TunnelLayerExporterTest {
                         } else if (z <= 20) {
                             assertEquals(x + "," + y + "," + z, STONE, material);
                         } else if (z <= 30) {
-                            assertTrue(x + "," + y + "," + z + ": " + material, material == STONE || material == AIR);
+                            assertTrue(x + "," + y + "," + z + ": " + material, material == STONE || material.air);
                         } else if (z <= 70) {
-                            assertEquals(x + "," + y + "," + z, AIR, material);
+                            assertEquals(x + "," + y + "," + z, CAVE_AIR, material);
                         } else if (z < 80) {
-                            assertTrue(x + "," + y + "," + z + ": " + material, material == STONE || material == AIR);
+                            assertTrue(x + "," + y + "," + z + ": " + material, material == STONE || material.air);
                         } else if (z < 97) {
                             assertEquals(x + "," + y + "," + z, STONE, material);
                         } else if (z < 100) {
@@ -85,9 +86,9 @@ public class TunnelLayerExporterTest {
                     int detectedFloorLevel = Integer.MIN_VALUE, detectedRoofLevel = Integer.MIN_VALUE;
                     for (int z = MIN_HEIGHT; z <= 100; z++) {
                         final Material material = minecraftWorld.getMaterialAt(x, y, z);
-                        if ((detectedFloorLevel == Integer.MIN_VALUE) && (material == AIR)) {
+                        if ((detectedFloorLevel == Integer.MIN_VALUE) && (material.air)) {
                             detectedFloorLevel = z - 1;
-                        } else if ((detectedFloorLevel != Integer.MIN_VALUE) && (material != AIR)) {
+                        } else if ((detectedFloorLevel != Integer.MIN_VALUE) && ((! material.air))) {
                             detectedRoofLevel = z;
                             break;
                         }
@@ -101,7 +102,7 @@ public class TunnelLayerExporterTest {
     }
 
     private TunnelLayer createTestLayer() {
-        final TunnelLayer layer = new TunnelLayer("Test", null);
+        final TunnelLayer layer = new TunnelLayer("Test", CAVE, null, PLATFORM);
         layer.setFloorMode(FIXED_HEIGHT);
         layer.setFloorLevel(25);
         layer.setFloorWallDepth(0);

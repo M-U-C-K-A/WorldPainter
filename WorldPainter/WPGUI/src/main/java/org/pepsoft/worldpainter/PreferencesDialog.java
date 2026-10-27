@@ -31,6 +31,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.SortedMap;
+import java.util.prefs.BackingStoreException;
+import java.util.prefs.Preferences;
 
 import static java.awt.BorderLayout.CENTER;
 import static java.awt.BorderLayout.SOUTH;
@@ -53,6 +55,7 @@ import static org.pepsoft.worldpainter.HeightTransform.IDENTITY;
 import static org.pepsoft.worldpainter.Platform.Capability.BLOCK_BASED;
 import static org.pepsoft.worldpainter.Platform.Capability.NAME_BASED;
 import static org.pepsoft.worldpainter.Terrain.GRASS;
+import static org.pepsoft.worldpainter.Version.isSnapshot;
 import static org.pepsoft.worldpainter.World2.DEFAULT_OCEAN_SEED;
 import static org.pepsoft.worldpainter.util.WorldUtils.resizeDimension;
 
@@ -362,7 +365,16 @@ public class PreferencesDialog extends WorldPainterDialog {
 
         try {
             config.save();
-        } catch (IOException e) {
+
+            // Store the acceleration type and manual GUI scale separately, because we need them before we can
+            // load the config:
+            Preferences prefs = Preferences.userNodeForPackage(Main.class);
+            prefs.put((isSnapshot() ? "snapshot." : "") + "accelerationType", config.getAccelerationType().name());
+            prefs.flush();
+            prefs = Preferences.userNodeForPackage(GUIUtils.class);
+            prefs.putFloat((isSnapshot() ? "snapshot." : "") + "manualUIScale", config.getUiScale());
+            prefs.flush();
+        } catch (IOException | BackingStoreException e) {
             handleException(e, this);
         }
     }
@@ -394,7 +406,7 @@ public class PreferencesDialog extends WorldPainterDialog {
     private void editTerrainAndLayerSettings() {
         Configuration config = Configuration.getInstance();
         defaultTerrainAndLayerSettings.getWorld().setPlatform((Platform) comboBoxPlatform.getSelectedItem());
-        DimensionPropertiesDialog dialog = new DimensionPropertiesDialog(this, defaultTerrainAndLayerSettings, colourScheme, true);
+        DimensionPropertiesDialog dialog = new DimensionPropertiesDialog(this, defaultTerrainAndLayerSettings, colourScheme, null, true);
         dialog.setVisible(true);
         TileFactory tileFactory = defaultTerrainAndLayerSettings.getTileFactory();
         if ((tileFactory instanceof HeightMapTileFactory)
@@ -460,7 +472,7 @@ public class PreferencesDialog extends WorldPainterDialog {
             if ((currentGameType != null) && supportedGameTypes.contains(currentGameType)) {
                 comboBoxMode.setSelectedItem(currentGameType);
             }
-            checkBoxChestOfGoodies.setEnabled((platform != JAVA_ANVIL_1_15) && (platform != JAVA_ANVIL_1_17));
+            checkBoxChestOfGoodies.setEnabled((platform != JAVA_ANVIL_1_15) && (platform != JAVA_ANVIL_1_17)); // TODO why?!?!
             checkBoxExtendedBlockIds.setEnabled(platform.capabilities.contains(BLOCK_BASED) && (!platform.capabilities.contains(NAME_BASED)) && (platform != JAVA_MCREGION));
             try {
                 resizeDimension(defaultTerrainAndLayerSettings, newMinHeight, newMaxHeight, IDENTITY, true, null);
@@ -499,7 +511,7 @@ public class PreferencesDialog extends WorldPainterDialog {
         comboBoxHeight.setModel(new DefaultComboBoxModel<>(supportedMaxHeights.toArray(new Integer[0])));
         final List<GameType> supportedGameTypes = platform.supportedGameTypes;
         comboBoxMode.setModel(new DefaultComboBoxModel<>(supportedGameTypes.toArray(new GameType[0])));
-        checkBoxChestOfGoodies.setEnabled((platform != JAVA_ANVIL_1_15) && (platform != JAVA_ANVIL_1_17));
+        checkBoxChestOfGoodies.setEnabled((platform != JAVA_ANVIL_1_15) && (platform != JAVA_ANVIL_1_17)); // TODO why?!?!
         checkBoxExtendedBlockIds.setEnabled(platform.capabilities.contains(BLOCK_BASED) && (!platform.capabilities.contains(NAME_BASED)) && (platform != JAVA_MCREGION));
 
         // Check whether this platform supports the current default export settings (or any export settings)

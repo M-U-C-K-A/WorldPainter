@@ -13,11 +13,12 @@ package org.pepsoft.worldpainter;
 
 import org.pepsoft.minecraft.ChunkFactory;
 import org.pepsoft.util.*;
-import org.pepsoft.util.Version;
 import org.pepsoft.util.ProgressReceiver.OperationCancelled;
+import org.pepsoft.util.Version;
 import org.pepsoft.util.swing.ProgressTask;
 import org.pepsoft.worldpainter.exporting.WorldExportSettings;
 import org.pepsoft.worldpainter.exporting.WorldExporter;
+import org.pepsoft.worldpainter.layers.Layer;
 import org.pepsoft.worldpainter.plugins.PlatformManager;
 import org.pepsoft.worldpainter.util.FileInUseException;
 
@@ -29,7 +30,9 @@ import java.io.File;
 import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
+import static java.util.Comparator.comparingLong;
 import static org.pepsoft.minecraft.Constants.*;
 import static org.pepsoft.util.ExceptionUtils.chainContains;
 import static org.pepsoft.worldpainter.Constants.V_1_17;
@@ -98,14 +101,37 @@ public class ExportProgressDialog extends MultiProgressDialog<Map<Integer, Chunk
             sb.append("<br><br>Please note: this map is <b>more than 384 blocks</b> high.<br>This may cause performance problems on lower end computers.");
         }
         if ((platform == JAVA_ANVIL_1_17) && ((world.getMinHeight() != DEFAULT_MIN_HEIGHT) || (world.getMaxHeight() != DEFAULT_MAX_HEIGHT_ANVIL))) {
-            sb.append("<br><br>Please note: <b>this map uses a data pack</b> for a deviating build height.<br>This data pack is only compatible with Minecraft 1.17.<br>It is not forward compatible with newer versions of Minecraft.");
-        } else if (((platform == JAVA_ANVIL_1_18) || (platform == JAVA_ANVIL_1_19)) && ((world.getMinHeight() != DEFAULT_MIN_HEIGHT_1_18) || (world.getMaxHeight() != DEFAULT_MAX_HEIGHT_1_18))) {
-            sb.append("<br><br>Please note: <b>this map uses a data pack</b> for a deviating build height.<br>This data pack is only compatible with Minecraft 1.18.2 - 1.20.1.<br>It may not be forward compatible with newer versions of Minecraft.");
+            sb.append("<br><br>Please note: <b>this map uses a data pack</b> for a deviating build height.<br>This data pack has only been tested with Minecraft 1.17.<br>It is not forward compatible with newer versions of Minecraft.");
+        } else if ((world.getMinHeight() != DEFAULT_MIN_HEIGHT_1_18) || (world.getMaxHeight() != DEFAULT_MAX_HEIGHT_1_18)) {
+            if ((platform == JAVA_ANVIL_1_18) || (platform == JAVA_ANVIL_1_19)) {
+                sb.append("<br><br>Please note: <b>this map uses a data pack</b> for a deviating build height.<br>This data pack has only been tested with Minecraft 1.18.2 - 1.20.4.<br>It may not be forward compatible with newer versions of Minecraft.");
+            } else if (platform == JAVA_ANVIL_1_20_5) {
+                sb.append("<br><br>Please note: <b>this map uses a data pack</b> for a deviating build height.<br>This data pack has only been tested with Minecraft 1.20.5 - 1.21.10.<br>It may not be forward compatible with newer versions of Minecraft.");
+            } else if (platform == JAVA_ANVIL_1_21_11) {
+                sb.append("<br><br>Please note: <b>this map uses a data pack</b> for a deviating build height.<br>This data pack has only been tested with Minecraft 1.21.11.<br>It may not be forward compatible with newer versions of Minecraft.");
+            } else if (platform == JAVA_ANVIL_26_1) {
+                sb.append("<br><br>Please note: <b>this map uses a data pack</b> for a deviating build height.<br>This data pack has only been tested with Minecraft 26.1 - 26.2.<br>It may not be forward compatible with newer versions of Minecraft.");
+            }
         }
         if (result.size() == 1) {
             ChunkFactory.Stats stats = result.get(result.keySet().iterator().next());
             sb.append("<br><br>Statistics:<br>");
             dumpStats(sb, stats, world.getMaxHeight() - world.getMinHeight());
+            if ((stats.timings != null) && (! stats.timings.isEmpty())) {
+                sb.append("<br>Three longest stages (preview of timings feature):");
+                sb.append("<table><tr><th>Stage</th><th>Description</th><th>Duration</th></tr>");
+                stats.timings.entrySet().stream()
+                        .sorted(comparingLong((Map.Entry<Object, AtomicLong> entry) -> entry.getValue().longValue()).reversed())
+                        .limit(3)
+                        .forEach(entry -> sb.append("<tr><td>")
+                                .append(formatTimingLabel(entry.getKey()))
+                                .append("</td><td>")
+                                .append(formatTimingDescription(entry.getKey()))
+                                .append("</td><td>")
+                                .append(formatTimingValue(entry.getValue().longValue()))
+                                .append("</td></tr>"));
+                sb.append("</table><br>");
+            }
         } else {
             for (Map.Entry<Integer, ChunkFactory.Stats> entry: result.entrySet()) {
                 final int dim = entry.getKey();
@@ -202,11 +228,36 @@ public class ExportProgressDialog extends MultiProgressDialog<Map<Integer, Chunk
             }
         }
     }
-    
+
+    private String formatTimingLabel(Object label) {
+        if (label instanceof Layer) {
+            return ((Layer) label).getName();
+        } else if (label instanceof ChunkFactory.Stage) {
+            return ((ChunkFactory.Stage) label).getName();
+        } else {
+            return label.toString();
+        }
+    }
+
+    private String formatTimingDescription(Object label) {
+        if (label instanceof Layer) {
+            return ((Layer) label).getDescription();
+        } else if (label instanceof ChunkFactory.Stage) {
+            return ((ChunkFactory.Stage) label).getDescription();
+        } else {
+            return "";
+        }
+    }
+
+    private String formatTimingValue(long value) {
+        return formatter.format(value / 1000000000L) + " s";
+    }
+
     private final World2 world;
     private final String name, acknowledgedWarnings;
     private final File baseDir;
     private final WorldExportSettings exportSettings;
+    private final NumberFormat formatter = NumberFormat.getIntegerInstance();
     private volatile File backupDir;
     private volatile boolean allowRetry = false;
     

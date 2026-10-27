@@ -38,14 +38,12 @@ import static org.pepsoft.worldpainter.Constants.UNKNOWN_MATERIAL_COLOUR;
 import static org.pepsoft.worldpainter.Platform.Capability.NAME_BASED;
 
 /**
- * A representation of a Minecraft material, or one possible in- game block
- * type. Implements the Enumeration pattern, meaning there is only ever one
- * instance of this class for each block type (including properties), allowing
- * use of the equals operator (==) for comparing instances.
+ * A representation of a Minecraft material, or one possible in-game block type. Implements the Enumeration pattern,
+ * meaning there is only ever one instance of this class for each block type (including properties), allowing use of the
+ * equals operator (==) for comparing instances.
  *
- * <p>Supports modern post-Minecraft 1.13 materials based on names and
- * properties, as well as legacy pre-1.13 materials based on numerical IDs, and
- * provides continuity between them.
+ * <p>Supports modern post-Minecraft 1.13 materials based on names and properties, as well as legacy pre-1.13 materials
+ * based on numerical IDs, and provides continuity between them.
  *
  * @author pepijn
  */
@@ -99,8 +97,6 @@ public final class Material implements Serializable {
         name = identity.name;
         stringRep = createStringRep();
         legacyStringRep = createLegacyStringRep();
-        horizontalOrientationSchemes = determineHorizontalOrientations(identity);
-        verticalOrientationScheme = determineVerticalOrientation(identity);
         modded = (namespace != MINECRAFT);
         // TODO make this dynamic:
         leafBlock = simpleName.endsWith("_leaves");
@@ -128,6 +124,8 @@ public final class Material implements Serializable {
             colour = spec.containsKey("colour") ? ((int) spec.get("colour")) : UNKNOWN_MATERIAL_COLOUR;
             category = determineCategory();
             propertyDescriptors = (SortedMap<String, PropertyDescriptor>) spec.get("properties");
+            horizontalOrientationSchemes = determineHorizontalOrientations(identity, (String) spec.get("horizontal_orientation_schemes"));
+            verticalOrientationScheme = determineVerticalOrientation(identity, (String) spec.get("vertical_orientation_scheme"));
         } else {
             if (logger.isTraceEnabled()) {
                 logger.trace("Legacy material " + blockType + ":" + data + " not found in materials database");
@@ -149,6 +147,8 @@ public final class Material implements Serializable {
             colour = UNKNOWN_MATERIAL_COLOUR;
             category = CATEGORY_UNKNOWN;
             propertyDescriptors = null;
+            horizontalOrientationSchemes = determineHorizontalOrientations(identity, null);
+            verticalOrientationScheme = determineVerticalOrientation(identity, null);
         }
 
         lightSource = (blockLight > 0);
@@ -158,6 +158,8 @@ public final class Material implements Serializable {
         solid = ! veryInsubstantial;
         hasPropertySnowy = hasProperty(MC_SNOWY);
         canSupportSnow = determineCanSupportSnow();
+        air = (category == CATEGORY_AIR);
+        empty = air || (name == MC_LIGHT);
 
         if (namespace != null) {
             SIMPLE_NAMES_BY_NAMESPACE.computeIfAbsent(namespace, s -> new HashSet<>()).add(simpleName);
@@ -237,8 +239,6 @@ public final class Material implements Serializable {
         }
         stringRep = createStringRep();
         legacyStringRep = createLegacyStringRep();
-        horizontalOrientationSchemes = determineHorizontalOrientations(identity);
-        verticalOrientationScheme = determineVerticalOrientation(identity);
         modded = (namespace != MINECRAFT);
         // TODO make this dynamic:
         leafBlock = simpleName.endsWith("_leaves");
@@ -266,6 +266,8 @@ public final class Material implements Serializable {
             colour = spec.containsKey("colour") ? ((int) spec.get("colour")) : UNKNOWN_MATERIAL_COLOUR;
             category = determineCategory();
             propertyDescriptors = (SortedMap<String, PropertyDescriptor>) spec.get("properties");
+            horizontalOrientationSchemes = determineHorizontalOrientations(identity, (String) spec.get("horizontal_orientation_schemes"));
+            verticalOrientationScheme = determineVerticalOrientation(identity, (String) spec.get("vertical_orientation_scheme"));
         } else {
             if (logger.isDebugEnabled()) {
                 if ((namespace != null) && namespace.equals(MINECRAFT)) {
@@ -291,6 +293,8 @@ public final class Material implements Serializable {
             colour = UNKNOWN_MATERIAL_COLOUR;
             category = CATEGORY_UNKNOWN;
             propertyDescriptors = null;
+            horizontalOrientationSchemes = determineHorizontalOrientations(identity, null);
+            verticalOrientationScheme = determineVerticalOrientation(identity, null);
         }
 
         lightSource = (blockLight > 0);
@@ -300,6 +304,8 @@ public final class Material implements Serializable {
         solid = ! veryInsubstantial;
         hasPropertySnowy = hasProperty(MC_SNOWY);
         canSupportSnow = determineCanSupportSnow();
+        air = (category == CATEGORY_AIR);
+        empty = air || (name == MC_LIGHT);
 
         SIMPLE_NAMES_BY_NAMESPACE.computeIfAbsent(namespace, s -> new HashSet<>()).add(simpleName);
         if (! DEFAULT_MATERIALS_BY_NAME.containsKey(name)) {
@@ -703,35 +709,34 @@ public final class Material implements Serializable {
      * @return A vertically mirrored version of the material.
      */
     public Material invert(Platform platform) {
-        if ((verticalOrientationScheme != null) || (legacyVerticalOrientationScheme != null)) {
-            VerticalOrientationScheme scheme;
-            if (platform.capabilities.contains(NAME_BASED)) {
-                scheme = verticalOrientationScheme;
+        if (invertedMaterial == null) {
+            if ((verticalOrientationScheme != null) || (legacyVerticalOrientationScheme != null)) {
+                final VerticalOrientationScheme scheme;
+                if (platform.capabilities.contains(NAME_BASED)) {
+                    scheme = verticalOrientationScheme;
+                } else {
+                    if (! legacyVerticalOrientationSchemeSet) {
+                        legacyVerticalOrientationScheme = determineLegacyVerticalOrientation();
+                        legacyVerticalOrientationSchemeSet = true;
+                    }
+                    scheme = legacyVerticalOrientationScheme;
+                }
+                if (scheme != null) {
+                    invertedMaterial = switch (scheme) {
+                        case HALF -> withProperty(HALF, getProperty(HALF).equals("top") ? "bottom" : "top");
+                        case TYPE -> withProperty(TYPE, getProperty(TYPE).equals("top") ? "bottom" : "top");
+                        case UP -> withProperty(UP, ! getProperty(UP));
+                        case UP_DOWN -> withProperty(UP, getProperty(DOWN)).withProperty(DOWN, getProperty(UP));
+                        case VERTICAL_DIRECTION-> withProperty(VERTICAL_DIRECTION, getProperty(VERTICAL_DIRECTION).equals("up") ? "down" : "up");
+                    };
+                } else {
+                    invertedMaterial = this;
+                }
             } else {
-                if (! legacyVerticalOrientationSchemeSet) {
-                    legacyVerticalOrientationScheme = determineLegacyVerticalOrientation();
-                    legacyVerticalOrientationSchemeSet = true;
-                }
-                scheme = legacyVerticalOrientationScheme;
-            }
-            if (scheme != null) {
-                switch (scheme) {
-                    case HALF:
-                        return withProperty(HALF, getProperty(HALF).equals("top") ? "bottom" : "top");
-                    case TYPE:
-                        return withProperty(TYPE, getProperty(TYPE).equals("top") ? "bottom" : "top");
-                    case UP:
-                        return withProperty(UP, ! getProperty(UP));
-                    case UP_DOWN:
-                        return withProperty(UP, getProperty(DOWN)).withProperty(DOWN, getProperty(UP));
-                    case VERTICAL_DIRECTION:
-                        return withProperty(VERTICAL_DIRECTION, getProperty(VERTICAL_DIRECTION).equals("up") ? "down" : "up");
-                    default:
-                        throw new InternalError();
-                }
+                invertedMaterial = this;
             }
         }
-        return this;
+        return invertedMaterial;
     }
 
     /**
@@ -916,9 +921,20 @@ public final class Material implements Serializable {
         return watery || is(WATERLOGGED) || (isNamed(MC_WATER) && (getProperty(LEVEL, 0) == 0));
     }
 
-    private HorizontalOrientationScheme[] determineHorizontalOrientations(Identity identity) {
-        if (identity.properties != null) {
-            List<HorizontalOrientationScheme> horizontalOrientationSchemes = new ArrayList<>();
+    private HorizontalOrientationScheme[] determineHorizontalOrientations(Identity identity, String override) {
+        if ("none".equalsIgnoreCase(override)) {
+            return null;
+        }
+        final List<HorizontalOrientationScheme> horizontalOrientationSchemes = new ArrayList<>();
+        if (override != null) {
+            for (String scheme: override.split(",")) {
+                try {
+                    horizontalOrientationSchemes.add(HorizontalOrientationScheme.valueOf(override.trim().toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    logger.error("Block {} specifies invalid horizontal orientation scheme override {}; ignoring", identity.name, override);
+                }
+            }
+        } else if (identity.properties != null) {
             if (identity.properties.keySet().containsAll(ImmutableSet.of("north", "east", "south", "west"))) {
                 horizontalOrientationSchemes.add(CARDINAL_DIRECTIONS);
             }
@@ -943,13 +959,11 @@ public final class Material implements Serializable {
             if (identity.containsPropertyWithValues(MC_HINGE, "left", "right")) {
                 horizontalOrientationSchemes.add(HorizontalOrientationScheme.HINGE);
             }
-            if (horizontalOrientationSchemes.isEmpty()) {
-                return null;
-            } else {
-                return horizontalOrientationSchemes.toArray(new HorizontalOrientationScheme[0]);
-            }
-        } else {
+        }
+        if (horizontalOrientationSchemes.isEmpty()) {
             return null;
+        } else {
+            return horizontalOrientationSchemes.toArray(new HorizontalOrientationScheme[0]);
         }
     }
 
@@ -1022,7 +1036,16 @@ public final class Material implements Serializable {
         return material.blockType != -1;
     }
 
-    private VerticalOrientationScheme determineVerticalOrientation(Identity identity) {
+    private VerticalOrientationScheme determineVerticalOrientation(Identity identity, String override) {
+        if ("none".equalsIgnoreCase(override)) {
+            return null;
+        } else if (override != null) {
+            try {
+                return VerticalOrientationScheme.valueOf(override.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                logger.error("Block {} specifies invalid vertical orientation scheme override {}; ignoring", identity.name, override);
+            }
+        }
         if (identity.containsPropertyWithValues("half", "top", "bottom")) {
             return VerticalOrientationScheme.HALF;
         } else if (identity.containsPropertyWithValues("up", "true", "false")) {
@@ -1043,7 +1066,7 @@ public final class Material implements Serializable {
     @SuppressWarnings("StringEquality") // interned
     private int determineCategory() {
         // Determine the category
-        if ((name == MC_AIR) || (name == MC_CAVE_AIR)) {
+        if ((name == MC_AIR) || (name == MC_CAVE_AIR) || (name == MC_VOID_AIR)) {
             return CATEGORY_AIR;
         } else if ((name == MC_WATER) || (name == MC_LAVA)) {
             return CATEGORY_FLUID;
@@ -1383,6 +1406,11 @@ public final class Material implements Serializable {
     }
 
     /**
+     * Whether the block is an air block.
+     */
+    public final transient boolean air;
+
+    /**
      * How much light the block blocks from 0 (fully transparent) to 15 (fully
      * opaque).
      */
@@ -1493,6 +1521,11 @@ public final class Material implements Serializable {
     public final transient boolean watery;
 
     /**
+     * Whether the block contains nothing physical and is fully transparent.
+     */
+    public final transient boolean empty;
+
+    /**
      * The horizontal orientation scheme(s) detected for this material, or
      * {@code null} if this material has no horizontal orientation, or one could
      * not be determined.
@@ -1597,6 +1630,7 @@ public final class Material implements Serializable {
     private transient boolean legacyHorizontalOrientationSchemesForRotatingSet;
     private transient VerticalOrientationScheme legacyVerticalOrientationScheme;
     private transient boolean legacyVerticalOrientationSchemeSet;
+    private transient Material invertedMaterial;
 
     private static final Map<Integer, Map<String, Object>> LEGACY_BLOCK_SPECS_BY_COMBINED_ID = new HashMap<>();
     private static final Map<String, Set<Map<String, Object>>> LEGACY_BLOCK_SPECS_BY_NAME = new HashMap<>();
@@ -1941,6 +1975,8 @@ public final class Material implements Serializable {
     public static final Property<Integer>   DISTANCE           = new Property<>(MC_DISTANCE,           Integer.class);
     public static final Property<String>    VERTICAL_DIRECTION = new Property<>(MC_VERTICAL_DIRECTION, String.class);
     public static final Property<Integer>   FLOWER_AMOUNT      = new Property<>(MC_FLOWER_AMOUNT,      Integer.class);
+    public static final Property<Boolean>   TIP                = new Property<>(MC_TIP,                Boolean.class);
+    public static final Property<Integer>   SEGMENT_AMOUNT     = new Property<>(MC_SEGMENT_AMOUNT,     Integer.class);
 
     // Modern materials (based on MC 1.13+ block names and properties)
 
@@ -2124,6 +2160,24 @@ public final class Material implements Serializable {
     public static final Material TORCHFLOWER_CROP = get(MC_TORCHFLOWER_CROP);
     public static final Material TORCHFLOWER = get(MC_TORCHFLOWER);
     public static final Material LEAVES_CHERRY = get(MC_CHERRY_LEAVES);
+    /**
+     * A dry light block with level 8.
+     */
+    public static final Material LIGHT = get(MC_LIGHT, MC_LEVEL, 8, MC_WATERLOGGED, false);
+    public static final Material CAVE_AIR = get(MC_CAVE_AIR);
+    public static final Material SHORT_GRASS = get(MC_SHORT_GRASS);
+    public static final Material CLOSED_EYEBLOSSOM = get(MC_CLOSED_EYEBLOSSOM);
+    public static final Material PALE_HANGING_MOSS = get(MC_PALE_HANGING_MOSS).withProperty(TIP, false);
+    public static final Material PALE_HANGING_MOSS_TIP = get(MC_PALE_HANGING_MOSS).withProperty(TIP, true);
+    public static final Material PALE_MOSS_CARPET = get(MC_PALE_MOSS_CARPET);
+    public static final Material PALE_MOSS_BLOCK = get(MC_PALE_MOSS_BLOCK);
+    public static final Material WILDFLOWERS = get(MC_WILDFLOWERS);
+    public static final Material LEAF_LITTER = get(MC_LEAF_LITTER);
+    public static final Material BUSH = get(MC_BUSH);
+    public static final Material FIREFLY_BUSH = get(MC_FIREFLY_BUSH);
+    public static final Material CACTUS_FLOWER = get(MC_CACTUS_FLOWER);
+    public static final Material SHORT_DRY_GRASS = get(MC_SHORT_DRY_GRASS);
+    public static final Material TALL_DRY_GRASS = get(MC_TALL_DRY_GRASS);
 
     // Material type categories
 

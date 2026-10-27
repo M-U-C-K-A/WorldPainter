@@ -4,7 +4,6 @@
  */
 package org.pepsoft.worldpainter.layers.exporters;
 
-import org.pepsoft.minecraft.Direction;
 import org.pepsoft.minecraft.Entity;
 import org.pepsoft.minecraft.Material;
 import org.pepsoft.minecraft.TileEntity;
@@ -22,16 +21,15 @@ import org.pepsoft.worldpainter.util.WPObjectUtils;
 
 import javax.vecmath.Point3i;
 import java.awt.*;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.pepsoft.minecraft.Constants.*;
-import static org.pepsoft.minecraft.Material.*;
+import static org.pepsoft.minecraft.Material.AIR;
 import static org.pepsoft.worldpainter.Platform.Capability.NAME_BASED;
 import static org.pepsoft.worldpainter.Platform.Capability.WATERLOGGED_LEAVES;
 import static org.pepsoft.worldpainter.objects.WPObject.*;
+import static org.pepsoft.worldpainter.util.WPObjectUtils.placeBlock;
 
 /**
  * An exporter which knows how to render {@link WPObject}s to a
@@ -103,6 +101,7 @@ public abstract class WPObjectExporter<L extends Layer> extends AbstractLayerExp
             final boolean extendFoundation = object.getAttribute(ATTRIBUTE_EXTEND_FOUNDATION);
             final boolean waterLoggedLeaves = platform.capabilities.contains(WATERLOGGED_LEAVES);
             final boolean connectBlocks = object.getAttribute(ATTRIBUTE_CONNECT_BLOCKS) && platform.capabilities.contains(NAME_BASED);
+            final boolean manageWaterlogged = object.getAttribute(ATTRIBUTE_MANAGE_WATERLOGGED) && platform.capabilities.contains(NAME_BASED);
 //            System.out.println("Object dimensions: " + dim + ", origin: " + orig);
             for (int dx = 0; dx < dim.x; dx++) {
                 for (int dy = 0; dy < dim.y; dy++) {
@@ -117,39 +116,39 @@ public abstract class WPObjectExporter<L extends Layer> extends AbstractLayerExp
                             if (worldZ < minHeight + (bottomless || obliterate ? 0 : 1)) {
                                 continue;
                             } else if (obliterate) {
-                                placeBlock(world, worldX, worldY, worldZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks);
+                                placeBlock(world, worldX, worldY, worldZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks, manageWaterlogged);
                             } else {
                                 final Material existingMaterial = world.getMaterialAt(worldX, worldY, worldZ);
                                 if (worldZ <= terrainHeight) {
                                     switch (undergroundMode) {
                                         case COLLISION_MODE_ALL:
                                             // Replace every block
-                                            placeBlock(world, worldX, worldY, worldZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks);
+                                            placeBlock(world, worldX, worldY, worldZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks, manageWaterlogged);
                                             break;
                                         case COLLISION_MODE_SOLID:
                                             // Only replace if object block is solid
                                             if (! finalMaterial.veryInsubstantial) {
-                                                placeBlock(world, worldX, worldY, worldZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks);
+                                                placeBlock(world, worldX, worldY, worldZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks, manageWaterlogged);
                                             }
                                             break;
                                         case COLLISION_MODE_NONE:
                                             // Only replace less solid blocks
                                             if (existingMaterial.veryInsubstantial) {
-                                                placeBlock(world, worldX, worldY, worldZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks);
+                                                placeBlock(world, worldX, worldY, worldZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks, manageWaterlogged);
                                             }
                                             break;
                                     }
                                 } else {
                                     // Above ground only replace less solid blocks
                                     if (existingMaterial.veryInsubstantial) {
-                                        placeBlock(world, worldX, worldY, worldZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks);
+                                        placeBlock(world, worldX, worldY, worldZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks, manageWaterlogged);
                                     }
                                 }
                             }
                             if (extendFoundation && (dz == 0) && (terrainHeight != Integer.MIN_VALUE) && (worldZ > terrainHeight) && (! finalMaterial.veryInsubstantial)) {
                                 int legZ = worldZ - 1;
                                 while ((legZ >= minHeight) && world.getMaterialAt(worldX, worldY, legZ).veryInsubstantial) {
-                                    placeBlock(world, worldX, worldY, legZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks);
+                                    placeBlock(world, worldX, worldY, legZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks, manageWaterlogged);
                                     legZ--;
                                 }
                             }
@@ -239,6 +238,7 @@ public abstract class WPObjectExporter<L extends Layer> extends AbstractLayerExp
             final boolean replaceBlocks = replaceMaterial != null;
             final boolean waterLoggedLeaves = platform.capabilities.contains(WATERLOGGED_LEAVES);
             final boolean connectBlocks = object.getAttribute(ATTRIBUTE_CONNECT_BLOCKS) && platform.capabilities.contains(NAME_BASED);
+            final boolean manageWaterlogged = object.getAttribute(ATTRIBUTE_MANAGE_WATERLOGGED) && platform.capabilities.contains(NAME_BASED);
             for (int dx = 0; dx < dim.x; dx++) {
                 for (int dy = 0; dy < dim.y; dy++) {
                     final int worldX = x + dx + offset.x;
@@ -251,7 +251,7 @@ public abstract class WPObjectExporter<L extends Layer> extends AbstractLayerExp
                             final Material existingMaterial = world.getMaterialAt(worldX, worldY, worldZ);
                             // Only replace less solid blocks
                             if (existingMaterial.veryInsubstantial) {
-                                placeBlock(world, worldX, worldY, worldZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks);
+                                placeBlock(world, worldX, worldY, worldZ, finalMaterial, leafDecayMode, waterLoggedLeaves, connectBlocks, manageWaterlogged);
                             }
                         }
                     }
@@ -387,7 +387,7 @@ public abstract class WPObjectExporter<L extends Layer> extends AbstractLayerExp
                                 } else if (worldZ > dimension.getIntHeightAt(worldX, worldY)) {
                                     Material material = world.getMaterialAt(worldX, worldY, worldZ);
                                     if ((collisionMode == COLLISION_MODE_ALL)
-                                            ? ((material != AIR) && (! material.isNamed(MC_WATER)) && (! material.isNamed(MC_LAVA)))
+                                            ? (((! material.empty)) && (! material.isNamed(MC_WATER)) && (! material.isNamed(MC_LAVA)))
                                             : (! material.veryInsubstantial)) {
                                         // The block is above ground, it is present in the
                                         // custom object, is substantial, and there is already a
@@ -505,130 +505,6 @@ public abstract class WPObjectExporter<L extends Layer> extends AbstractLayerExp
         return new Box(x + offset.x, x + offset.x + dimensions.x,
                 y + offset.y, y + offset.y + dimensions.y,
                 z + offset.z, z + offset.z + dimensions.z);
-    }
-
-    private static void placeBlock(MinecraftWorld world, int x, int y, int height, Material material, int leafDecayMode, boolean waterloggedLeaves, boolean connectBlocks) {
-        final boolean materialHasPropertyWaterlogged;
-        if (material.leafBlock) {
-            materialHasPropertyWaterlogged = waterloggedLeaves;
-            if (leafDecayMode != LEAF_DECAY_NO_CHANGE) {
-                if (leafDecayMode == LEAF_DECAY_ON) {
-                    material = material.withProperty(PERSISTENT, false);
-                } else {
-                    material = material.withProperty(PERSISTENT, true);
-                }
-            }
-        } else {
-            materialHasPropertyWaterlogged = material.hasProperty(WATERLOGGED);
-        }
-        final Material existingMaterial = world.getMaterialAt(x, y, height);
-        final boolean existingMaterialContainsWater = existingMaterial.containsWater();
-        // Manage the waterlogged property, but only if we're confident what it should be based on the block that is
-        // already there
-        if ((existingMaterial.translucent || existingMaterial.hasProperty(WATERLOGGED)) && materialHasPropertyWaterlogged) {
-            if (existingMaterialContainsWater) {
-                material = material.withProperty(WATERLOGGED, true);
-            } else {
-                material = material.withProperty(WATERLOGGED, false);
-            }
-        }
-        // Manage the cardinal direction properties for connecting blocks, if requested
-        Set<Direction> checkReverseConnections = null;
-        if (connectBlocks) {
-            if (material.connectingBlock) {
-                // The object block is a connecting block; check around it for other connecting blocks or solid blocks
-                if (WPObjectUtils.wouldConnect(material, world.getMaterialAt(x - 1, y, height))) {
-                    material = material.withProperty(WEST, true);
-                    checkReverseConnections = EnumSet.of(Direction.WEST);
-                }
-                if (WPObjectUtils.wouldConnect(material, world.getMaterialAt(x, y - 1, height))) {
-                    material = material.withProperty(NORTH, true);
-                    if (checkReverseConnections == null) {
-                        checkReverseConnections = EnumSet.of(Direction.NORTH);
-                    } else {
-                        checkReverseConnections.add(Direction.NORTH);
-                    }
-                }
-                if (WPObjectUtils.wouldConnect(material, world.getMaterialAt(x + 1, y, height))) {
-                    material = material.withProperty(EAST, true);
-                    if (checkReverseConnections == null) {
-                        checkReverseConnections = EnumSet.of(Direction.EAST);
-                    } else {
-                        checkReverseConnections.add(Direction.EAST);
-                    }
-                }
-                if (WPObjectUtils.wouldConnect(material, world.getMaterialAt(x, y + 1, height))) {
-                    material = material.withProperty(SOUTH, true);
-                    if (checkReverseConnections == null) {
-                        checkReverseConnections = EnumSet.of(Direction.SOUTH);
-                    } else {
-                        checkReverseConnections.add(Direction.SOUTH);
-                    }
-                }
-            } else if (material.solid && material.opaque) {
-                // The object block is not a connecting block, but it *is* solid and opaque, so check for surrounding
-                // connecting blocks which might need to be connected to it
-                if (WPObjectUtils.wouldConnect(material, world.getMaterialAt(x - 1, y, height))) {
-                    checkReverseConnections = EnumSet.of(Direction.WEST);
-                }
-                if (WPObjectUtils.wouldConnect(material, world.getMaterialAt(x, y - 1, height))) {
-                    if (checkReverseConnections == null) {
-                        checkReverseConnections = EnumSet.of(Direction.NORTH);
-                    } else {
-                        checkReverseConnections.add(Direction.NORTH);
-                    }
-                }
-                if (WPObjectUtils.wouldConnect(material, world.getMaterialAt(x + 1, y, height))) {
-                    if (checkReverseConnections == null) {
-                        checkReverseConnections = EnumSet.of(Direction.EAST);
-                    } else {
-                        checkReverseConnections.add(Direction.EAST);
-                    }
-                }
-                if (WPObjectUtils.wouldConnect(material, world.getMaterialAt(x, y + 1, height))) {
-                    if (checkReverseConnections == null) {
-                        checkReverseConnections = EnumSet.of(Direction.SOUTH);
-                    } else {
-                        checkReverseConnections.add(Direction.SOUTH);
-                    }
-                }
-            }
-        }
-        // Don't replace water with insubstantial blocks that don't have a waterlogged property (assume such a block
-        // would be washed away), except air. We are slightly guessing at what the user would want to happen here...
-        if ((! material.veryInsubstantial) || (! existingMaterialContainsWater) || material.containsWater() || (material == AIR)) {
-            world.setMaterialAt(x, y, height, material);
-            if (connectBlocks && (checkReverseConnections != null)) {
-                makeReverseConnections(world, x, y, height, checkReverseConnections);
-            }
-        }
-    }
-
-    /**
-     * Check neighbouring blocks to see if they need to be connected back to the object block.
-     */
-    private static void makeReverseConnections(MinecraftWorld world, int x, int y, int height, Set<Direction> directions) {
-        for (Direction direction: directions) {
-            final int neighbourX = x + direction.getDx(), neighbourY = y + direction.getDy();
-            Material neighbouringMaterial = world.getMaterialAt(neighbourX, neighbourY, height);
-            if (neighbouringMaterial.connectingBlock) {
-                switch (direction) {
-                    case WEST:
-                        neighbouringMaterial = neighbouringMaterial.withProperty(EAST, true);
-                        break;
-                    case NORTH:
-                        neighbouringMaterial = neighbouringMaterial.withProperty(SOUTH, true);
-                        break;
-                    case EAST:
-                        neighbouringMaterial = neighbouringMaterial.withProperty(WEST, true);
-                        break;
-                    case SOUTH:
-                        neighbouringMaterial = neighbouringMaterial.withProperty(NORTH, true);
-                        break;
-                }
-                world.setMaterialAt(neighbourX, neighbourY, height, neighbouringMaterial);
-            }
-        }
     }
 
     // TODO centralise block merging logic and make it more readable by being systematic (haven't we already done that somewhere?)

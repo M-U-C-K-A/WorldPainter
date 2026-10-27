@@ -573,6 +573,20 @@ public final class Constants {
     public static final String MC_SUSPICIOUS_SAND = "minecraft:suspicious_sand";
     public static final String MC_SUSPICIOUS_GRAVEL = "minecraft:suspicious_gravel";
     public static final String MC_CHERRY_LEAVES = "minecraft:cherry_leaves";
+    public static final String MC_LIGHT = "minecraft:light";
+    public static final String MC_VOID_AIR = "minecraft:void_air";
+    public static final String MC_SHORT_GRASS = "minecraft:short_grass";
+    public static final String MC_CLOSED_EYEBLOSSOM = "minecraft:closed_eyeblossom";
+    public static final String MC_PALE_HANGING_MOSS = "minecraft:pale_hanging_moss";
+    public static final String MC_PALE_MOSS_CARPET = "minecraft:pale_moss_carpet";
+    public static final String MC_PALE_MOSS_BLOCK = "minecraft:pale_moss_block";
+    public static final String MC_WILDFLOWERS = "minecraft:wildflowers";
+    public static final String MC_LEAF_LITTER = "minecraft:leaf_litter";
+    public static final String MC_BUSH = "minecraft:bush";
+    public static final String MC_FIREFLY_BUSH = "minecraft:firefly_bush";
+    public static final String MC_CACTUS_FLOWER = "minecraft:cactus_flower";
+    public static final String MC_SHORT_DRY_GRASS = "minecraft:short_dry_grass";
+    public static final String MC_TALL_DRY_GRASS = "minecraft:tall_dry_grass";
 
     // MC 1.18 biome names
 
@@ -608,6 +622,8 @@ public final class Constants {
     public static final String MC_VERTICAL_DIRECTION = "vertical_direction";
     public static final String MC_THICKNESS          = "thickness";
     public static final String MC_FLOWER_AMOUNT      = "flower_amount";
+    public static final String MC_TIP                = "tip";
+    public static final String MC_SEGMENT_AMOUNT     = "segment_amount";
 
     // Minecraft NBT tag names. An underscore at the end signifies a lower case
     // initial
@@ -724,6 +740,7 @@ public final class Constants {
     public static final String TAG_SEED_                   = "seed";
     public static final String TAG_TYPE_                   = "type";
     public static final String TAG_GENERATE_FEATURES_      = "generate_features";
+    public static final String TAG_GENERATE_STRUCTURES_    = "generate_structures";
     public static final String TAG_SETTINGS_               = "settings";
     public static final String TAG_BIOME_SOURCE_           = "biome_source";
     public static final String TAG_PRESET_                 = "preset";
@@ -748,6 +765,10 @@ public final class Constants {
     public static final String TAG_SPAWN_DIMENSION         = "SpawnDimension";
     public static final String TAG_FACING                  = "Facing";
     public static final String TAG_FACING_                 = "facing";
+    public static final String TAG_SPAWN_                  = "spawn";
+    public static final String TAG_DIMENSION_              = "dimension";
+    public static final String TAG_YAW_                    = "yaw";
+    public static final String TAG_PITCH_                  = "pitch";
 
     /**
      * Possibly unofficial, SpoutCraft-specific
@@ -758,15 +779,20 @@ public final class Constants {
     public static final int VERSION_MCREGION = 0x4abc;
     public static final int VERSION_ANVIL    = 0x4abd;
 
-    public static final int DATA_VERSION_MC_1_12_2 = 1343;
-    public static final int DATA_VERSION_MC_1_14_4 = 1976;
-    public static final int DATA_VERSION_MC_1_15_2 = 2230;
-    public static final int DATA_VERSION_MC_1_16_5 = 2586;
-    public static final int DATA_VERSION_MC_1_17   = 2724;
-    public static final int DATA_VERSION_MC_1_17_1 = 2730;
-    public static final int DATA_VERSION_MC_1_18_0 = 2860;
-    public static final int DATA_VERSION_MC_1_18_2 = 2975;
-    public static final int DATA_VERSION_MC_1_19_0 = 3105;
+    public static final int DATA_VERSION_MC_1_12_2  = 1343;
+    public static final int DATA_VERSION_MC_1_14_4  = 1976;
+    public static final int DATA_VERSION_MC_1_15_2  = 2230;
+    public static final int DATA_VERSION_MC_1_16_5  = 2586;
+    public static final int DATA_VERSION_MC_1_17    = 2724;
+    public static final int DATA_VERSION_MC_1_17_1  = 2730;
+    public static final int DATA_VERSION_MC_1_18_0  = 2860;
+    public static final int DATA_VERSION_MC_1_18_2  = 2975;
+    public static final int DATA_VERSION_MC_1_19_0  = 3105;
+    public static final int DATA_VERSION_MC_1_20_4  = 3700;
+    public static final int DATA_VERSION_MC_1_20_5  = 3837;
+    public static final int DATA_VERSION_MC_1_21_10 = 4556;
+    public static final int DATA_VERSION_MC_1_21_11 = 4671;
+    public static final int DATA_VERSION_MC_26_1    = 4786;
 
     // Legacy (pre-MC 1.13) block IDs
 

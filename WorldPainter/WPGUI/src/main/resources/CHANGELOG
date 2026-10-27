@@ -1,3 +1,165 @@
+-- Version 2.27.1, released 30-8-2027
+
+ * Bug fix: make setting the spawn point work once again for Minecraft 26.1 and later
+
+-- Version 2.27.0, released 27-6-2026
+
+ * Added support for Exporting, Importing and Merging with maps from Minecraft 26.1 and later
+   + This is just the map format, which has changed structurally; not yet new blocks etc.
+   + Since the structure of the map has changed there is more potential for bugs and errors; please report any problems you encounter
+
+-- Version 2.26.4, released 25-6-2026
+
+ * Bug fix: fix an error with non-standard build heights over 1000 for Minecraft 1.21.11 and above
+
+-- Version 2.26.3, released 21-6-2026
+
+ * Java 26 and later are now supported as the runtime (fixes the ClassNotFoundException when starting WorldPainter on Java 26)
+ * Minecraft versions 1.21.11 and later have a compatible data pack generated for non standard build heights
+ * Bug fix: fix a problem with the Minecraft 1.21.11 non-standard build height datapack that was causing errors
+
+-- Version 2.26.1, released 28-9-2025
+
+ * Bug fix: using Undo too many times in Custom Cave/Tunnel floor dimensions or Floating Dimensions will no longer cause errors
+   + This has unfortunately necessitated the clearing of the undo buffer for the floor or floating dimension whenever its shape is changed. In other words: whenever you change the shape of a Custom Cave/Tunnel layer with a floor dimension, or a Floating Dimension, you cannot undo past that point when subsequently editing the floor or floating dimension.
+
+-- Version 2.26.0, released 19-8-2025
+
+ * The new plants from Minecraft 1.21.5 have been added to the Custom Plants layer
+   + The Edit Layer Settings screen for the Custom Plants layer has been modified slightly to fit the new plants: the "Plants and flowers" category now takes two columns
+   + In the near future this screen will be laid out better
+ * The Fill tool can now also fill in valleys by raising the terrain level, instead of (or in addition to) filling areas with a layer, terrain or biome
+   + Select "Raise terrain" on the Tool Settings panel when the Fill tool is selected
+   + The terrain will be raised by one at the location where you click, and the surrounding area which is at that level or lower will be raised to the same level
+   + You can optionally select "Apply theme" to also apply the theme in the areas that are raised
+   + Or alternatively, you can select "Apply paint" to apply the currently selected paint, such as a Terrain type, in the areas that are raised. You can use this to "fill" a valley with a particular material (although it is important to remember that the shape of the valley is erased; you are just flattening the terrain and changing the terrain type)
+   + If the Fill tool is active and "Raise terrain" is selected, and you select a paint from one of the panels, "Apply paint" will automatically be selected
+ * The Flatten tool can now also selectively just raise or just lower the terrain, in addition to flattening in both directions
+   + Select "Only raise terrain" or "Only lower terrain" on the Tool Settings panel when the Flatten tool is selected to only flatten in the selected direction
+ * Scaling, shifting and rotation operations on dimensions are now multithreaded for increased performance
+ * When changing the map format, the Resources layer settings are now automatically adjusted to turn off resources which are not supported in the new map format. Note that this change is not automatically reverted if the map format is changed back.
+ * A new advanced setting has been added to be able to run multiple different copies of WorldPainter with separate configurations
+   + See www.worldpainter.net/trac/wiki/AdvancedSettings#ConfigurationClassifier for details
+ * Bug fix: in the scripting API, the `installCustomTerrain()` function now returns the correct terrain index for later usage in e.g. `applyTerrain()`
+
+-- Version 2.25.1, released 10-07-2025
+
+ * Bug fix: make Ceiling Dimensions work under y = 0.
+ * Bug fix: fix a crash related to applying biomes from Ceiling Dimensions, e.g. patches of lush or dripstone caves
+ * Bug fix: apply biomes from Ceiling Dimensions, e.g. patches of lush or dripstone caves, in the correct locations
+ * Bug fix: revert an accidentally included change to the progress manager which made the Export progress bar jump around and give (even more) nonsensical times
+
+-- Version 2.25.0, released 08-07-2025
+
+ * WorldPainter now requires Java 17 or later! If necessary, you can download an appropriate version of Java using the links on www.worldpainter.net.
+ * Some Export performance optimisations have been implemented for Stone Mix, Chasms and Perlin noise
+   + For a typical world and settings you can expect a performance increase of roughly 25%
+   + Depending on the selected Post Processing and Export settings the performance increase can rise significantly
+   + With thanks to https://github.com/qf200011 for Stone Mix and Chasms and https://github.com/MCRcortex for Perlin noise
+ * The Floating Dimension support has received some updates:
+   + It is now in the Alpha Test rather than Preview stage
+   + The "rounded" edge shape has been enabled for the edges of floating dimensions, and is now the default for new floating dimensions
+   + Both surface and underground biomes of the floating dimension can now be exported. The height above the floor within which surface biomes are applied can be configured
+   + The Resources layer settings tab is now enabled for floating dimension properties
+   + Bug fix: Resources are once again only exported when directed, and only in the underground portion of the floating dimension, not outside or underneath
+ * The "Underground biome" setting on the General tab of the Dimension Properties is now actually honoured, if the map format supports it
+ * An Undo button has been added to the Global Operations tool window. It activates when the window is kept open after an action and allow you to undo the results of that action. You may also press Ctrl+Z (or ⌘+Z on a Mac) to perform an Undo.
+ * The Global Operations tool now also allows you to raise or lower the terrain relative to the current height; in other words raise or lower it by an amount instead of to a target level
+ * A Reset button has been added to the Resources layer settings tab to reset all values to their defaults
+ * Sponge schem version 3 custom object files in which the data is embedded in a Schematic tag are now correctly loaded
+ * Bug fix: fix a crash that occurred trying to use the Pencil tool without a paint selected
+
+-- Version 2.24.3, released 22-06-2025
+
+ * Bug fix: removed an optimisation that broke the brushes in some circumstances
+
+-- Version 2.24.2, released 21-06-2025
+
+ * Panels with dynamic contents now display vertical scrollbars when their contents are taller than the display area
+ * Scripts can now check for interrupts so that they can be aborted if they run too long or enter an infinite loop
+   + A script can either check the wp.interrupted property to check whether it should abort (if it wishes to do clean-up), or call wp.checkForInterrupt(), which will throw an exception if it should abort, if it does not need to do any clean-up
+   + Scripts that don't check for interrupts and enter an infinite loop still cannot be aborted. If a script does not respond to an abort request after ten seconds, a warning is displayed recommending to ask the author of the script to add interrupt support
+ * Bug fix: the Pencil tool did not draw continuous lines in Fast Mode with brush radius 0
+
+-- Version 2.24.1, released 05-05-2025
+
+ * Increase performance of the Pencil tool with large brushes or long lines by adding new fast mode
+   + In fast mode, the Pencil tool can only draw lines with the default circular brushes. If you have a non-circular brush selected the tool will automatically use a solid circle of the same size
+   + Fast mode is the default, but you can switch to slow mode on the Tool Settings panel for the Pencil tool
+   + Slow mode is the old painting mode, which may hang or even crash the program if you try to draw lines too wide, long or fast, because it tries to paint the full brush shape along every pixel of the line; that does mean that the result is pixel perfect
+ * Added a new Global Operation: change terrain height
+   + You can raise (which will only affect lower ground), lower (only affects higher ground) or set the terrain height to a particular height
+   + Like the other operations, you can apply this everywhere, or use the filter to apply it only to the selection, or some other condition
+ * Preview of timings feature added
+   + WorldPainter keeps track of how long it takes to perform individual Export stages and Layers
+   + In this preview, the three longest stages or layers will be shown in the summary after the Export is finished
+   + An upcoming release will display the timings in more detail
+ * Bug fix: prevent a UI scaling error from crashing the program
+
+-- Version 2.24.0, released 05-04-2025
+
+ * Add Minecraft 1.21 support:
+   + Support version 1.20.5 and later with non standard height datapack
+   + Add Pale Garden biome
+   + Add support for Importing short_grass (note that short grass is still exported as minecraft:grass, in order to support older versions, since Minecraft appears to correct the name upon first loading chunks)
+   + Add Hanging Pale Grass, Eyeblossom and Pale Moss Carpet plants
+   + Add Pale Moss Block terrain type
+   + Add known properties of all new blocks
+
+-- Version 2.23.2, released 20-10-2024
+
+ * Bug fix: fix an error during config file migration. If your configuration was reset due to this error, you can get it back by shutting down WorldPainter, renaming the config.old file to config and restarting WorldPainter
+
+-- Version 2.23.1, released 18-10-2024
+
+ * Bug fix: the terrain panel no longer collapses when there is not enough space for its contents
+
+-- Version 2.23.0, released 18-10-2024
+
+ * Custom Object Layers now have a grid setting, to place objects only on a square grid of configurable size
+   + In addition, an optional random displacement from those grid points can be specified for more variation
+ * The spawn point can now be in a Custom Cave/Tunnel layer or on a floating dimension
+   + Just edit the corresponding floor dimension and then use the Spawn tool to set the spawn point there
+   + If the spawn point is moved during a test export because it is outside the selected tiles, it will always be moved to the surface
+ * You can now optionally configure a separate underground biome for map formats that support 3D biomes
+   + This also applies to Floating Dimensions, which can have a different underground biome
+ * Added a warning when creating a Master Dimension, as people continue to do this by accident or without sufficient understanding. It will be displayed the first three times you try to create a Master Dimension
+ * A new scripting operation has been added to obtain a numerical biome ID on map formats which use named biome IDs, since WorldPainter's scripting operations always need a numerical ID:
+   biomeId = wp.getBiome().withName('minecraft:cherry_grove').go() // For vanilla biomes
+   biomeId = wp.getBiome().fromWorld(world).withName('custom:mybiome').go() // For custom biomes from a particular world. Note that if there is more than one custom biome defined with the same name but different ID's, the result is undefined
+ * Custom block spec files can now override the horizontal and vertical orientation schemes of the blocks, allowing WorldPainter to rotate and mirror them correctly (or disabling rotating and mirroring). See https://www.worldpainter.net/trac/wiki/CustomBlocks for details
+
+-- Version 2.22.1, released 22-1-2024
+
+ * A preview of floating dimensions has been added
+   + They work very similarly to Custom Cave/Tunnel layers:
+   + You create a new floating dimension layer and configure what you want the default height of the floor to be
+   + Then you paint the layer in the desired shape of the floating dimension. You'll most likely want to use a solid brush at 100%
+   + Then you right-click the layer button and select "edit floor dimension" to customise the floating dimension floor
+   + This is a preview! It is not finished and contains bugs. It exists mainly to solicit feedback. Please report your experiences in the WorldPainter subreddit: https://www.reddit.com/r/WorldPainter
+   + Known missing functionality:
+     - Bottom layers do not yet work. These will work the same as roof layers for Custom Cave/Tunnel layers; they will be exported inverted at the bottom of the floating dimension
+     - You cannot yet configure the material on the bottom of the floating dimension, or the shape of the edge of the floating dimension
+     - There is no way yet to raise or lower the floating dimension after creating it, other than using the regular height tools. Don't try to use the Change Height screen; it will affect the surface dimension as well
+     - A limited set of layers can be used on the floor dimension. This will be expanded later (in particular layers that affect the underground, such as underground pockets and the cave layers, will be supported)
+     - 3D biomes are not yet applied to the map
+ * The Find entry on Custom Layer button popups has been moved below the Edit entry
+ * Bug fix: fix a crash when trying to add an existing layer to a Custom Cave/Tunnel layer roof or floor, when there are Custom Annotation layers present
+ * Bug fix: fix a crash when Exporting a Custom Cave/Tunnel layer that has Custom Annotations
+
+-- Version 2.22.0, released 3-12-2023
+
+ * Custom Cave/Tunnel Layers can now be filled with artificial light, or a custom material
+   + The four choices for the fill material are:
+     - air (the default for existing layers)
+     - cave_air (the default for new layers)
+     - artificial block light with a configurable level (using the minecraft:light block)
+     - a custom material of your own configuration
+   + cave_air and artificial light are only available for map formats which support them
+ * A "Find" choice has been added to the context menu of Custom Layer buttons, that will move the view to the nearest location where that layer has been painted. This makes it easier to quickly find where a layer is in use
+ * Bug fix: fix a scripting error that occurred when creating filters
+ * Bug fix: fix a bug that would sometimes prevent complex Custom Materials from working correctly
+
 -- Version 2.21.3, released 20-10-2023
 
  * Check more thoroughly for incompatible blocks before Exporting in Minecraft 1.2 - 1.12 format, to try and prevent errors later in the Export

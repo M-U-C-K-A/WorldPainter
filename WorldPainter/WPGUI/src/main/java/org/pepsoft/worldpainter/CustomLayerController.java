@@ -1,12 +1,14 @@
 package org.pepsoft.worldpainter;
 
 import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.AtomicDouble;
 import com.jidesoft.docking.DockContext;
 import com.jidesoft.docking.DockableFrame;
 import org.jetbrains.annotations.NotNull;
 import org.pepsoft.minecraft.Material;
 import org.pepsoft.util.DesktopUtils;
 import org.pepsoft.util.IconUtils;
+import org.pepsoft.util.MathUtils;
 import org.pepsoft.util.swing.BetterJPopupMenu;
 import org.pepsoft.worldpainter.importing.CustomItemsTreeModel;
 import org.pepsoft.worldpainter.layers.*;
@@ -15,6 +17,7 @@ import org.pepsoft.worldpainter.layers.groundcover.GroundCoverLayer;
 import org.pepsoft.worldpainter.layers.plants.PlantLayer;
 import org.pepsoft.worldpainter.layers.pockets.UndergroundPocketsDialog;
 import org.pepsoft.worldpainter.layers.pockets.UndergroundPocketsLayer;
+import org.pepsoft.worldpainter.layers.tunnel.FloatingLayerDialog;
 import org.pepsoft.worldpainter.layers.tunnel.TunnelLayer;
 import org.pepsoft.worldpainter.layers.tunnel.TunnelLayerDialog;
 import org.pepsoft.worldpainter.operations.PaintOperation;
@@ -39,23 +42,30 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.*;
 import java.text.MessageFormat;
-import java.util.List;
 import java.util.*;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.zip.GZIPOutputStream;
 
-import static java.awt.Color.BLACK;
-import static java.awt.Color.YELLOW;
+import static java.awt.Color.*;
 import static java.util.Arrays.asList;
 import static java.util.Comparator.comparing;
 import static javax.swing.JOptionPane.*;
 import static org.pepsoft.minecraft.Constants.DEFAULT_WATER_LEVEL;
 import static org.pepsoft.util.AwtUtils.doLaterOnEventThread;
+import static org.pepsoft.util.DesktopUtils.beep;
 import static org.pepsoft.util.swing.MessageUtils.*;
 import static org.pepsoft.worldpainter.App.COMMAND_KEY_NAME;
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE;
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE_BITS;
 import static org.pepsoft.worldpainter.Dimension.Role.CAVE_FLOOR;
+import static org.pepsoft.worldpainter.Dimension.Role.FLOATING_FLOOR;
+import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.EdgeShape.ROUNDED;
+import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.LayerMode.CAVE;
+import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.LayerMode.FLOATING;
+import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.Mode.FIXED_HEIGHT_ABOVE_FLOOR;
+import static org.pepsoft.worldpainter.panels.DefaultFilter.buildForDimension;
 
 public class CustomLayerController implements PropertyChangeListener {
     CustomLayerController(App app) {
@@ -106,20 +116,41 @@ public class CustomLayerController implements PropertyChangeListener {
 
             private void showPopup(MouseEvent e) {
                 final JPopupMenu popup = new BetterJPopupMenu();
+
                 JMenuItem menuItem = new JMenuItem(strings.getString("edit") + "...");
                 menuItem.addActionListener(e1 -> editCustomLayer(layer));
                 popup.add(menuItem);
+
                 final Dimension dimension = app.getDimension();
-                if ((layer instanceof TunnelLayer)) {
-                    final TunnelLayer tunnelLayer = (TunnelLayer) layer;
+                if (layer instanceof TunnelLayer tunnelLayer) {
                     final Integer floorDimensionId = tunnelLayer.getFloorDimensionId();
                     if (floorDimensionId != null) {
-                        menuItem = new JMenuItem("Edit floor dimension");
-                        if (dimension.containsOneOf(layer)) {
+                        final String shortName, longName;
+                        switch (tunnelLayer.getLayerMode()) {
+                            case CAVE:
+                                shortName = "floor dimension";
+                                longName = "Custom Cave/Tunnel layer floor dimension";
+                                break;
+                            case FLOATING:
+                                shortName = "floating dimension";
+                                longName = "Floating Dimension";
+                                break;
+                            default:
+                                throw new InternalError("Unknown layer mode " + tunnelLayer.getLayerMode());
+                        }
+                        menuItem = new JMenuItem("Edit " + shortName);
+                        if (dimension.containsOneOf(tunnelLayer)) {
                             menuItem.addActionListener(e1 -> {
                                 final Point viewPosition = app.view.getViewCentreInWorldCoords();
                                 final Dimension floorDimension = tunnelLayer.updateFloorDimension(dimension, null);
                                 app.setDimension(floorDimension);
+                                if (tunnelLayer.isFloorDimensionShapeDirty()) {
+                                    // If we don't do this, the user can undo the changes to the NotPresentBlack layer,
+                                    // which would cause havoc
+                                    floorDimension.clearUndo();
+                                    floorDimension.armSavePoint();
+                                    tunnelLayer.setFloorDimensionShapeDirty(false);
+                                }
 
                                 // Initially we move to the same location as we were on the surface. Then we check
                                 // whether the floor dimension is actually visible then. If not, we try to find the
@@ -150,21 +181,23 @@ public class CustomLayerController implements PropertyChangeListener {
                                     if (tile.getY() > maxY) {
                                         maxY = tile.getY();
                                     }
-                                };
+                                }
                                 if ((! floorTileVisible) && (minX != Integer.MAX_VALUE)) {
                                     app.view.moveTo((((maxX + minX) / 2) << TILE_SIZE_BITS) + (TILE_SIZE / 2),
                                             (((maxY + minY) / 2) << TILE_SIZE_BITS) + (TILE_SIZE / 2));
                                 }
 
                                 final Configuration config = Configuration.getInstance();
-                                if (! config.isMessageDisplayedCountAtLeast(EDITING_FLOOR_DIMENSION_KEY, 3)) {
+                                if (! config.isMessageDisplayedCountAtLeast(EDITING_FLOOR_DIMENSION_KEY_2, 3)) {
                                     doLaterOnEventThread(() -> JOptionPane.showMessageDialog(app,
-                                            "Press Esc to finish editing the Custom Cave/Tunnel layer floor dimension,\n" +
-                                                    "or select the Surface dimension from the app.view menu or by pressing " + COMMAND_KEY_NAME + "+U", "Editing Cave/Tunnel Floor", JOptionPane.INFORMATION_MESSAGE));
-                                    config.setMessageDisplayed(EDITING_FLOOR_DIMENSION_KEY);
+                                            "Press Esc to finish editing the " + longName + ",\n" +
+                                                    "or select the Surface dimension from the app.view menu or by pressing " + COMMAND_KEY_NAME + "+U.\n\n" +
+                                                    "NOTE: changing the shape of the dimension later will throw away the undo information\n" +
+                                                    "of this " + longName + ".", "Editing " + longName, JOptionPane.INFORMATION_MESSAGE));
+                                    config.setMessageDisplayed(EDITING_FLOOR_DIMENSION_KEY_2);
                                 }
 
-                                final JLabel label = new JLabel("<html><font size='+1'>Press Esc to leave the Custom Cave/Tunnel Floor Dimension.</font></html>");
+                                final JLabel label = new JLabel("<html><font size='+1'>Press Esc to leave the " + longName + ".</font></html>");
                                 label.setBorder(new CompoundBorder(new LineBorder(BLACK), new EmptyBorder(5, 5, 5, 5)));
                                 app.pushGlassPaneComponent(label);
                             });
@@ -174,6 +207,11 @@ public class CustomLayerController implements PropertyChangeListener {
                         popup.add(menuItem);
                     }
                 }
+
+                menuItem = new JMenuItem("Find");
+                menuItem.addActionListener(e1 -> findLayer(layer));
+                popup.add(menuItem);
+
                 menuItem = new JMenuItem("Duplicate...");
                 if (layer.isExportableToFile()) {
                     menuItem.addActionListener(e1 -> duplicate());
@@ -182,9 +220,11 @@ public class CustomLayerController implements PropertyChangeListener {
                     menuItem.setToolTipText("This layer cannot be duplicated.");
                 }
                 popup.add(menuItem);
+
                 menuItem = new JMenuItem(strings.getString("remove") + "...");
                 menuItem.addActionListener(e1 -> remove());
                 popup.add(menuItem);
+
                 menuItem = new JMenuItem("Export to file...");
                 if (layer.isExportableToFile()) {
                     menuItem.addActionListener(e1 -> exportLayer(layer));
@@ -226,8 +266,7 @@ public class CustomLayerController implements PropertyChangeListener {
                 final CustomLayer duplicate = layer.clone();
                 duplicate.setName("Copy of " + layer.getName());
                 final Object paint = layer.getPaint();
-                if (paint instanceof Color) {
-                    Color colour = (Color) paint;
+                if (paint instanceof Color colour) {
                     final float[] hsb = Color.RGBtoHSB(colour.getRed(), colour.getGreen(), colour.getBlue(), null);
                     hsb[0] += 1f / 12;
                     if (hsb[0] > 1f) {
@@ -261,7 +300,7 @@ public class CustomLayerController implements PropertyChangeListener {
         addLayerButton.setMargin(new Insets(2, 2, 2, 2));
         addLayerButton.addActionListener(e -> {
             if (app.getDimension() == null) {
-                DesktopUtils.beep();
+                beep();
                 return;
             }
             // Find out which palette the button is on
@@ -276,7 +315,7 @@ public class CustomLayerController implements PropertyChangeListener {
                 customLayerMenu.show(addLayerButton, addLayerButton.getWidth(), 0);
             } else {
                 logger.error("Could not find palette add layer button is on");
-                DesktopUtils.beep();
+                beep();
             }
         });
         final List<Component> addLayerButtonPanel = new ArrayList<>(3);
@@ -305,6 +344,17 @@ public class CustomLayerController implements PropertyChangeListener {
 
         if (activate) {
             paletteManager.activate(layer);
+        }
+
+        final Configuration config = Configuration.getInstance();
+        if (activate
+                && (paletteManager.getPaletteContaining(layer).getLayers().size() >= 25)
+                && (! config.isMessageDisplayed(LAYER_PALETTE_TIP_KEY))) {
+            showInfo(app, """
+                    Tip: you can distribute Custom Layers over multiple
+                    palettes by right-clicking on the layer button and
+                    selecting Move to palette → New palette...""", "Layer Palette Tip");
+            config.setMessageDisplayed(LAYER_PALETTE_TIP_KEY);
         }
     }
 
@@ -366,14 +416,14 @@ public class CustomLayerController implements PropertyChangeListener {
                 registerCustomLayer(layer, true);
             });
         });
-        if (anchor.role == CAVE_FLOOR) {
+        if ((anchor.role == CAVE_FLOOR) || (anchor.role == FLOATING_FLOOR)) { // TODO support more layers in floating dimensions
             menuItem.setEnabled(false);
         }
         customLayerMenu.add(menuItem);
 
         menuItem = new JMenuItem("Add a custom cave/tunnel layer...");
         menuItem.addActionListener(e -> {
-            final TunnelLayer layer = new TunnelLayer("Tunnels", BLACK);
+            final TunnelLayer layer = new TunnelLayer("Tunnels", CAVE, BLACK, world.getPlatform());
             final int baseHeight, waterLevel;
             final TileFactory tileFactory = dimension.getTileFactory();
             if (tileFactory instanceof HeightMapTileFactory) {
@@ -394,7 +444,7 @@ public class CustomLayerController implements PropertyChangeListener {
                 registerCustomLayer(layer, true);
             });
         });
-        if (anchor.role == CAVE_FLOOR) {
+        if ((anchor.role == CAVE_FLOOR) || (anchor.role == FLOATING_FLOOR)) { // TODO support more layers in floating dimensions
             menuItem.setEnabled(false);
         }
         customLayerMenu.add(menuItem);
@@ -437,6 +487,37 @@ public class CustomLayerController implements PropertyChangeListener {
                 registerCustomLayer(layer, true);
             });
         });
+        customLayerMenu.add(menuItem);
+
+        menuItem = new JMenuItem("[ALPHA] Add a floating dimension...");
+        menuItem.addActionListener(e -> {
+            final TunnelLayer layer = new TunnelLayer("Floating Dimension", FLOATING, CYAN, world.getPlatform());
+            layer.setFloorMode(FIXED_HEIGHT_ABOVE_FLOOR);
+            layer.setFloorLevel(16);
+            layer.setBottomEdgeShape(ROUNDED);
+            final int baseHeight, waterLevel;
+            final TileFactory tileFactory = dimension.getTileFactory();
+            if (tileFactory instanceof HeightMapTileFactory) {
+                baseHeight = (int) ((HeightMapTileFactory) tileFactory).getBaseHeight();
+                waterLevel = ((HeightMapTileFactory) tileFactory).getWaterHeight();
+                layer.setFloodWithLava(((HeightMapTileFactory) tileFactory).isFloodWithLava());
+            } else {
+                baseHeight = 58;
+                waterLevel = DEFAULT_WATER_LEVEL;
+            }
+            // TODO passing in dimension here is a crude mechanism. It is supposed to be the dimension on which this
+            //  layer will be used, but that is impossible to enforce. In practice this will usually be right though
+            final FloatingLayerDialog dialog = new FloatingLayerDialog(app, world.getPlatform(), layer, dimension, world.isExtendedBlockIds(), app.getColourScheme(), app.getCustomBiomeManager(), dimension.getMinHeight(), dimension.getMaxHeight(), baseHeight, waterLevel);
+            dialog.setVisible(() -> {
+                if (paletteName != null) {
+                    layer.setPalette(paletteName);
+                }
+                registerCustomLayer(layer, true);
+            });
+        });
+        if ((anchor.role == CAVE_FLOOR) || (anchor.role == FLOATING_FLOOR)) { // TODO support more layers in floating dimensions
+            menuItem.setEnabled(false);
+        }
         customLayerMenu.add(menuItem);
 
         List<Class<? extends CustomLayer>> allPluginLayers = new ArrayList<>();
@@ -537,7 +618,7 @@ public class CustomLayerController implements PropertyChangeListener {
             dimension.clearLayerData(layer);
             if ((layer instanceof TunnelLayer) && (((TunnelLayer) layer).getFloorDimensionId() != null)) {
                 final Dimension.Anchor anchor = dimension.getAnchor();
-                app.getWorld().removeDimension(new Dimension.Anchor(anchor.dim, CAVE_FLOOR, anchor.invert, ((TunnelLayer) layer).getFloorDimensionId()));
+                app.getWorld().removeDimension(new Dimension.Anchor(anchor.dim, (((TunnelLayer) layer).getLayerMode() == CAVE) ? CAVE_FLOOR : FLOATING_FLOOR, anchor.invert, ((TunnelLayer) layer).getFloorDimensionId()));
             }
             dimension.clearUndo();
         } finally {
@@ -575,7 +656,7 @@ public class CustomLayerController implements PropertyChangeListener {
     void deleteUnusedLayers() {
         final Dimension dimension = app.getDimension();
         if (dimension == null) {
-            DesktopUtils.beep();
+            beep();
             return;
         }
         final List<CustomLayer> unusedLayers = getCustomLayers();
@@ -629,8 +710,7 @@ public class CustomLayerController implements PropertyChangeListener {
         boolean customTerrainButtonsAdded = false;
         layer.setExportIndex(null);
         registerCustomLayer(layer, true);
-        if (layer instanceof CombinedLayer) {
-            final CombinedLayer combinedLayer = (CombinedLayer) layer;
+        if (layer instanceof CombinedLayer combinedLayer) {
             importLayersFromCombinedLayer(combinedLayer);
             if (! combinedLayer.restoreCustomTerrain()) {
                 showWarning(app, "The layer contained a Custom Terrain which could not be restored. The terrain has been reset.", "Custom Terrain Not Restored");
@@ -685,6 +765,66 @@ public class CustomLayerController implements PropertyChangeListener {
                 importLayersFromCombinedLayer((CombinedLayer) customLayer);
             }
         });
+    }
+
+    private void findLayer(Layer layer) {
+        final WorldPainter view = app.view;
+        final Dimension dimension = app.getDimension();
+        final int tileX = view.getViewX() >> TILE_SIZE_BITS, tileY = view.getViewY() >> TILE_SIZE_BITS;
+        final AtomicInteger closestTileX = new AtomicInteger(), closestTileY = new AtomicInteger();
+        final AtomicDouble closestDistance = new AtomicDouble(Double.MAX_VALUE);
+        dimension.visitTiles()
+                .forFilter(buildForDimension(dimension).onlyOn(layer).build())
+                .andDo(tile -> {
+                    if (! isLayerSet(tile, layer)) {
+                        return;
+                    }
+                    final float distance = MathUtils.getDistance(tile.getX() - tileX, tile.getY() - tileY);
+                    if (distance < closestDistance.floatValue()) {
+                        closestDistance.set(distance);
+                        closestTileX.set(tile.getX());
+                        closestTileY.set(tile.getY());
+                    }
+                    // TODO stop iterating if the current location already contains the layer
+                });
+        if (closestDistance.get() == Double.MAX_VALUE) {
+            beep();
+            showInfo(view, "Layer " + layer + " is not in use in the current dimension", "Layer Not Present");
+        } else {
+            view.moveTo((closestTileX.get() << TILE_SIZE_BITS) + (TILE_SIZE / 2), (closestTileY.get() << TILE_SIZE_BITS) + (TILE_SIZE / 2));
+        }
+    }
+
+    /**
+     * Check whether the layer is set anywhere in the tile.
+     */
+    private boolean isLayerSet(Tile tile, Layer layer) {
+        switch (layer.dataSize) {
+            case BIT:
+            case BIT_PER_CHUNK:
+                final boolean defaultBitValue = layer.getDefaultValue() != 0;
+                for (int x = 0; x < TILE_SIZE; x++) {
+                    for (int y = 0; y < TILE_SIZE; y++) {
+                        if (tile.getBitLayerValue(layer, x, y) != defaultBitValue) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            case NIBBLE:
+            case BYTE:
+                final int defaultValue = layer.getDefaultValue();
+                for (int x = 0; x < TILE_SIZE; x++) {
+                    for (int y = 0; y < TILE_SIZE; y++) {
+                        if (tile.getLayerValue(layer, x, y) != defaultValue) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            default:
+                throw new IllegalArgumentException("Invalid data size " + layer.dataSize);
+        }
     }
 
     private void editCustomLayer(CustomLayer layer) {
@@ -784,7 +924,9 @@ public class CustomLayerController implements PropertyChangeListener {
             // TODO passing in dimension here is a crude mechanism. It is supposed to be the dimension on which this
             //  layer is being used, but that is a lot of work to determine. In practice this will usually be right
             //  though
-            dialog = (AbstractEditLayerDialog<L>) new TunnelLayerDialog(app, world.getPlatform(), (TunnelLayer) layer, dimension, world.isExtendedBlockIds(), app.getColourScheme(), app.getCustomBiomeManager(), dimension.getMinHeight(), dimension.getMaxHeight(), baseHeight, waterLevel);
+            dialog = (AbstractEditLayerDialog<L>) ((((TunnelLayer) layer).getLayerMode() == CAVE)
+                ? new TunnelLayerDialog(app, world.getPlatform(), (TunnelLayer) layer, dimension, world.isExtendedBlockIds(), app.getColourScheme(), app.getCustomBiomeManager(), dimension.getMinHeight(), dimension.getMaxHeight(), baseHeight, waterLevel)
+                : new FloatingLayerDialog(app, world.getPlatform(), (TunnelLayer) layer, dimension, world.isExtendedBlockIds(), app.getColourScheme(), app.getCustomBiomeManager(), dimension.getMinHeight(), dimension.getMaxHeight(), baseHeight, waterLevel));
         } else if (layer instanceof CustomAnnotationLayer) {
             dialog = (AbstractEditLayerDialog<L>) new CustomAnnotationLayerDialog(app, (CustomAnnotationLayer) layer);
         } else {
@@ -846,7 +988,8 @@ public class CustomLayerController implements PropertyChangeListener {
     final PaletteManager paletteManager = new PaletteManager(this);
 
     private static final ResourceBundle strings = ResourceBundle.getBundle("org.pepsoft.worldpainter.resources.strings"); // NOI18N
-    private static final String EDITING_FLOOR_DIMENSION_KEY = "org.pepsoft.worldpainter.TunnelLayer.editingFloorDimension";
+    private static final String EDITING_FLOOR_DIMENSION_KEY_2 = "org.pepsoft.worldpainter.TunnelLayer.editingFloorDimension.2";
+    private static final String LAYER_PALETTE_TIP_KEY = "org.pepsoft.worldpainter.layerPaletteTip";
     private static final Icon ADD_CUSTOM_LAYER_BUTTON_ICON = IconUtils.loadScaledIcon("org/pepsoft/worldpainter/icons/plus.png");
     private static final Logger logger = LoggerFactory.getLogger(CustomLayerController.class);
 }

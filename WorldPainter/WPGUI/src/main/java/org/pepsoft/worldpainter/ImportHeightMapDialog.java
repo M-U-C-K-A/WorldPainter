@@ -5,6 +5,7 @@
  */
 package org.pepsoft.worldpainter;
 
+import org.pepsoft.util.DesktopUtils;
 import org.pepsoft.util.IconUtils;
 import org.pepsoft.util.ProgressReceiver;
 import org.pepsoft.util.ProgressReceiver.OperationCancelled;
@@ -42,6 +43,7 @@ import java.util.Random;
 import java.util.Vector;
 
 import static com.google.common.primitives.Ints.asList;
+import static javax.swing.JOptionPane.*;
 import static org.pepsoft.minecraft.Constants.DEFAULT_MAX_HEIGHT_MCREGION;
 import static org.pepsoft.minecraft.Constants.DEFAULT_WATER_LEVEL;
 import static org.pepsoft.util.AwtUtils.doLaterOnEventThread;
@@ -50,10 +52,8 @@ import static org.pepsoft.util.swing.MessageUtils.showInfo;
 import static org.pepsoft.util.swing.ProgressDialog.NOT_CANCELABLE;
 import static org.pepsoft.util.swing.SpinnerUtils.setMaximum;
 import static org.pepsoft.util.swing.SpinnerUtils.setMinimum;
-import static org.pepsoft.worldpainter.App.FLOAT_NUMBER_FORMAT;
-import static org.pepsoft.worldpainter.App.INT_NUMBER_FORMAT;
-import static org.pepsoft.worldpainter.Constants.MAX_HEIGHT;
-import static org.pepsoft.worldpainter.Constants.MIN_HEIGHT;
+import static org.pepsoft.worldpainter.App.*;
+import static org.pepsoft.worldpainter.Constants.*;
 import static org.pepsoft.worldpainter.DefaultPlugin.JAVA_MCREGION;
 import static org.pepsoft.worldpainter.Dimension.Anchor.NORMAL_DETAIL;
 import static org.pepsoft.worldpainter.Dimension.Anchor.NORMAL_MASTER;
@@ -243,8 +243,10 @@ public class ImportHeightMapDialog extends WorldPainterDialog implements Documen
                 .withName(selectedFile.getName())
                 .withImage(image)
                 .withFile(selectedFile)
-                .withSmoothScaling(scale != 100.0f)
                 .now();
+        if (scale != 100.f) {
+            heightMap = heightMap.smoothed();
+        }
         final int offsetX = (int) spinnerOffsetX.getValue();
         final int offsetY = (int) spinnerOffsetY.getValue();
         if ((scale != 100.0f) || (offsetX != 0) || (offsetY != 0)) {
@@ -342,17 +344,7 @@ public class ImportHeightMapDialog extends WorldPainterDialog implements Documen
                 programmaticChange = true;
                 try {
                     labelImageDimensions.setForeground(null);
-                    if (heightMap.hasAlpha()) {
-                        spinnerScale.setValue(100.0f);
-                        spinnerScale.setEnabled(false);
-                        spinnerScale.setToolTipText("<html>Scaling not supported for grey scale images with an alpha channel!<br>To enable scaling, please remove the alpha channel.</html>");
-                        labelImageDimensions.setIcon(ICON_WARNING);
-                        labelImageDimensions.setText("Scaling not supported for images with an alpha channel!");
-                    } else {
-                        spinnerScale.setEnabled(true);
-                        spinnerScale.setToolTipText(null);
-                        labelImageDimensions.setIcon(null);
-                    }
+                    labelImageDimensions.setIcon(null);
                     bitDepth = heightMap.getBitDepth();
                     imageMinHeight = heightMap.getMinHeight();
                     imageMaxHeight = heightMap.getMaxHeight();
@@ -399,12 +391,10 @@ public class ImportHeightMapDialog extends WorldPainterDialog implements Documen
                 // Set levels to reasonable defaults
                 selectDefaultVerticalScaling(false);
 
-                if (! heightMap.hasAlpha()) {
-                    if (heightMap.isFloatingPoint()) {
-                        labelImageDimensions.setText(String.format("Image size: %,d x %,d, %d bits, lowest value: %,f, highest value: %,f", width, height, bitDepth, imageLowValue, imageHighValue));
-                    } else {
-                        labelImageDimensions.setText(String.format("Image size: %,d x %,d, %d bits, lowest value: %,d, highest value: %,d", width, height, bitDepth, Math.round(imageLowValue), Math.round(imageHighValue)));
-                    }
+                if (heightMap.isFloatingPoint()) {
+                    labelImageDimensions.setText(String.format("Image size: %,d x %,d, %d bits, lowest value: %,f, highest value: %,f", width, height, bitDepth, imageLowValue, imageHighValue));
+                } else {
+                    labelImageDimensions.setText(String.format("Image size: %,d x %,d, %d bits, lowest value: %,d, highest value: %,d", width, height, bitDepth, Math.round(imageLowValue), Math.round(imageHighValue)));
                 }
                 updateWorldDimensions();
                 updatePreview(true);
@@ -598,6 +588,24 @@ public class ImportHeightMapDialog extends WorldPainterDialog implements Documen
     protected void ok() {
         if (currentDimension != null) {
             importToDimension();
+        } else if (checkBoxMasterDimension.isSelected()) {
+            final Configuration config = Configuration.getInstance();
+            if (! config.isMessageDisplayedCountAtLeast(MESSAGE_KEY_MASTER_WARNING, 3)) {
+                DesktopUtils.beep();
+                if (JOptionPane.showConfirmDialog(this, /* language=HTML */ "<html>" +
+                        "<h1>About Master Dimensions</h1>" +
+                        "<p>A master dimension will be exported at 256 times the size (by area)<br>and is meant for speeding up the creation of very large maps.</p>" +
+                        "<ul>" +
+                        "    <li>You <b>cannot change your mind</b> later; if you do not want this to be<br>a master dimension later you will have to start over." +
+                        "    <li>Loading, editing and saving are quicker, but Exporting is not!<br><b>Exporting takes 256 times longer</b> than a regular dimension<br>of the same pixel size in WorldPainter." +
+                        "    <li>You can detail areas of the Master Dimension at 1:1 scale by<br>switching to the Surface Dimension (" + COMMAND_KEY_NAME + "+M or View menu)<br>and then adding tiles (" + COMMAND_KEY_NAME + "+T or Edit menu)." +
+                        "</ul>" +
+                        "<p>Are you sure?</p>" +
+                        "</html>", "Create Master Dimension?", YES_NO_OPTION, WARNING_MESSAGE) != YES_OPTION) {
+                    return;
+                }
+                config.setMessageDisplayed(MESSAGE_KEY_MASTER_WARNING);
+            }
         }
         super.ok();
     }

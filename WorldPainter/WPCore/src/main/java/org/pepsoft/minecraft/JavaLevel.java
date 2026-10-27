@@ -7,13 +7,12 @@ package org.pepsoft.minecraft;
 
 import org.jnbt.*;
 import org.pepsoft.minecraft.datapack.DataPack;
-import org.pepsoft.minecraft.datapack.Descriptor;
-import org.pepsoft.minecraft.datapack.Dimension;
-import org.pepsoft.minecraft.datapack.Meta;
 import org.pepsoft.util.mdc.MDCCapturingRuntimeException;
 import org.pepsoft.worldpainter.AccessDeniedException;
 import org.pepsoft.worldpainter.Platform;
 import org.pepsoft.worldpainter.Version;
+import org.pepsoft.worldpainter.platforms.JavaPlatformProvider;
+import org.pepsoft.worldpainter.plugins.PlatformManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,7 +118,7 @@ public abstract class JavaLevel extends AbstractNBTItem {
         if (version == VERSION_ANVIL) {
             if (((dataVersion > DATA_VERSION_MC_1_14_4) && (dataVersion <= DATA_VERSION_MC_1_17_1) && (maxHeight != DEFAULT_MAX_HEIGHT_ANVIL))
                     || ((dataVersion > DATA_VERSION_MC_1_17_1) && ((minHeight != DEFAULT_MIN_HEIGHT_1_18) || (maxHeight != DEFAULT_MAX_HEIGHT_1_18)))) {
-                createWorldPainterDataPack(worldDir);
+                createWorldPainterDataPackFile(worldDir);
             }
         }
 
@@ -135,7 +134,7 @@ public abstract class JavaLevel extends AbstractNBTItem {
         // files
         if ((version == VERSION_MCREGION) && (maxHeight != DEFAULT_MAX_HEIGHT_MCREGION)) {
             int exp = (int) (Math.log(maxHeight) / Math.log(2));
-            PrintWriter writer = new PrintWriter(new File(worldDir, "maxheight.txt"), "US-ASCII");
+            PrintWriter writer = new PrintWriter(new File(worldDir, "maxheight.txt"), US_ASCII);
             try {
                 writer.println("#DynamicHeight Save Format 2");
                 writer.println("#" + new Date());
@@ -144,7 +143,7 @@ public abstract class JavaLevel extends AbstractNBTItem {
                 writer.close();
             }
 
-            writer = new PrintWriter(new File(worldDir, "Height.txt"), "US-ASCII");
+            writer = new PrintWriter(new File(worldDir, "Height.txt"), US_ASCII);
             try {
                 writer.println("#HeightMod 1.5");
                 writer.println("#" + new Date());
@@ -283,6 +282,10 @@ public abstract class JavaLevel extends AbstractNBTItem {
         setInt(TAG_SPAWN_Z, spawnZ);
     }
 
+    public void setSpawnDimension(String dimension) {
+        setString(TAG_SPAWN_DIMENSION, dimension);
+    }
+
     public void setTime(long time) {
         setLong(TAG_TIME, time);
     }
@@ -350,20 +353,29 @@ public abstract class JavaLevel extends AbstractNBTItem {
     /**
      * Set the multiplayer and single player spawn point and the single player location.
      */
-    public void setSpawn(int x, int y, int z) {
+    public void setSpawn(int dim, int x, int y, int z) {
         setSpawnX(x);
         setSpawnY(y);
         setSpawnZ(z);
-        Map<String, Tag> playerSettings = getMap(TAG_PLAYER);
-        if (playerSettings == null) {
-            playerSettings = new HashMap<>();
+        setSpawnDimension(switch (dim) {
+            case DIM_NORMAL -> MC_OVERWORLD;
+            case DIM_NETHER -> MC_THE_NETHER;
+            case DIM_END -> MC_THE_END;
+            default -> throw new IllegalArgumentException("Don't know how to set spawn for dimension " + dim);
+        });
+        if ((platform.getAttribute(ATTRIBUTE_MC_VERSION).compareTo(V_26_1) < 0) && (dim == DIM_NORMAL)) {
+            // TODO: also make this work for other dimensions
+            Map<String, Tag> playerSettings = getMap(TAG_PLAYER);
+            if (playerSettings == null) {
+                playerSettings = new HashMap<>();
+            }
+            playerSettings.put(TAG_SPAWN_X, new IntTag(TAG_SPAWN_X, x));
+            playerSettings.put(TAG_SPAWN_Y, new IntTag(TAG_SPAWN_Y, y));
+            playerSettings.put(TAG_SPAWN_Z, new IntTag(TAG_SPAWN_Z, z));
+            playerSettings.put(TAG_SPAWN_FORCED, new ByteTag(TAG_SPAWN_FORCED, (byte) 1));
+            playerSettings.put(TAG_POS, new ListTag<>(TAG_POS, DoubleTag.class, asList(new DoubleTag("", x + 0.5), new DoubleTag("", y), new DoubleTag("", z + 0.5))));
+            setMap(TAG_PLAYER, playerSettings);
         }
-        playerSettings.put(TAG_SPAWN_X, new IntTag(TAG_SPAWN_X, x));
-        playerSettings.put(TAG_SPAWN_Y, new IntTag(TAG_SPAWN_Y, y));
-        playerSettings.put(TAG_SPAWN_Z, new IntTag(TAG_SPAWN_Z, x));
-        playerSettings.put(TAG_SPAWN_FORCED, new ByteTag(TAG_SPAWN_FORCED, (byte) 1));
-        playerSettings.put(TAG_POS, new ListTag<>(TAG_POS, DoubleTag.class, asList(new DoubleTag("", x + 0.5), new DoubleTag("", y), new DoubleTag("", z + 0.5))));
-        setMap(TAG_PLAYER, playerSettings);
     }
 
     public Platform getPlatform() {
@@ -398,7 +410,9 @@ public abstract class JavaLevel extends AbstractNBTItem {
 
     public static JavaLevel create(Platform platform, int minHeight, int maxHeight) {
         final org.pepsoft.util.Version platformMcVersion = platform.getAttribute(ATTRIBUTE_MC_VERSION);
-        if (platformMcVersion.isAtLeast(V_1_18)) {
+        if (platformMcVersion.isAtLeast(V_26_1)) {
+            return new Java261Level(minHeight, maxHeight, platform);
+        } else if (platformMcVersion.isAtLeast(V_1_18)) {
             return new Java118Level(minHeight, maxHeight, platform);
         } else if (platformMcVersion.isAtLeast(V_1_16)) {
             return new Java116Level(minHeight, maxHeight, platform);
@@ -458,10 +472,11 @@ public abstract class JavaLevel extends AbstractNBTItem {
                         if (name.startsWith("file/")) {
                             try {
                                 DataPack datapack = DataPack.load(worldDir, name);
-                                for (Map.Entry<String, Descriptor> entry: datapack.getDescriptors().entrySet()) {
-                                    if ((entry.getValue() instanceof org.pepsoft.minecraft.datapack.Dimension) && entry.getKey().endsWith("overworld.json")) {
-                                        int minY = ((org.pepsoft.minecraft.datapack.Dimension) entry.getValue()).getMinY();
-                                        int height = ((org.pepsoft.minecraft.datapack.Dimension) entry.getValue()).getHeight();
+                                for (Map.Entry<String, Object> entry: datapack.getDescriptors().entrySet()) {
+                                    final Object value = entry.getValue();
+                                    if ((value instanceof org.pepsoft.minecraft.datapack.Dimension) && entry.getKey().endsWith("overworld.json")) {
+                                        int minY = ((org.pepsoft.minecraft.datapack.Dimension) value).getMinY();
+                                        int height = ((org.pepsoft.minecraft.datapack.Dimension) value).getHeight();
                                         if (height != 0) {
                                             if (buildLimitsEncountered && (minY != minHeight)) {
                                                 throw new IllegalArgumentException(String.format("Multiple different minHeights (%d and %d) encountered in data packs", minHeight, minY));
@@ -499,23 +514,22 @@ public abstract class JavaLevel extends AbstractNBTItem {
             return new Java115Level((CompoundTag) tag, maxHeight);
         } else if (dataVersion <= DATA_VERSION_MC_1_17_1) {
             return new Java116Level((CompoundTag) tag, minHeight, maxHeight);
-        } else {
+        } else if (dataVersion <= DATA_VERSION_MC_1_21_11) {
             return new Java118Level((CompoundTag) tag, minHeight, maxHeight);
+        } else {
+            final Java261Level level = new Java261Level((CompoundTag) tag, minHeight, maxHeight);
+            level.loadWorldGenSettings(worldDir);
+            return level;
         }
     }
 
-    private void createWorldPainterDataPack(File worldDir) {
+    private void createWorldPainterDataPackFile(File worldDir) {
         try {
             final File datapackDir = new File(worldDir, "datapacks");
             datapackDir.mkdirs();
-            final File datapackFile = new File(datapackDir, "worldpainter.zip");
-            final DataPack datapack = new DataPack();
-            datapack.addDescriptor("pack.mcmeta", Meta.builder()
-                    .pack(Meta.Pack.builder()
-                            .packFormat((platform == JAVA_ANVIL_1_17) ? 7 : 9)
-                            .description("WorldPainter Settings").build()).build());
-            datapack.addDescriptor("data/minecraft/dimension_type/overworld.json", Dimension.createDefault(platform, DIM_NORMAL, minHeight, maxHeight));
-            datapack.write(new FileOutputStream(datapackFile));
+            ((JavaPlatformProvider) PlatformManager.getInstance().getPlatformProvider(platform))
+                    .createWorldPainterDataPack(platform, minHeight, maxHeight)
+                    .write(new FileOutputStream(new File(datapackDir, "worldpainter.zip")));
         } catch (IOException e) {
             throw new MDCCapturingRuntimeException("I/O error creating datapack", e);
         }
@@ -529,5 +543,6 @@ public abstract class JavaLevel extends AbstractNBTItem {
     private static volatile JavaLevel cachedLevel;
 
     private static final Logger logger = LoggerFactory.getLogger(JavaLevel.class);
+    @Serial
     private static final long serialVersionUID = 1L;
 }
