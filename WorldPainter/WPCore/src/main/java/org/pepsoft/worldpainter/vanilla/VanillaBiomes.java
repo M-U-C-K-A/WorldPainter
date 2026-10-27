@@ -82,7 +82,7 @@ public final class VanillaBiomes {
     }
 
     public static Category getCategory(int biome) {
-        return Category.of(getName(biome));
+        return ((biome >= 0) && (biome < CATEGORIES.length)) ? CATEGORIES[biome] : Category.of(getName(biome));
     }
 
     /**
@@ -231,6 +231,17 @@ public final class VanillaBiomes {
         define(184, "mangrove_swamp", 0x2ccc8e);
         define(185, "cherry_grove", 0xff91c8);
         define(186, "pale_garden", 0x696d95);
+    }
+
+    /**
+     * The categories of all biome IDs, worked out once since this is called for every sample of the seed search.
+     */
+    private static final Category[] CATEGORIES = new Category[256];
+
+    static {
+        for (int i = 0; i < CATEGORIES.length; i++) {
+            CATEGORIES[i] = Category.of(getName(i));
+        }
     }
 
     private static void define(int id, String name, int colour) {

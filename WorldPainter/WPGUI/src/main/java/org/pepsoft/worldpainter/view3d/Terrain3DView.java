@@ -61,6 +61,7 @@ class Terrain3DView extends JComponent {
             public void mouseReleased(MouseEvent e) {
                 interacting = false;
                 repaint();
+                targetChanged();
             }
 
             @Override
@@ -92,6 +93,7 @@ class Terrain3DView extends JComponent {
                         targetH = point[2] / verticalScale();
                         distance = Math.max(MIN_DISTANCE, distance * 0.6);
                         repaint();
+                        targetChanged();
                     }
                 }
             }
@@ -134,6 +136,7 @@ class Terrain3DView extends JComponent {
         distance = ((w > 0) && (h > 0)) ? (radius * 1.1 * focal(w) / (Math.min(w, h) / 2.0)) : (radius * 2.8);
         distance = Math.min(maxDistance, distance);
         repaint();
+        targetChanged();
     }
 
     void rotateBy(double degrees) {
@@ -185,13 +188,33 @@ class Terrain3DView extends JComponent {
     }
 
     /**
-     * Set the full resolution model of the whole map, used for the block mode.
+     * Set the full resolution model of the area around the centre of the view, used for the block mode.
      */
     void setDetail(TerrainModel detail) {
         this.detail = detail;
+        blockMesh = null;
         if (blocks) {
-            invalidateMesh();
             repaint();
+        }
+    }
+
+    /**
+     * The block coordinates of the point the camera looks at.
+     */
+    Point getTargetBlock() {
+        return (model != null) ? new Point(model.x0 + (int) Math.floor(targetX * model.step), model.y0 + (int) Math.floor(targetY * model.step)) : null;
+    }
+
+    /**
+     * Set a listener which is notified when the point the camera looks at moves.
+     */
+    void setTargetListener(Runnable targetListener) {
+        this.targetListener = targetListener;
+    }
+
+    private void targetChanged() {
+        if (targetListener != null) {
+            targetListener.run();
         }
     }
 
@@ -273,16 +296,24 @@ class Terrain3DView extends JComponent {
     private void invalidateMesh() {
         mesh = null;
         coarseMesh = null;
+        blockMesh = null;
+    }
+
+    /**
+     * The block mesh of the detail area, or {@code null} when not in block mode or not loaded yet.
+     */
+    private Mesh getBlockMesh() {
+        if ((! blocks) || (detail == null)) {
+            return null;
+        }
+        if (blockMesh == null) {
+            blockMesh = buildBlockMesh();
+        }
+        return blockMesh;
     }
 
     private Mesh getMesh(boolean coarse) {
-        if (blocks) {
-            // Always the same blocks, whatever the zoom or movement, so that the preview stays put
-            if (mesh == null) {
-                mesh = buildBlockMesh();
-            }
-            return mesh;
-        } else if (coarse) {
+        if (coarse) {
             if (coarseMesh == null) {
                 coarseMesh = buildMesh(COARSE_CELL_BUDGET);
             }
@@ -303,7 +334,7 @@ class Terrain3DView extends JComponent {
      * strips; the edges of the individual blocks are drawn per pixel afterwards.
      */
     private Mesh buildBlockMesh() {
-        final TerrainModel model = (detail != null) ? detail : this.model;
+        final TerrainModel model = detail;
         final TerrainModel overview = this.model;
         final int[] colours = calculateColours(model, true);
         // Size and position of the columns in the coordinates of the overview model, in which the camera works
@@ -585,7 +616,7 @@ class Terrain3DView extends JComponent {
             kindBuffer = new byte[w * h];
         }
         camera = new Camera(w, h);
-        render(getMesh(interacting), camera, ((DataBufferInt) image.getRaster().getDataBuffer()).getData(), w, h);
+        render(camera, ((DataBufferInt) image.getRaster().getDataBuffer()).getData(), w, h);
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g2.drawImage(image, 0, 0, width, height, null);
     }
@@ -598,7 +629,7 @@ class Terrain3DView extends JComponent {
         return Math.max(width, 1) * 1.2;
     }
 
-    private void render(Mesh mesh, Camera camera, int[] pixels, int w, int h) {
+    private void render(Camera camera, int[] pixels, int w, int h) {
         final boolean dark = ThemeUtils.isDarkTheme();
         final int skyTop = dark ? 0x0b1220 : 0xdbeafe, skyBottom = dark ? 0x18181b : 0xf8fafc;
         for (int y = 0; y < h; y++) {
@@ -608,6 +639,29 @@ class Terrain3DView extends JComponent {
         Arrays.fill(heightBuffer, Float.NaN);
         Arrays.fill(faceBuffer, 0);
 
+        // In block mode, the area around the centre of the view is drawn block by block, and the rest of the map as
+        // the smooth surface
+        final Mesh blockMesh = getBlockMesh();
+        float[] exclude = null;
+        if (blockMesh != null) {
+            exclude = new float[] {(float) (detail.x0 - model.x0) / model.step, (float) (detail.y0 - model.y0) / model.step,
+                    (float) (detail.x0 + detail.width - model.x0) / model.step, (float) (detail.y0 + detail.height - model.y0) / model.step};
+        }
+        drawMesh(getMesh(interacting), exclude, 0, camera, pixels, w, h, skyBottom);
+        if (blockMesh != null) {
+            drawMesh(blockMesh, null, BLOCK_FACES, camera, pixels, w, h, skyBottom);
+            drawBlockEdges(pixels, w, h, camera);
+        }
+        if (showContours) {
+            drawContours(pixels, w, h);
+        }
+    }
+
+    /**
+     * Draw a mesh, leaving out the triangles which lie within an area (in model coordinates), if any. Face numbers
+     * start after an offset, so that faces of different meshes can be told apart.
+     */
+    private void drawMesh(Mesh mesh, float[] exclude, int faceOffset, Camera camera, int[] pixels, int w, int h, int fogColour) {
         // Transform all vertices to the camera, and project them
         final int n = mesh.vertexCount;
         if (mesh.cz == null) {
@@ -627,7 +681,6 @@ class Terrain3DView extends JComponent {
         // Haze only the far distance, also when zoomed in close
         final double size = Math.max(model.width, model.height);
         final double fogStart = Math.max(distance * 0.85, size * 0.6), fogEnd = fogStart + Math.max(distance * 1.75, size);
-        final int fogColour = skyBottom;
         IntStream.range(0, (n + 4095) / 4096).parallel().forEach(chunk -> {
             for (int v = chunk * 4096; v < Math.min(n, (chunk + 1) * 4096); v++) {
                 final double wx = mesh.x[v], wy = mesh.y[v], wh = Float.isNaN(mesh.h[v]) ? floor : mesh.h[v] * vertical;
@@ -670,6 +723,12 @@ class Terrain3DView extends JComponent {
             final int from = (int) ((long) triangles * chunk / chunkCount), to = (int) ((long) triangles * (chunk + 1) / chunkCount);
             for (int t = from; t < to; t++) {
                 final int a = mesh.triangles[t * 3], b = mesh.triangles[t * 3 + 1], c = mesh.triangles[t * 3 + 2];
+                if (exclude != null) {
+                    final float mx = (mesh.x[a] + mesh.x[b] + mesh.x[c]) / 3, my = (mesh.y[a] + mesh.y[b] + mesh.y[c]) / 3;
+                    if ((mx > exclude[0]) && (my > exclude[1]) && (mx < exclude[2]) && (my < exclude[3])) {
+                        continue;
+                    }
+                }
                 if (! orthographic) {
                     final boolean inA = cz[a] > NEAR, inB = cz[b] > NEAR, inC = cz[c] > NEAR;
                     if (! (inA || inB || inC)) {
@@ -701,7 +760,7 @@ class Terrain3DView extends JComponent {
                     final int t = list.values[i];
                     final int a = mesh.triangles[t * 3], b = mesh.triangles[t * 3 + 1], c = mesh.triangles[t * 3 + 2];
                     final boolean wall = t >= wallStart;
-                    rasteriser.triangle(t / 2 + 1, (mesh.kinds != null) ? mesh.kinds[t] : KIND_TOP,
+                    rasteriser.triangle(faceOffset + t / 2 + 1, (mesh.kinds != null) ? mesh.kinds[t] : KIND_TOP,
                             sx[a], sy[a], depth[a], q[a], colour[a], wall ? Float.NaN : mesh.h[a], mesh.x[a] * blockScale, mesh.y[a] * blockScale,
                             sx[b], sy[b], depth[b], q[b], colour[b], wall ? Float.NaN : mesh.h[b], mesh.x[b] * blockScale, mesh.y[b] * blockScale,
                             sx[c], sy[c], depth[c], q[c], colour[c], wall ? Float.NaN : mesh.h[c], mesh.x[c] * blockScale, mesh.y[c] * blockScale);
@@ -710,17 +769,11 @@ class Terrain3DView extends JComponent {
                 final IntList list2 = clipped[chunk];
                 for (int i = 0; i < list2.size; i++) {
                     final int t = list2.values[i];
-                    rasteriser.clippedTriangle(mesh, t, t >= wallStart, cx, cy, cz, colour, camera, blockScale);
+                    rasteriser.clippedTriangle(mesh, t, faceOffset, t >= wallStart, cx, cy, cz, colour, camera, blockScale);
                 }
             }
         });
 
-        if (blocks) {
-            drawBlockEdges(pixels, w, h, camera);
-        }
-        if (showContours) {
-            drawContours(pixels, w, h);
-        }
     }
 
     /**
@@ -736,7 +789,8 @@ class Terrain3DView extends JComponent {
             for (int x = 0; x < w - 1; x++) {
                 final int i = y * w + x;
                 final int face = faces[i];
-                if (face == 0) {
+                if (face < BLOCK_FACES) {
+                    // Not a block
                     continue;
                 }
                 final double pixelsPerBlock = camera.orthographic ? (camera.scale * unit) : (camera.focal * depths[i] * unit);
@@ -882,7 +936,7 @@ class Terrain3DView extends JComponent {
     }
 
     private TerrainModel model, detail;
-    private Mesh mesh, coarseMesh;
+    private Mesh mesh, coarseMesh, blockMesh;
     private volatile Camera camera;
     private float[] depthBuffer, heightBuffer;
     private int[] faceBuffer;
@@ -894,6 +948,7 @@ class Terrain3DView extends JComponent {
     private float exaggeration = 1.0f;
     private double targetX, targetY, targetH, yaw, pitch, distance = 200, maxDistance = 1000;
     private HoverListener hoverListener;
+    private Runnable targetListener;
 
     static final int[] HEIGHT_RAMP = {0x2e6b3f, 0x5f9e4a, 0xa9c56b, 0xe6d79a, 0xc39a68, 0x8b6a52, 0xf5f5f4};
     static final int[] SLOPE_RAMP = {0x3b82f6, 0x22c55e, 0xeab308, 0xf97316, 0xdc2626};
@@ -904,6 +959,10 @@ class Terrain3DView extends JComponent {
      * The kinds of faces of the block mesh: tops, sides facing east or west (constant x), and sides facing north or
      * south (constant y). The smooth mesh is all tops.
      */
+    /**
+     * The face numbers of the block mesh start here, to tell them apart from those of the smooth surface.
+     */
+    private static final int BLOCK_FACES = 1 << 30;
     private static final byte KIND_TOP = 0, KIND_SIDE_X = 1, KIND_SIDE_Y = 2;
     private static final double MIN_PITCH = Math.toRadians(-45), MAX_PITCH = Math.toRadians(89.5), MIN_DISTANCE = 4;
     private static final float NEAR = 0.5f, ORTHO_DEPTH = 1.0e6f;
@@ -1101,7 +1160,7 @@ class Terrain3DView extends JComponent {
         /**
          * Draw a triangle which crosses the near plane of the camera, by clipping it against that plane.
          */
-        void clippedTriangle(Mesh mesh, int t, boolean wall, float[] cx, float[] cy, float[] cz, int[] colour, Camera camera, float blockScale) {
+        void clippedTriangle(Mesh mesh, int t, int faceOffset, boolean wall, float[] cx, float[] cy, float[] cz, int[] colour, Camera camera, float blockScale) {
             final float[] px = new float[4], py = new float[4], pz = new float[4], ph = new float[4], pu = new float[4], pv = new float[4];
             final int[] pc = new int[4];
             int count = 0;
@@ -1139,7 +1198,7 @@ class Terrain3DView extends JComponent {
                 d[k] = 1 / pz[k];
             }
             for (int k = 1; k < count - 1; k++) {
-                triangle(t / 2 + 1, (mesh.kinds != null) ? mesh.kinds[t] : KIND_TOP,
+                triangle(faceOffset + t / 2 + 1, (mesh.kinds != null) ? mesh.kinds[t] : KIND_TOP,
                         sx[0], sy[0], d[0], d[0], pc[0], ph[0], pu[0], pv[0],
                         sx[k], sy[k], d[k], d[k], pc[k], ph[k], pu[k], pv[k],
                         sx[k + 1], sy[k + 1], d[k + 1], d[k + 1], pc[k + 1], ph[k + 1], pu[k + 1], pv[k + 1]);

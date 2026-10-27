@@ -24,7 +24,6 @@ public final class VanillaBiomeSource {
         continentalness = initClimate(xlo, xhi, largeBiomes, NP_CONTINENTALNESS);
         erosion = initClimate(xlo, xhi, largeBiomes, NP_EROSION);
         weirdness = initClimate(xlo, xhi, largeBiomes, NP_WEIRDNESS);
-        spline = createOverworldSpline();
     }
 
     public long getSeed() {
@@ -279,7 +278,10 @@ public final class VanillaBiomeSource {
     private final long seed;
     private final boolean largeBiomes;
     private final DoublePerlinNoise shift, temperature, humidity, continentalness, erosion, weirdness;
-    private final Spline spline;
+    /**
+     * The terrain offset spline does not depend on the seed (and is only read), so it is shared.
+     */
+    private static final Spline spline = createOverworldSpline();
 
     /**
      * The biome Y coordinate (block Y / 4) at which surface biomes are sampled: sea level.

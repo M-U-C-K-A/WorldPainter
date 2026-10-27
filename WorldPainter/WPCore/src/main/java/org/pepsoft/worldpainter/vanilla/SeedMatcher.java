@@ -89,7 +89,7 @@ public final class SeedMatcher {
             final VanillaBiomes.Category actual = VanillaBiomes.getCategory(source.getSurfaceBiomeAtBlock(sample.x, sample.z));
             total += sample.expected.similarity(actual);
             // Early exit: even if all remaining samples match perfectly, the threshold cannot be beaten
-            if ((i % 16 == 15) && ((total + (samples.length - i - 1)) / samples.length <= threshold)) {
+            if ((i % 4 == 3) && ((total + (samples.length - i - 1)) / samples.length <= threshold)) {
                 return -1;
             }
         }

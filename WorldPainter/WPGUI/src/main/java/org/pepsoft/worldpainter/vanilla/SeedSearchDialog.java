@@ -113,7 +113,8 @@ public class SeedSearchDialog extends WorldPainterDialog {
     }
 
     private void startSearch() {
-        final int threads = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
+        // Half of the cores, so that the computer stays responsive during a long search
+        final int threads = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
         executor = Executors.newFixedThreadPool(threads, runnable -> {
             final Thread thread = new Thread(runnable, "Seed search");
             thread.setDaemon(true);
@@ -123,7 +124,7 @@ public class SeedSearchDialog extends WorldPainterDialog {
         for (int i = 0; i < threads; i++) {
             executor.submit(() -> {
                 final ThreadLocalRandom random = ThreadLocalRandom.current();
-                while ((! stopped.get()) && (tested.get() < MAX_SEEDS)) {
+                while (! stopped.get()) {
                     final long seed = random.nextLong();
                     final float threshold = currentThreshold();
                     final float score = matcher.score(new VanillaBiomeSource(seed, largeBiomes), threshold);
@@ -163,7 +164,13 @@ public class SeedSearchDialog extends WorldPainterDialog {
         }
         newCandidates.forEach(this::addResult);
         final boolean done = stopped.get() || executor.isTerminated();
-        statusLabel.setText(String.format("%s %,d seeds tested%s", done ? "Done:" : "Searching…", tested.get(), best.isEmpty() ? "" : String.format(" · best match %d%%", Math.round(best.get(0).score * 100))));
+        final long now = System.nanoTime(), count = tested.get();
+        if (now - rateTime > 1_000_000_000L) {
+            rate = (count - rateCount) * 1_000_000_000L / (now - rateTime);
+            rateTime = now;
+            rateCount = count;
+        }
+        statusLabel.setText(String.format("%s %,d seeds tested%s%s", done ? "Stopped:" : "Searching…", count, done ? "" : String.format(" (%,d/s)", rate), best.isEmpty() ? "" : String.format(" · best match %d%%", Math.round(best.get(0).score * 100))));
         if (done && executor.isTerminated()) {
             timer.stop();
             stopButton.setEnabled(false);
@@ -253,7 +260,7 @@ public class SeedSearchDialog extends WorldPainterDialog {
     private long selectedSeed;
 
     private static final int MAX_RESULTS = 8;
-    private static final long MAX_SEEDS = 1_000_000;
+    private long rate, rateCount, rateTime = System.nanoTime();
     private static final long serialVersionUID = 1L;
 
     private static final class Result {
