@@ -96,6 +96,10 @@ public class Terrain3DPanel extends JPanel {
             view.setPitchDegrees(90);
         });
         toolBar.add(topButton);
+        final JToggleButton blocksButton = new JToggleButton(Icons.get("package", 18));
+        blocksButton.setToolTipText(App.richToolTip("Blocks", "Show every column as a Minecraft block, at its exact height in whole blocks, instead of a smooth surface", null));
+        blocksButton.addActionListener(e -> view.setBlocks(blocksButton.isSelected()));
+        toolBar.add(blocksButton);
         final JToggleButton orthographicButton = new JToggleButton(Icons.get("box", 18));
         orthographicButton.setToolTipText(App.richToolTip("Orthographic", "Show the land without perspective: parallel lines stay parallel and sizes do not shrink with distance", null));
         orthographicButton.addActionListener(e -> view.setOrthographic(orthographicButton.isSelected()));

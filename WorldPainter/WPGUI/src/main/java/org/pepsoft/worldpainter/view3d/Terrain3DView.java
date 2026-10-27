@@ -44,7 +44,7 @@ class Terrain3DView extends JComponent {
                     final double scale = distance / focal(getWidth());
                     final double rx = Math.cos(yaw), ry = Math.sin(yaw); // Right
                     final double gx = Math.sin(yaw), gy = -Math.cos(yaw); // Forward along the ground
-                    final double along = 1 / Math.max(0.25, Math.sin(pitch));
+                    final double along = 1 / Math.max(0.25, Math.abs(Math.sin(pitch)));
                     targetX += (-dx * rx + dy * gx * along) * scale;
                     targetY += (-dx * ry + dy * gy * along) * scale;
                     targetX = Math.max(0, Math.min(model.width, targetX));
@@ -177,6 +177,12 @@ class Terrain3DView extends JComponent {
         repaint();
     }
 
+    void setBlocks(boolean blocks) {
+        this.blocks = blocks;
+        invalidateMesh();
+        repaint();
+    }
+
     void setOrthographic(boolean orthographic) {
         this.orthographic = orthographic;
         repaint();
@@ -253,15 +259,127 @@ class Terrain3DView extends JComponent {
     private Mesh getMesh(boolean coarse) {
         if (coarse) {
             if (coarseMesh == null) {
-                coarseMesh = buildMesh(COARSE_CELL_BUDGET);
+                coarseMesh = blocks ? buildBlockMesh(COARSE_BLOCK_BUDGET) : buildMesh(COARSE_CELL_BUDGET);
             }
             return coarseMesh;
         } else {
             if (mesh == null) {
-                mesh = buildMesh(CELL_BUDGET);
+                mesh = blocks ? buildBlockMesh(BLOCK_BUDGET) : buildMesh(CELL_BUDGET);
             }
             return mesh;
         }
+    }
+
+    /**
+     * Build a mesh of the height field as Minecraft would show it: every column a flat topped block at a whole number
+     * of blocks of height, with vertical sides down to its lower neighbours (or to the base of the model at the edges).
+     * Large models use columns of two, four, ... samples so that the number of columns stays within a budget.
+     */
+    private Mesh buildBlockMesh(int columnBudget) {
+        final int[] colours = calculateColours();
+        int stride = 1;
+        while (((long) (model.width / stride)) * (model.height / stride) > columnBudget) {
+            stride *= 2;
+        }
+        final int nx = (model.width + stride - 1) / stride, ny = (model.height + stride - 1) / stride;
+        // The height of the top of each column in blocks above the lowest point, or NaN where there is no land
+        final float[] tops = new float[nx * ny];
+        final int[] samples = new int[nx * ny];
+        for (int gy = 0; gy < ny; gy++) {
+            for (int gx = 0; gx < nx; gx++) {
+                final int sample = (gy * stride) * model.width + gx * stride;
+                samples[gy * nx + gx] = sample;
+                tops[gy * nx + gx] = model.present[sample] ? ((float) Math.floor(surfaceHeight(sample)) + 1 - (float) Math.floor(model.lowestHeight)) : Float.NaN;
+            }
+        }
+        // Neighbours: north, east, south, west, with the light falling on sides facing that way (from the north west)
+        final int[] dxs = {0, 1, 0, -1}, dys = {-1, 0, 1, 0};
+        final float[] lights = {0.82f, 0.62f, 0.55f, 0.75f};
+        int columns = 0, sides = 0;
+        for (int gy = 0; gy < ny; gy++) {
+            for (int gx = 0; gx < nx; gx++) {
+                final float top = tops[gy * nx + gx];
+                if (Float.isNaN(top)) {
+                    continue;
+                }
+                columns++;
+                for (int d = 0; d < 4; d++) {
+                    if (sideBelow(tops, nx, ny, gx + dxs[d], gy + dys[d], top)) {
+                        sides++;
+                    }
+                }
+            }
+        }
+        final Mesh mesh = new Mesh((columns + sides) * 4, (columns + sides) * 2);
+        int v = 0, t = 0;
+        for (int gy = 0; gy < ny; gy++) {
+            for (int gx = 0; gx < nx; gx++) {
+                final float top = tops[gy * nx + gx];
+                if (Float.isNaN(top)) {
+                    continue;
+                }
+                final float x0 = gx * stride, y0 = gy * stride, x1 = Math.min(model.width, x0 + stride), y1 = Math.min(model.height, y0 + stride);
+                final int colour = colours[samples[gy * nx + gx]];
+                v = addQuad(mesh, v, t, x0, y0, top, x1, y0, top, x1, y1, top, x0, y1, top, colour, colour);
+                t += 2;
+            }
+        }
+        mesh.wallTriangleStart = t;
+        for (int gy = 0; gy < ny; gy++) {
+            for (int gx = 0; gx < nx; gx++) {
+                final float top = tops[gy * nx + gx];
+                if (Float.isNaN(top)) {
+                    continue;
+                }
+                final float x0 = gx * stride, y0 = gy * stride, x1 = Math.min(model.width, x0 + stride), y1 = Math.min(model.height, y0 + stride);
+                final int colour = colours[samples[gy * nx + gx]];
+                for (int d = 0; d < 4; d++) {
+                    final int ngx = gx + dxs[d], ngy = gy + dys[d];
+                    if (! sideBelow(tops, nx, ny, ngx, ngy, top)) {
+                        continue;
+                    }
+                    final boolean edge = (ngx < 0) || (ngy < 0) || (ngx >= nx) || (ngy >= ny) || Float.isNaN(tops[ngy * nx + ngx]);
+                    final float bottom = edge ? Float.NaN : tops[ngy * nx + ngx];
+                    final int upper = shade(colour, lights[d]), lower = edge ? shade(EARTH, 0.55f * lights[d] / 0.82f) : shade(colour, lights[d] * 0.85f);
+                    switch (d) {
+                        case 0: v = addQuad(mesh, v, t, x0, y0, top, x1, y0, top, x1, y0, bottom, x0, y0, bottom, upper, lower); break;
+                        case 1: v = addQuad(mesh, v, t, x1, y0, top, x1, y1, top, x1, y1, bottom, x1, y0, bottom, upper, lower); break;
+                        case 2: v = addQuad(mesh, v, t, x1, y1, top, x0, y1, top, x0, y1, bottom, x1, y1, bottom, upper, lower); break;
+                        default: v = addQuad(mesh, v, t, x0, y1, top, x0, y0, top, x0, y0, bottom, x0, y1, bottom, upper, lower); break;
+                    }
+                    t += 2;
+                }
+            }
+        }
+        mesh.floor = -Math.max(6f, Math.max(model.width, model.height) * 0.025f) * model.step;
+        return mesh;
+    }
+
+    /**
+     * Whether a column needs a side towards a neighbour: when the neighbour is lower, or there is no land there.
+     */
+    private static boolean sideBelow(float[] tops, int nx, int ny, int gx, int gy, float top) {
+        if ((gx < 0) || (gy < 0) || (gx >= nx) || (gy >= ny)) {
+            return true;
+        }
+        final float neighbour = tops[gy * nx + gx];
+        return Float.isNaN(neighbour) || (neighbour < top);
+    }
+
+    /**
+     * Add a quad as two triangles; the first two corners get the upper colour, the last two the lower colour.
+     */
+    private static int addQuad(Mesh mesh, int v, int t, float xa, float ya, float ha, float xb, float yb, float hb, float xc, float yc, float hc, float xd, float yd, float hd, int upper, int lower) {
+        final float[] xs = {xa, xb, xc, xd}, ys = {ya, yb, yc, yd}, hs = {ha, hb, hc, hd};
+        for (int i = 0; i < 4; i++) {
+            mesh.x[v + i] = xs[i];
+            mesh.y[v + i] = ys[i];
+            mesh.h[v + i] = hs[i];
+            mesh.colour[v + i] = (i < 2) ? upper : lower;
+        }
+        mesh.setTriangle(t, v, v + 1, v + 2);
+        mesh.setTriangle(t + 1, v, v + 2, v + 3);
+        return v + 4;
     }
 
     /**
@@ -655,7 +773,7 @@ class Terrain3DView extends JComponent {
     private float[] depthBuffer, heightBuffer;
     private BufferedImage image;
     private Mode mode = Mode.TERRAIN;
-    private boolean showWater = true, showContours, interacting, orthographic;
+    private boolean showWater = true, showContours, interacting, orthographic, blocks;
     private float exaggeration = 1.0f;
     private double targetX, targetY, targetH, yaw, pitch, distance = 200, maxDistance = 1000;
     private IntConsumer hoverListener;
@@ -664,8 +782,8 @@ class Terrain3DView extends JComponent {
     static final int[] SLOPE_RAMP = {0x3b82f6, 0x22c55e, 0xeab308, 0xf97316, 0xdc2626};
     static final int CONTOUR_INTERVAL = 8;
     private static final int EARTH = 0x6b5442;
-    private static final int CELL_BUDGET = 600_000, COARSE_CELL_BUDGET = 150_000;
-    private static final double MIN_PITCH = Math.toRadians(5), MAX_PITCH = Math.toRadians(89.5), MIN_DISTANCE = 4;
+    private static final int CELL_BUDGET = 1_100_000, COARSE_CELL_BUDGET = 150_000, BLOCK_BUDGET = 600_000, COARSE_BLOCK_BUDGET = 100_000;
+    private static final double MIN_PITCH = Math.toRadians(-45), MAX_PITCH = Math.toRadians(89.5), MIN_DISTANCE = 4;
     private static final float NEAR = 0.5f, ORTHO_DEPTH = 1.0e6f;
     private static final long serialVersionUID = 1L;
 
@@ -708,7 +826,13 @@ class Terrain3DView extends JComponent {
             final double th = targetH * exaggeration;
             x = targetX - fx * distance;
             y = targetY - fy * distance;
-            this.h = th - fh * distance;
+            // Below the horizontal the camera may end up under the land: keep it above the surface instead
+            double cameraH = th - fh * distance;
+            final int csx = (int) Math.floor(x), csy = (int) Math.floor(y);
+            if ((csx >= 0) && (csy >= 0) && (csx < model.width) && (csy < model.height) && model.present[csy * model.width + csx]) {
+                cameraH = Math.max(cameraH, (surfaceHeight(csy * model.width + csx) - model.lowestHeight + 2) * exaggeration / model.step);
+            }
+            this.h = cameraH;
         }
 
         final boolean orthographic;
