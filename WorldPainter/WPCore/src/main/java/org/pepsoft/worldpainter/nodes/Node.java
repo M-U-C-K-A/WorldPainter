@@ -35,6 +35,22 @@ public abstract class Node implements Serializable, Cloneable {
     public abstract List<String> getInputNames();
 
     /**
+     * Whether an input, when it is not connected, receives the final terrain (the input of the {@link OutputNode}).
+     * This lets masks work on the terrain without wiring. By default no input does.
+     */
+    public boolean isTerrainInput(int index) {
+        return false;
+    }
+
+    /**
+     * A short hint shown next to the name of an input while it is not connected, describing what it then receives,
+     * or {@code null}. By default "terrain" for {@link #isTerrainInput(int) terrain inputs}.
+     */
+    public String getInputHint(int index) {
+        return isTerrainInput(index) ? "terrain" : null;
+    }
+
+    /**
      * Whether the node has an output which can be connected to other nodes.
      */
     public boolean hasOutput() {

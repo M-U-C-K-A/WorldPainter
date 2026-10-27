@@ -175,7 +175,25 @@ public class NodeGraph implements Serializable, Cloneable {
      *                  {@code null} if not known.
      */
     public CompiledGraph compile(Rectangle mapBounds) {
-        return new CompiledGraph(this, mapBounds);
+        return compile(mapBounds, null);
+    }
+
+    /**
+     * Compile the graph into a thread safe evaluator.
+     *
+     * @param mapBounds The extent of the map in blocks, used by nodes which can fit themselves to the map, or
+     *                  {@code null} if not known.
+     * @param mapSource The existing map, for nodes which build on it, or {@code null} if not available.
+     */
+    public CompiledGraph compile(Rectangle mapBounds, MapSource mapSource) {
+        return new CompiledGraph(this, mapBounds, mapSource);
+    }
+
+    /**
+     * Indicates whether the graph contains a node of a particular type.
+     */
+    public boolean contains(Class<? extends Node> type) {
+        return nodes.stream().anyMatch(type::isInstance);
     }
 
     /**

@@ -14,7 +14,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.function.DoubleUnaryOperator;
 
 import static org.pepsoft.util.swing.MessageUtils.showWarning;
@@ -25,9 +25,10 @@ import static org.pepsoft.util.swing.MessageUtils.showWarning;
  */
 public class NodePropertiesPanel extends JPanel implements Scrollable {
     /**
-     * @param changeListener Notified on the event dispatch thread whenever the user changes a parameter of the node.
+     * @param changeListener Notified on the event dispatch thread whenever the user changes a parameter of the node,
+     *                       with the node and the parameter.
      */
-    public NodePropertiesPanel(Consumer<Node> changeListener) {
+    public NodePropertiesPanel(BiConsumer<Node, Parameter<?>> changeListener) {
         super(new GridBagLayout());
         this.changeListener = changeListener;
         setOpaque(false);
@@ -117,7 +118,7 @@ public class NodePropertiesPanel extends JPanel implements Scrollable {
             final JCheckBox checkBox = new JCheckBox(parameter.getLabel(), node.get((BooleanParameter) parameter));
             checkBox.setOpaque(false);
             checkBox.setToolTipText(parameter.getDescription());
-            checkBox.addActionListener(e -> changed(() -> node.set((BooleanParameter) parameter, checkBox.isSelected())));
+            checkBox.addActionListener(e -> changed(parameter, () -> node.set((BooleanParameter) parameter, checkBox.isSelected())));
             row.add(checkBox, BorderLayout.CENTER);
         } else if (parameter instanceof ChoiceParameter) {
             createChoiceEditor(row, label, (ChoiceParameter<?>) parameter);
@@ -178,7 +179,7 @@ public class NodePropertiesPanel extends JPanel implements Scrollable {
                     } finally {
                         updating[0] = false;
                     }
-                    changed(() -> node.set(parameter, value));
+                    changed(parameter, () -> node.set(parameter, value));
                 }
             });
             row.add(slider, BorderLayout.CENTER);
@@ -194,7 +195,7 @@ public class NodePropertiesPanel extends JPanel implements Scrollable {
                         updating[0] = false;
                     }
                 }
-                changed(() -> node.set(parameter, value));
+                changed(parameter, () -> node.set(parameter, value));
             }
         });
     }
@@ -207,7 +208,7 @@ public class NodePropertiesPanel extends JPanel implements Scrollable {
             @SuppressWarnings("unchecked") // Guaranteed by the model
             final E value = (E) comboBox.getSelectedItem();
             if (value != null) {
-                changed(() -> node.set(parameter, value));
+                changed(parameter, () -> node.set(parameter, value));
             }
         });
         row.add(label, BorderLayout.NORTH);
@@ -217,7 +218,7 @@ public class NodePropertiesPanel extends JPanel implements Scrollable {
     private void createCurveEditor(JPanel row, JLabel label, CurveParameter parameter) {
         final CurveEditor editor = new CurveEditor();
         editor.setPoints(node.get(parameter));
-        editor.setChangeListener(points -> changed(() -> node.set(parameter, points)));
+        editor.setChangeListener(points -> changed(parameter, () -> node.set(parameter, points)));
         final JButton presets = new JButton("Presets", Icons.get("chevron-down", 14));
         presets.setHorizontalTextPosition(SwingConstants.LEADING);
         presets.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
@@ -229,7 +230,7 @@ public class NodePropertiesPanel extends JPanel implements Scrollable {
                 final JMenuItem item = new JMenuItem(CURVE_PRESET_NAMES[i]);
                 item.addActionListener(event -> {
                     editor.setPoints(preset);
-                    changed(() -> node.set(parameter, preset.clone()));
+                    changed(parameter, () -> node.set(parameter, preset.clone()));
                 });
                 menu.add(item);
             }
@@ -263,7 +264,7 @@ public class NodePropertiesPanel extends JPanel implements Scrollable {
                     }
                     final HeightImage heightImage = HeightImage.fromImage(file.getName(), bufferedImage);
                     nameLabel.setText(heightImage.toString());
-                    changed(() -> node.set(parameter, heightImage));
+                    changed(parameter, () -> node.set(parameter, heightImage));
                 } catch (IOException ex) {
                     showWarning(this, "Could not read " + file.getName() + ": " + ex.getMessage(), "Error Reading Image");
                 }
@@ -277,13 +278,13 @@ public class NodePropertiesPanel extends JPanel implements Scrollable {
     /**
      * Apply a change to the node and notify the listener.
      */
-    private void changed(Runnable change) {
+    private void changed(Parameter<?> parameter, Runnable change) {
         change.run();
         if (titleLabel != null) {
             titleLabel.setText(node.getTitle());
         }
         updateRelevance();
-        changeListener.accept(node);
+        changeListener.accept(node, parameter);
     }
 
     private void updateRelevance() {
@@ -323,7 +324,7 @@ public class NodePropertiesPanel extends JPanel implements Scrollable {
         return label;
     }
 
-    private final Consumer<Node> changeListener;
+    private final BiConsumer<Node, Parameter<?>> changeListener;
     private final List<Row> rows = new ArrayList<>();
     private Node node;
     private JLabel titleLabel;

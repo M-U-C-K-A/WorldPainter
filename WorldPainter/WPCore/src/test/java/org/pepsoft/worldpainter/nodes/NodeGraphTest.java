@@ -1,14 +1,20 @@
 package org.pepsoft.worldpainter.nodes;
 
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.pepsoft.worldpainter.Dimension;
+import org.pepsoft.worldpainter.Terrain;
 import org.pepsoft.worldpainter.TestData;
+import org.pepsoft.worldpainter.layers.Biome;
+import org.pepsoft.worldpainter.layers.PineForest;
+import org.pepsoft.worldpainter.layers.plants.PlantLayer;
+import org.pepsoft.worldpainter.selection.SelectionBlock;
 
 import java.awt.*;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
+import java.util.List;
+import java.util.zip.GZIPOutputStream;
 
 import static org.junit.Assert.*;
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE;
@@ -29,7 +35,8 @@ public class NodeGraphTest {
                 min = Math.min(min, value);
                 max = Math.max(max, value);
             }
-            assertTrue(example + " is flat: " + min + " - " + max, max - min > 0.05f);
+            // Eroding the current map needs a map to work on
+            assertTrue(example + " is flat: " + min + " - " + max, (max - min > 0.05f) || (example == ExampleGraphs.Example.ERODE_CURRENT_MAP));
         }
     }
 
@@ -183,6 +190,164 @@ public class NodeGraphTest {
         }
     }
 
+    @Test
+    public void testPaintersApply() throws Exception {
+        final Dimension dimension = TestData.createDimension(new Rectangle(0, 0, 2 * TILE_SIZE, 2 * TILE_SIZE), 62);
+        final NodeGraph graph = flatGraph(0.5);
+        // Two competing terrain painters: the strongest wins everywhere
+        graph.add(new TerrainPainterNode(Terrain.ROCK)).set(TerrainPainterNode.STRENGTH, 0.6);
+        graph.add(new TerrainPainterNode(Terrain.SAND)).set(TerrainPainterNode.STRENGTH, 1.5);
+        graph.add(new BiomePainterNode(MinecraftBiome.DESERT));
+        graph.add(new FloraPainterNode(Vegetation.PINE_FOREST)).set(FloraPainterNode.DENSITY, 1.0);
+        graph.add(new FloraPainterNode(Vegetation.GRASS_AND_FLOWERS)).set(FloraPainterNode.DENSITY, 0.5);
+        final NodeGraphOperation operation = new NodeGraphOperation(graph);
+        operation.apply(dimension, null);
+        assertEquals(100, dimension.getHeightAt(10, 10), 0.01f);
+        int plants = 0;
+        final PlantLayer plantLayer = (PlantLayer) operation.getCreatedLayers().get(0);
+        for (int x = 0; x < 2 * TILE_SIZE; x += 3) {
+            for (int y = 0; y < 2 * TILE_SIZE; y += 5) {
+                assertEquals(Terrain.SAND, dimension.getTerrainAt(x, y));
+                assertEquals(MinecraftBiome.DESERT.getId(), dimension.getLayerValueAt(Biome.INSTANCE, x, y));
+                assertEquals(15, dimension.getLayerValueAt(PineForest.INSTANCE, x, y));
+                if (dimension.getBitLayerValueAt(plantLayer, x, y)) {
+                    plants++;
+                }
+            }
+        }
+        // About half of the blocks get a plant
+        final int samples = ((2 * TILE_SIZE + 2) / 3) * ((2 * TILE_SIZE + 4) / 5);
+        assertTrue(plants + " of " + samples, (plants > samples * 0.4) && (plants < samples * 0.6));
+        // The plant layer is reused when it already exists
+        final NodeGraphOperation again = new NodeGraphOperation(graph);
+        again.setExistingLayers(operation.getCreatedLayers());
+        again.apply(dimension, null);
+        assertTrue(again.getCreatedLayers().isEmpty());
+    }
+
+    @Test
+    public void testMasksUseTerrainByDefault() throws Exception {
+        final Dimension dimension = TestData.createDimension(new Rectangle(0, 0, TILE_SIZE, TILE_SIZE), 62);
+        final NodeGraph graph = flatGraph(0.5);
+        final HeightMaskNode inRange = graph.add(new HeightMaskNode());
+        inRange.set(HeightMaskNode.FROM, 90);
+        inRange.set(HeightMaskNode.TO, 110);
+        graph.connect(inRange, graph.add(new TerrainPainterNode(Terrain.GRAVEL)), 0);
+        // Flat terrain has no steep slopes, so this painter never wins
+        final SlopeMaskNode steep = graph.add(new SlopeMaskNode());
+        final TerrainPainterNode rock = graph.add(new TerrainPainterNode(Terrain.ROCK));
+        rock.set(TerrainPainterNode.STRENGTH, 2.0);
+        graph.connect(steep, rock, 0);
+        new NodeGraphOperation(graph).apply(dimension, null);
+        assertEquals(Terrain.GRAVEL, dimension.getTerrainAt(50, 50));
+        final CompiledGraph compiled = graph.compile(null);
+        final float[] mask = compiled.evaluate(compiled.createEvaluation(), inRange.getId(), new Region(0, 0, 1, 4, 4));
+        assertEquals(1.0f, mask[5], 1e-6f);
+        final float[] slope = compiled.evaluate(compiled.createEvaluation(), steep.getId(), new Region(0, 0, 1, 4, 4));
+        assertEquals(0.0f, slope[5], 1e-6f);
+    }
+
+    @Test
+    public void testSlopeMaskMeasuresSlopes() {
+        // A ramp rising one block per block: 45 degrees
+        final NodeGraph graph = new NodeGraph();
+        final GradientNode ramp = graph.add(new GradientNode());
+        ramp.set(GradientNode.SHAPE, GradientNode.Shape.LINEAR);
+        ramp.set(GradientNode.FIT_TO_MAP, false);
+        ramp.set(GradientNode.SMOOTH, false);
+        ramp.set(GradientNode.SIZE, 100);
+        graph.connect(ramp, graph.getOutputNode(), 0);
+        graph.getOutputNode().set(OutputNode.MIN_HEIGHT, 0);
+        graph.getOutputNode().set(OutputNode.MAX_HEIGHT, 200);
+        final SlopeMaskNode slope = graph.add(new SlopeMaskNode());
+        slope.set(SlopeMaskNode.MIN, 40);
+        slope.set(SlopeMaskNode.MAX, 50);
+        slope.set(SlopeMaskNode.FADE, 0);
+        final CompiledGraph compiled = graph.compile(null);
+        // The same in a preview at a coarse scale as at full resolution
+        assertEquals(1.0f, compiled.evaluate(compiled.createEvaluation(), slope.getId(), new Region(-10, 0, 1, 8, 8))[9], 1e-6f);
+        assertEquals(1.0f, compiled.evaluate(compiled.createEvaluation(), slope.getId(), new Region(-10, 0, 2.7, 8, 8))[9], 1e-6f);
+    }
+
+    @Test
+    public void testCurrentMapAndSelection() throws Exception {
+        final Dimension dimension = TestData.createDimension(new Rectangle(0, 0, 2 * TILE_SIZE, 2 * TILE_SIZE), 70);
+        final NodeGraph graph = new NodeGraph();
+        graph.getOutputNode().set(OutputNode.MIN_HEIGHT, dimension.getMinHeight());
+        graph.getOutputNode().set(OutputNode.MAX_HEIGHT, dimension.getMaxHeight() - 1);
+        // Raise the map by ten blocks where it is selected
+        final CombineNode raise = graph.add(new CombineNode(CombineNode.Mode.ADD));
+        graph.connect(graph.add(new CurrentMapNode()), raise, 0);
+        final CombineNode selected = graph.add(new CombineNode(CombineNode.Mode.MULTIPLY));
+        graph.connect(graph.add(new SelectionMaskNode()), selected, 0);
+        graph.connect(graph.add(constant(10.0 / (dimension.getMaxHeight() - 1 - dimension.getMinHeight()))), selected, 1);
+        graph.connect(selected, raise, 1);
+        graph.connect(raise, graph.getOutputNode(), 0);
+        for (int x = 0; x < 32; x++) {
+            for (int y = 0; y < 32; y++) {
+                dimension.setBitLayerValueAt(SelectionBlock.INSTANCE, x, y, true);
+            }
+        }
+        final NodeGraphOperation operation = new NodeGraphOperation(graph);
+        operation.setApplyTheme(false);
+        operation.apply(dimension, null);
+        assertEquals(80, dimension.getHeightAt(10, 10), 0.02f);
+        assertEquals(70, dimension.getHeightAt(100, 100), 0.02f);
+        // Just outside the selection nothing changed
+        assertEquals(70, dimension.getHeightAt(32, 10), 0.02f);
+    }
+
+    @Test
+    public void testSaveAndLoad() throws Exception {
+        final NodeGraph graph = createExample(ExampleGraphs.Example.VOLCANIC_ISLAND);
+        final File file = folder.newFile("volcano." + NodeGraphIO.EXTENSION);
+        NodeGraphIO.save(graph, file);
+        final NodeGraph loaded = NodeGraphIO.load(file);
+        assertEquals(graph.getNodes().size(), loaded.getNodes().size());
+        assertEquals(graph.getConnections(), loaded.getConnections());
+        final Region region = new Region(-500, -500, 16, 32, 32);
+        assertArrayEquals(graph.compile(BOUNDS).evaluate(region), loaded.compile(BOUNDS).evaluate(region), 0.0f);
+
+        // Other classes are refused
+        final File hostile = folder.newFile("hostile." + NodeGraphIO.EXTENSION);
+        try (ObjectOutputStream out = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(hostile)))) {
+            out.writeObject(new java.util.Date());
+        }
+        try {
+            NodeGraphIO.load(hostile);
+            fail("Loaded a file containing another class");
+        } catch (IOException e) {
+            // Expected
+        }
+    }
+
+    @Test
+    public void testPaintersAreSeamless() {
+        final NodeGraph graph = createExample(ExampleGraphs.Example.ERODED_MOUNTAINS);
+        final CompiledGraph compiled = graph.compile(BOUNDS);
+        final int size = 2 * TILE_SIZE;
+        final Region whole = new Region(0, 0, 1, size, size), tile = new Region(TILE_SIZE, TILE_SIZE, 1, TILE_SIZE, TILE_SIZE);
+        final List<Painter> painters = compiled.getPainters();
+        assertFalse(painters.isEmpty());
+        final Evaluation wholeEvaluation = compiled.createEvaluation(), tileEvaluation = compiled.createEvaluation();
+        for (Painter painter: painters) {
+            final float[] wholeStrengths = painter.evaluate(wholeEvaluation, whole), tileStrengths = painter.evaluate(tileEvaluation, tile);
+            for (int y = 0; y < TILE_SIZE; y++) {
+                for (int x = 0; x < TILE_SIZE; x++) {
+                    assertEquals(painter.getTarget() + " at " + x + "," + y, wholeStrengths[(TILE_SIZE + x) + (TILE_SIZE + y) * size], tileStrengths[x + y * TILE_SIZE], 0.0f);
+                }
+            }
+        }
+    }
+
+    private static NodeGraph flatGraph(double value) {
+        final NodeGraph graph = new NodeGraph();
+        graph.getOutputNode().set(OutputNode.MIN_HEIGHT, 0);
+        graph.getOutputNode().set(OutputNode.MAX_HEIGHT, 200);
+        graph.connect(graph.add(constant(value)), graph.getOutputNode(), 0);
+        return graph;
+    }
+
     private static NodeGraph createExample(ExampleGraphs.Example example) {
         return ExampleGraphs.create(example, 12345L, 62, -64, 320);
     }
@@ -236,6 +401,9 @@ public class NodeGraphTest {
             return (NodeGraph) in.readObject();
         }
     }
+
+    @Rule
+    public final TemporaryFolder folder = new TemporaryFolder();
 
     private static final Rectangle BOUNDS = new Rectangle(-1024, -1024, 2048, 2048);
 }

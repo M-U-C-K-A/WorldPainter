@@ -63,13 +63,16 @@ WorldPainter permet de « peindre » des paysages Minecraft avec des outils proc
 
 ### Éditeur de nœuds
 
-**Generate › Node graph terrain…** (<kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>N</kbd>), dans l'esprit de Gaia ou World Machine : on relie des nœuds sur un canevas et on voit le résultat.
+**Generate › Node graph terrain…** (<kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>N</kbd>), dans l'esprit de Gaia ou World Machine : on relie des nœuds sur un canevas et on obtient une carte complète, relief, terrains, biomes et végétation compris.
 
-- **Générateurs** : bruit de Perlin, bruit à crêtes, bruit « billow », dunes, cellules (Voronoï), dégradé (radial, carré ou linéaire, ajusté à la carte), constante, image en niveaux de gris importée.
+- **Générateurs** : bruit de Perlin, bruit à crêtes, bruit « billow », dunes, cellules (Voronoï), dégradé (radial, carré ou linéaire, ajusté à la carte), constante, image en niveaux de gris importée et **carte actuelle** (pour retravailler un relief peint à la main).
 - **Combinaisons** : ajouter, soustraire, multiplier, maximum, minimum, mélange avec masque. **Filtres** : courbe éditable, terrasses, bornage, flou, érosion (ravines ramifiées qui descendent les pentes) et érosion thermique.
-- Chaque nœud affiche une **vignette** de son résultat ; aperçu en relief de la sortie ou du nœud sélectionné.
-- Application à toute la carte ou à la **sélection avec bords adoucis**, annulable, avec repeinture des terrains selon le thème. Le graphe est **enregistré avec le monde**.
-- Exemples prêts à l'emploi : collines, montagnes érodées, archipel, mesa. Évaluation par tuiles en parallèle, identique au bit près à un calcul d'un seul tenant : aucune couture.
+- **Masques** : plage d'altitude, plage de pente et sélection. Sans branchement, les masques lisent le terrain final.
+- **Surface** : peindre un terrain (roche, sable, neige, terre cuite…), un **biome** Minecraft (43 biomes) ou de la **flore** (forêts de feuillus, de pins, jungle, marais, neige, herbes et fleurs, fougères, plantes du désert, champignons). Le masque le plus fort l'emporte, avec des bordures mouchetées naturelles.
+- Chaque nœud affiche une **vignette** ; aperçu **relief**, **surface**, **biomes** ou du nœud sélectionné.
+- Édition confortable : **annuler / rétablir**, **sélection multiple** (<kbd>⇧</kbd> clic, <kbd>⇧</kbd> glisser, <kbd>⌘</kbd> <kbd>A</kbd>), copier-coller et dupliquer, **ouverture et enregistrement de graphes** (`.wpgraph`) pour les réutiliser d'un monde à l'autre.
+- Application à toute la carte ou à la **sélection avec bords adoucis**, annulable ; le graphe est **enregistré avec le monde**.
+- **8 exemples** de cartes complètes : collines, montagnes érodées, archipel tropical, canyons de mesa, dunes du désert, île volcanique, lacs et forêts, et « éroder la carte actuelle ». Évaluation par tuiles en parallèle, identique au bit près à un calcul d'un seul tenant : aucune couture.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/divider-dark.svg">

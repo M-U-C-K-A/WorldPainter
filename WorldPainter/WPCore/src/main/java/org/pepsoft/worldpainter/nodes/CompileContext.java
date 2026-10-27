@@ -6,15 +6,23 @@ import java.awt.*;
  * Global information which nodes may use when they are compiled.
  */
 final class CompileContext {
-    CompileContext(long seed, float minHeight, float maxHeight, Rectangle mapBounds) {
+    CompileContext(long seed, float minHeight, float maxHeight, Rectangle mapBounds, MapSource mapSource) {
         this.seed = seed;
         this.minHeight = minHeight;
         this.maxHeight = maxHeight;
         this.mapBounds = mapBounds;
+        this.mapSource = mapSource;
     }
 
     long getSeed() {
         return seed;
+    }
+
+    /**
+     * The height in blocks corresponding to a value of zero.
+     */
+    float getMinHeight() {
+        return minHeight;
     }
 
     /**
@@ -31,7 +39,15 @@ final class CompileContext {
         return mapBounds;
     }
 
+    /**
+     * The existing map, or {@code null} if not available.
+     */
+    MapSource getMapSource() {
+        return mapSource;
+    }
+
     private final long seed;
     private final float minHeight, maxHeight;
     private final Rectangle mapBounds;
+    private final MapSource mapSource;
 }

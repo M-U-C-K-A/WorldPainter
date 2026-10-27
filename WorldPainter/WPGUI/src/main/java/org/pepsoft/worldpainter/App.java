@@ -4333,10 +4333,18 @@ public final class App extends JFrame implements BrushControl,
             return;
         }
         cancelPaintSelection();
-        final NodeGraphDialog dialog = new NodeGraphDialog(this, dimension, view, view.getViewCentreInWorldCoords(), selectionState.getValue());
+        final List<CustomLayer> existingLayers = new ArrayList<>();
+        getCustomLayersByPalette().values().forEach(existingLayers::addAll);
+        final NodeGraphDialog dialog = new NodeGraphDialog(this, dimension, view, selectedColourScheme, view.getViewCentreInWorldCoords(), selectionState.getValue(), existingLayers);
         dialog.setVisible(true);
-        if ((! dialog.isCancelled()) && (threeDeeFrame != null)) {
-            threeDeeFrame.refresh(true);
+        if (! dialog.isCancelled()) {
+            // Make plant layers created by the graph available for painting by hand too
+            for (CustomLayer layer: dialog.getCreatedLayers()) {
+                customLayerController.registerCustomLayer(layer, false);
+            }
+            if (threeDeeFrame != null) {
+                threeDeeFrame.refresh(true);
+            }
         }
     }
 
