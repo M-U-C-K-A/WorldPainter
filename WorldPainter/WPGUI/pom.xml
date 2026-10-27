@@ -41,42 +41,16 @@
             <artifactId>jpen</artifactId>
             <version>${jpen.version}</version>
         </dependency>
-        <!-- If you can't or won't use the JIDE docking framework, you can use the JIDE open source components so that
-             at least the derived Swing controls will work: -->
-        <!--<dependency>-->
-            <!--<groupId>com.jidesoft</groupId>-->
-            <!--<artifactId>jide-oss</artifactId>-->
-            <!--<version>${jide.version}</version>-->
-        <!--</dependency>-->
         <dependency>
-            <!-- Commercial product; you will need to download the evaluation version, or obtain a license to use JIDE
-                 (an open source license is free). -->
-            <groupId>com.jidesoft</groupId>
-            <artifactId>jide-common</artifactId>
-            <version>${jide.version}</version>
+            <!-- Modern, cross-platform look and feel (light/dark, macOS themes, HiDPI) -->
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>${flatlaf.version}</version>
         </dependency>
         <dependency>
-            <!-- Commercial product; you will need to download the evaluation version, or obtain a license to use JIDE
-                 (an open source license is free). -->
-            <groupId>com.jidesoft</groupId>
-            <artifactId>jide-dock</artifactId>
-            <version>${jide.version}</version>
-        </dependency>
-        <dependency>
-            <!-- Commercial product; you will need to download the evaluation version, or obtain a license to use JIDE
-                 (an open source license is free). This module is only necessary on Linux, to make the GTK look and feel
-                 work correctly. -->
-            <groupId>com.jidesoft</groupId>
-            <artifactId>jide-plaf-jdk7</artifactId>
-            <version>${jide.version}</version>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <!-- Not in Maven central; here it comes from the worldpainter-private repo. -->
-            <groupId>org.netbeans.swing</groupId>
-            <artifactId>laf-dark</artifactId>
-            <version>${laf-dark.version}</version>
-            <scope>runtime</scope>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf-extras</artifactId>
+            <version>${flatlaf.version}</version>
         </dependency>
 
         <dependency>
@@ -138,8 +112,10 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>${exec-maven-plugin.version}</version>
                 <configuration>
-                    <executable>java</executable>
+                    <!-- Use the JDK which is running Maven, rather than whatever java is on the path -->
+                    <executable>${java.home}/bin/java</executable>
                     <arguments>
+                        <argument>-XX:MaxRAMPercentage=75</argument>
                         <argument>-cp</argument>
                         <classpath/>
                         <argument>-Dorg.pepsoft.worldpainter.devMode=true</argument>

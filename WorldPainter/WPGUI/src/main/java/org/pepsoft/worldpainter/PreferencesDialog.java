@@ -183,7 +183,7 @@ public class PreferencesDialog extends WorldPainterDialog {
 
             previousMaxHeight = config.getDefaultMaxHeight();
 
-            comboBoxLookAndFeel.setSelectedIndex(config.getLookAndFeel() != null ? config.getLookAndFeel().ordinal() : 0);
+            comboBoxLookAndFeel.setSelectedIndex(LOOK_AND_FEEL_OPTIONS.indexOf(normaliseLookAndFeel(config.getLookAndFeel())));
             if (config.getUiScale() == 0.0f) {
                 radioButtonUIScaleAuto.setSelected(true);
                 sliderUIScale.setValue((int) (GUIUtils.SYSTEM_UI_SCALE_FLOAT * 100));
@@ -317,7 +317,7 @@ public class PreferencesDialog extends WorldPainterDialog {
         config.setDefaultGameType((GameType) comboBoxMode.getSelectedItem());
         config.setDefaultAllowCheats(checkBoxCheats.isSelected());
 
-        config.setLookAndFeel(Configuration.LookAndFeel.values()[comboBoxLookAndFeel.getSelectedIndex()]);
+        config.setLookAndFeel(LOOK_AND_FEEL_OPTIONS.get(comboBoxLookAndFeel.getSelectedIndex()));
         if (radioButtonUIScaleAuto.isSelected()) {
             config.setUiScale(0.0f);
         } else {
@@ -752,7 +752,7 @@ public class PreferencesDialog extends WorldPainterDialog {
 
         jLabel30.setText("Visual theme:");
 
-        comboBoxLookAndFeel.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "System", "Metal", "Nimbus", "Dark Metal", "Dark Nimbus" }));
+        comboBoxLookAndFeel.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Modern (follow system)", "Modern light", "Modern dark", "System", "Metal", "Nimbus" }));
         comboBoxLookAndFeel.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 comboBoxLookAndFeelActionPerformed(evt);
@@ -1912,6 +1912,27 @@ public class PreferencesDialog extends WorldPainterDialog {
     private void comboBoxLookAndFeelActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboBoxLookAndFeelActionPerformed
         // Do nothing
     }//GEN-LAST:event_comboBoxLookAndFeelActionPerformed
+
+    /**
+     * Map {@code null} and the legacy look and feels to the ones offered in the user interface.
+     */
+    private static Configuration.LookAndFeel normaliseLookAndFeel(Configuration.LookAndFeel lookAndFeel) {
+        if (lookAndFeel == null) {
+            return Configuration.LookAndFeel.MODERN_AUTO;
+        }
+        switch (lookAndFeel) {
+            case DARK_METAL:
+            case DARK_NIMBUS:
+                return Configuration.LookAndFeel.MODERN_DARK;
+            default:
+                return lookAndFeel;
+        }
+    }
+
+    /**
+     * The look and feels offered in the combo box, in order.
+     */
+    private static final java.util.List<Configuration.LookAndFeel> LOOK_AND_FEEL_OPTIONS = java.util.List.of(Configuration.LookAndFeel.MODERN_AUTO, Configuration.LookAndFeel.MODERN_LIGHT, Configuration.LookAndFeel.MODERN_DARK, Configuration.LookAndFeel.SYSTEM, Configuration.LookAndFeel.METAL, Configuration.LookAndFeel.NIMBUS);
 
     private void checkBoxAutoDeleteBackupsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxAutoDeleteBackupsActionPerformed
         setControlStates();

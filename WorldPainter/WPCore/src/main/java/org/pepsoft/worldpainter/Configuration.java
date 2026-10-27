@@ -1354,7 +1354,11 @@ public final class Configuration implements Serializable, EventLogger, Minecraft
 
     public enum DonationStatus {DONATED, NO_THANK_YOU}
     
-    public enum LookAndFeel {SYSTEM, METAL, NIMBUS, DARK_METAL, DARK_NIMBUS}
+    /**
+     * The look and feel of the user interface. {@code DARK_METAL} and {@code DARK_NIMBUS} are legacy values which are
+     * mapped to {@code MODERN_DARK}; the {@code MODERN_*} values use FlatLaf.
+     */
+    public enum LookAndFeel {SYSTEM, METAL, NIMBUS, DARK_METAL, DARK_NIMBUS, MODERN_LIGHT, MODERN_DARK, MODERN_AUTO}
 
     public enum OverlayType {SCALE_ON_LOAD, OPTIMISE_ON_LOAD, SCALE_ON_PAINT}
 

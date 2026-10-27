@@ -5,8 +5,6 @@
 
 package org.pepsoft.worldpainter;
 
-import com.jidesoft.docking.*;
-import com.jidesoft.swing.JideLabel;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.Nullable;
 import org.pepsoft.minecraft.Direction;
@@ -60,6 +58,11 @@ import org.pepsoft.worldpainter.tools.Eyedropper.PaintType;
 import org.pepsoft.worldpainter.tools.Eyedropper.SelectionListener;
 import org.pepsoft.worldpainter.tools.RespawnPlayerDialog;
 import org.pepsoft.worldpainter.tools.scripts.ScriptRunner;
+import org.pepsoft.worldpainter.docking.DockableFrame;
+import org.pepsoft.worldpainter.docking.DockingManager;
+import org.pepsoft.worldpainter.docking.Side;
+import org.pepsoft.worldpainter.procedural.EdgeBlendDialog;
+import org.pepsoft.worldpainter.procedural.ProceduralTerrainDialog;
 import org.pepsoft.worldpainter.util.*;
 import org.pepsoft.worldpainter.util.BetterAction;
 import org.pepsoft.worldpainter.util.FileFilter;
@@ -91,8 +94,6 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.zip.GZIPInputStream;
 
-import static com.jidesoft.docking.DockContext.DOCK_SIDE_EAST;
-import static com.jidesoft.docking.DockContext.DOCK_SIDE_WEST;
 import static java.awt.Color.BLACK;
 import static java.awt.Color.WHITE;
 import static java.awt.GridBagConstraints.HORIZONTAL;
@@ -116,7 +117,6 @@ import static org.pepsoft.util.swing.MessageUtils.*;
 import static org.pepsoft.util.swing.ProgressDialog.NOT_CANCELABLE;
 import static org.pepsoft.util.swing.ProgressDialog.NO_FOCUS_STEALING;
 import static org.pepsoft.worldpainter.App.TerrainMode.SHOW_TERRAIN;
-import static org.pepsoft.worldpainter.Configuration.LookAndFeel.DARK_METAL;
 import static org.pepsoft.worldpainter.Constants.*;
 import static org.pepsoft.worldpainter.DefaultPlugin.JAVA_MCREGION;
 import static org.pepsoft.worldpainter.Dimension.Anchor.*;
@@ -143,7 +143,7 @@ import static org.pepsoft.worldpainter.util.BiomeUtils.getBiomeScheme;
 @SuppressWarnings("MagicConstant")
 public final class App extends JFrame implements BrushControl,
         BiomesViewerFrame.SeedListener, BrushOptions.Listener, CustomBiomeListener,
-        DockableHolder, PropertyChangeListener, Dimension.Listener, Tile.Listener, MapDragControl {
+        PropertyChangeListener, Dimension.Listener, Tile.Listener, MapDragControl {
     private App() {
         super((mode == Mode.WORLDPAINTER) ? "WorldPainter" : "MinecraftMapEditor"); // NOI18N
 
@@ -166,7 +166,7 @@ public final class App extends JFrame implements BrushControl,
         };
         defaultColourScheme = colourSchemes[0];
         Configuration config = Configuration.getInstance();
-        darkMode = (! "true".equalsIgnoreCase(System.getProperty("org.pepsoft.worldpainter.safeMode"))) && (config.getLookAndFeel() == DARK_METAL);
+        darkMode = (! "true".equalsIgnoreCase(System.getProperty("org.pepsoft.worldpainter.safeMode"))) && ThemeUtils.isDarkTheme();
         final String customColourSchemeLocation = System.getProperty("org.pepsoft.worldpainter.colourSchemeFile");
         if (customColourSchemeLocation != null) {
             throw new UnsupportedOperationException("The org.pepsoft.worldpainter.colourSchemeFile advanced setting is no longer supported (colour schemes are once again available from the View menu)");
@@ -675,10 +675,10 @@ public final class App extends JFrame implements BrushControl,
             final Map<String, byte[]> layoutData = config.getJideLayoutData();
             final String key = dimension.getId().toString();
             if ((layoutData != null) && layoutData.containsKey(key)) {
-                dockingManager.loadLayoutFrom(new ByteArrayInputStream(layoutData.get(key)));
-                // This works around a bug in JIDE that otherwise causes painting to be shifted if this resulted in
-                // resized docks:
-                view.componentResized(new ComponentEvent(view, COMPONENT_RESIZED));
+                if (dockingManager.loadLayoutFrom(layoutData.get(key))) {
+                    // Make sure the view picks up any change in size caused by resized docks
+                    view.componentResized(new ComponentEvent(view, COMPONENT_RESIZED));
+                }
             }
 
             if (! refreshTerrainMode()) {
@@ -1839,9 +1839,6 @@ public final class App extends JFrame implements BrushControl,
         }
     }
     
-    // DockableHolder
-
-    @Override
     public DockingManager getDockingManager() {
         return dockingManager;
     }
@@ -1904,7 +1901,7 @@ public final class App extends JFrame implements BrushControl,
         Terrain.setCustomMaterial(index, customMaterial);
 
         if (customTerrainPanel == null) {
-            dockingManager.addFrame(new DockableFrameBuilder(createCustomTerrainPanel(), "Custom Terrain", DOCK_SIDE_WEST, 3).withId("customTerrain").scrollable().build());
+            dockingManager.addFrame(new DockableFrameBuilder(createCustomTerrainPanel(), "Custom Terrain", Side.WEST, 3).withId("customTerrain").scrollable().build());
         }
 
         JToggleButton newButton = createTerrainButton(Terrain.getCustomTerrain(index));
@@ -2701,21 +2698,9 @@ public final class App extends JFrame implements BrushControl,
         TiledImageViewerContainer viewContainer = new TiledImageViewerContainer(privateRootPane);
 
         // Set up docking framework
-        JPanel contentContainer = new JPanel(new BorderLayout());
-        getContentPane().add(contentContainer, BorderLayout.CENTER);
-        dockingManager = new DefaultDockingManager(this, contentContainer);
-        if (SystemUtils.isLinux()) {
-            // On Linux, at least in the GTK look and feel, the default
-            // (whatever it is) doesn't work; nothing is displayed
-            dockingManager.setOutlineMode(DockingManager.MIX_OUTLINE_MODE);
-        }
-        dockingManager.setGroupAllowedOnSidePane(false);
-        dockingManager.setTabbedPaneCustomizer(tabbedPane -> tabbedPane.setTabPlacement(JTabbedPane.LEFT));
-        // Stop JIDE from swallowing the Esc key
-        dockingManager.getMainContainer().unregisterKeyboardAction(getKeyStroke(VK_ESCAPE, 0));
-        Workspace workspace = dockingManager.getWorkspace();
-        workspace.setLayout(new BorderLayout());
-        workspace.add(viewContainer, BorderLayout.CENTER);
+        dockingManager = new DockingManager(this);
+        getContentPane().add(dockingManager.getMainContainer(), BorderLayout.CENTER);
+        dockingManager.getWorkspace().add(viewContainer, BorderLayout.CENTER);
 
         setJMenuBar(createMenuBar());
         
@@ -2725,39 +2710,37 @@ public final class App extends JFrame implements BrushControl,
 
         scrollController.install();
 
-        dockingManager.addFrame(new DockableFrameBuilder(createToolPanel(), "Tools", DOCK_SIDE_WEST, 1).build());
+        dockingManager.addFrame(new DockableFrameBuilder(createToolPanel(), "Tools", Side.WEST, 1).build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", DOCK_SIDE_WEST, 2).expand().scrollable().build());
+        dockingManager.addFrame(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", Side.WEST, 2).expand().scrollable().build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createLayerPanel(), "Layers", DOCK_SIDE_WEST, 3).build());
+        dockingManager.addFrame(new DockableFrameBuilder(createLayerPanel(), "Layers", Side.WEST, 3).build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createTerrainPanel(), "Terrain", DOCK_SIDE_WEST, 3).build());
+        dockingManager.addFrame(new DockableFrameBuilder(createTerrainPanel(), "Terrain", Side.WEST, 3).build());
 
-        biomesPanelFrame = new DockableFrameBuilder(createBiomesPanelContainer(), "Biomes", DOCK_SIDE_WEST, 3).scrollable().build();
+        biomesPanelFrame = new DockableFrameBuilder(createBiomesPanelContainer(), "Biomes", Side.WEST, 3).scrollable().build();
         dockingManager.addFrame(biomesPanelFrame);
 
-        dockingManager.addFrame(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", DOCK_SIDE_WEST, 3).build());
+        dockingManager.addFrame(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", Side.WEST, 3).build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createBrushPanel(), "Brushes", DOCK_SIDE_EAST, 1).build());
+        dockingManager.addFrame(new DockableFrameBuilder(createBrushPanel(), "Brushes", Side.EAST, 1).build());
 
         if (customBrushes.containsKey(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
-            dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(CUSTOM_BRUSHES_DEFAULT_TITLE, customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE)), "Custom Brushes", DOCK_SIDE_EAST, 1).withId("customBrushesDefault").scrollable().build());
+            dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(CUSTOM_BRUSHES_DEFAULT_TITLE, customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE)), "Custom Brushes", Side.EAST, 1).withId("customBrushesDefault").scrollable().build());
         }
         for (Map.Entry<String, BrushGroup> entry: customBrushes.entrySet()) {
             if (entry.getKey().equals(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
                 continue;
             }
-            dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), entry.getKey(), DOCK_SIDE_EAST, 1).withId("customBrushes." + entry.getKey()).scrollable().build());
+            dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), entry.getKey(), Side.EAST, 1).withId("customBrushes." + entry.getKey()).scrollable().build());
         }
         
-        dockingManager.addFrame(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", DOCK_SIDE_EAST, 2).withId("brushSettings").build());
+        dockingManager.addFrame(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", Side.EAST, 2).withId("brushSettings").build());
 
         infoPanel = createInfoPanel();
-        dockingManager.addFrame(new DockableFrameBuilder(infoPanel, "Info", DOCK_SIDE_EAST, 2).withId("infoPanel").expand().withIcon(loadScaledIcon("information")).build());
+        dockingManager.addFrame(new DockableFrameBuilder(infoPanel, "Info", Side.EAST, 2).withId("infoPanel").expand().withIcon(loadScaledIcon("information")).build());
 
-        if (config.getDefaultJideLayoutData() != null) {
-            dockingManager.loadLayoutFrom(new ByteArrayInputStream(config.getDefaultJideLayoutData()));
-        } else {
+        if (! dockingManager.loadLayoutFrom(config.getDefaultJideLayoutData())) {
             dockingManager.resetToDefault();
         }
 
@@ -3186,13 +3169,13 @@ public final class App extends JFrame implements BrushControl,
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.insets = new Insets(1, 1, 1, 1);
 
-        JideLabel label = new JideLabel("Show");
+        VerticalLabel label = new VerticalLabel("Show");
         label.setOrientation(SwingConstants.VERTICAL);
         label.setClockwise(false);
         label.setMinimumSize(label.getPreferredSize());
         constraints.anchor = GridBagConstraints.SOUTH;
         layerPanel.add(label, constraints);
-        label = new JideLabel("Solo");
+        label = new VerticalLabel("Solo");
         label.setOrientation(SwingConstants.VERTICAL);
         label.setClockwise(false);
         label.setMinimumSize(label.getPreferredSize());
@@ -3794,6 +3777,7 @@ public final class App extends JFrame implements BrushControl,
         menuBar.add(createFileMenu());
         menuBar.add(createEditMenu());
         menuBar.add(createViewMenu());
+        menuBar.add(createGenerateMenu());
         Configuration config = Configuration.getInstance();
         if (! config.isEasyMode()) {
             menuBar.add(createToolsMenu());
@@ -4217,6 +4201,8 @@ public final class App extends JFrame implements BrushControl,
         workspaceLayoutMenu.add(menuItem);
         menu.add(workspaceLayoutMenu);
 
+        menu.add(dockingManager.createPanelsMenu("Panels"));
+
         menu.addSeparator();
         
         menuItem = new JMenuItem(strings.getString("show.3d.view") + "...");
@@ -4262,6 +4248,55 @@ public final class App extends JFrame implements BrushControl,
 
         menu.putClientProperty(KEY_HELP_KEY, "Menu/View");
         return menu;
+    }
+
+    private JMenu createGenerateMenu() {
+        final JMenu menu = new JMenu("Generate");
+        menu.setMnemonic('g');
+
+        JMenuItem menuItem = new JMenuItem("Procedural terrain\u2026");
+        menuItem.setToolTipText("Generate terrain from layers of noise, with a live preview, for the whole map or the selection");
+        menuItem.setAccelerator(getKeyStroke(VK_G, PLATFORM_COMMAND_MASK | SHIFT_DOWN_MASK));
+        menuItem.addActionListener(e -> showProceduralTerrain());
+        menu.add(menuItem);
+
+        menuItem = new JMenuItem("Blend map edges\u2026");
+        menuItem.setToolTipText("Progressively blend the edges of the map into the surrounding terrain instead of ending in a cliff");
+        menuItem.addActionListener(e -> showEdgeBlend());
+        menu.add(menuItem);
+
+        menu.putClientProperty(KEY_HELP_KEY, "Menu/Generate");
+        return menu;
+    }
+
+    private void showProceduralTerrain() {
+        if ((world == null) || (dimension == null)) {
+            DesktopUtils.beep();
+            return;
+        }
+        cancelPaintSelection();
+        final ProceduralTerrainDialog dialog = new ProceduralTerrainDialog(this, dimension, view, selectedColourScheme, view.getViewCentreInWorldCoords(), selectionState.getValue());
+        dialog.setVisible(true);
+        if ((! dialog.isCancelled()) && (threeDeeFrame != null)) {
+            threeDeeFrame.refresh(true);
+        }
+    }
+
+    private void showEdgeBlend() {
+        if ((world == null) || (dimension == null) || (dimension.getTileCount() == 0)) {
+            DesktopUtils.beep();
+            return;
+        }
+        cancelPaintSelection();
+        final EdgeBlendDialog dialog = new EdgeBlendDialog(this, dimension, view, selectedColourScheme, view.getViewCentreInWorldCoords());
+        dialog.setVisible(true);
+        if (! dialog.isCancelled()) {
+            // Tiles may have been added
+            view.refreshTiles();
+            if (threeDeeFrame != null) {
+                threeDeeFrame.refresh(true);
+            }
+        }
     }
 
     private JMenu createToolsMenu() {
@@ -6615,7 +6650,7 @@ public final class App extends JFrame implements BrushControl,
         protected void performAction(ActionEvent e) {
             Configuration config = Configuration.getInstance();
             if (config.getDefaultJideLayoutData() != null) {
-                dockingManager.loadLayoutFrom(new ByteArrayInputStream(config.getDefaultJideLayoutData()));
+                dockingManager.loadLayoutFrom(config.getDefaultJideLayoutData());
             }
         }
     };

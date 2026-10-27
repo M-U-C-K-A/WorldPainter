@@ -1,22 +1,73 @@
 # Building WorldPainter
-## Installing dependencies
-WorldPainter needs some dependencies that are not in public Maven repos and cannot be distributed on WorldPainter's private repo due to their licence. You need to install these dependencies into your local Maven repo manually:
-### JIDE Docking Framework
-For the docks, WorldPainter uses the [JIDE Docking Framework](https://www.jidesoft.com/products/dock.htm), which is a commercial product. For development, you can download an evaluation version of the product [here](https://www.jidesoft.com/evaluation/), with user ID and password documented [here](https://www.jidesoft.com/forum/viewtopic.php?t=10) (note that you need to create a forum account to access the second link). The evaluation version will expire after two months, but you can keep downloading it again whenever it expires for two more months of development time.
 
-Once you have your copy, install the `jide-common.jar`, `jide-dock.jar` and `jide-plaf-jdk7.jar` files in your local Maven repository. If necessary, update the version numbers in the pom.xml of the WPGUI module if you downloaded a different version!
+This fork builds with nothing but a JDK and Maven: the commercial JIDE docking framework and the Maven toolchain setup
+that the original project required are no longer needed.
 
-## Set up Maven toolchain
-WorldPainter uses the [Maven toolchain framework](https://maven.apache.org/guides/mini/guide-using-toolchains.html) to find the JDK it needs. You need to follow the instructions on that page to configure a toolchain of type jdk and version 17 pointing to a Java 17 JDK. Note that it has not been tested whether WorldPainter will run correctly on older Java versions if you substitute a newer JDK for version 17, although in theory that should work.
+## Requirements
 
-## Build WorldPainter
-Once all dependencies are installed and the toolchains set up you can build WorldPainter from the command line or using your favourite IDE by invoking the `install` goal on the `WorldPainter` module. There are some rudimentary tests, but they take a while to run and don't contribute much, so I recommend skipping them by adding `-DskipTests=true`.
+- **JDK 21 or later** (any distribution: Temurin, Homebrew `openjdk@21`, Oracle, ...). It must be a full JDK, since
+  packaging uses `jpackage`.
+- **Maven 3.9 or later**.
 
-## Run WorldPainter
-Once it is built, you can run WorldPainter by invoking the `exec:exec` goal on the `WPGUI` module, or by running the main class: `org.pepsoft.worldpainter.Main`.
+On macOS with Homebrew:
+
+```bash
+brew install openjdk@21 maven
+export JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
+```
+
+A few dependencies are not in Maven Central; they are downloaded automatically from the WorldPainter repository
+(`https://www.worldpainter.net/maven-repo/`), which is configured in the POM.
+
+## Build
+
+From the `WorldPainter` directory:
+
+```bash
+mvn -DskipTests install
+```
+
+The tests for the procedural terrain and edge blending features are quick:
+
+```bash
+mvn -pl WPCore test -Dtest=ProceduralTerrainTest -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+## Run
+
+```bash
+mvn -pl WPGUI exec:exec
+```
+
+This runs WorldPainter with the JDK that runs Maven, allowing it to use up to 75% of the physical memory. You can also
+run the main class, `org.pepsoft.worldpainter.Main`, from your IDE.
+
+## Create a native application
+
+`packaging/package.sh` builds a self-contained application for the current operating system, with a bundled Java
+runtime, in the `dist` directory at the root of the repository:
+
+```bash
+packaging/package.sh            # macOS: dist/WorldPainter.app; Windows and Linux: dist/WorldPainter folder
+packaging/package.sh dmg        # macOS disk image
+packaging/package.sh deb        # Linux (also: rpm)
+packaging/package.sh msi        # Windows installer (requires the WiX toolset; also: exe)
+```
+
+On Windows, run the script from Git Bash. The application is not code signed: on macOS, open it the first time with
+right-click > Open, or remove the quarantine flag with `xattr -dr com.apple.quarantine WorldPainter.app`.
+
+The GitHub Actions workflow in `.github/workflows/build.yml` runs the tests and builds packages for macOS (Apple Silicon
+and Intel), Windows and Linux on every push.
 
 ## Develop WorldPainter
-For a few pointers, pitfalls and gotchas about developing WorldPainter, see [this page](https://www.worldpainter.net/trac/wiki/DevelopingWorldPainter).
 
-## More details
-For a more detailed description of the build process, see: https://www.worldpainter.net/doc/building.
+For a few pointers, pitfalls and gotchas about developing WorldPainter, see
+[this page](https://www.worldpainter.net/trac/wiki/DevelopingWorldPainter).
+
+- The user interface uses [FlatLaf](https://www.formdev.com/flatlaf/) for the modern themes and a small built-in docking
+  framework (`org.pepsoft.worldpainter.docking`) for the panels.
+- The procedural terrain and edge blending engine lives in `org.pepsoft.worldpainter.procedural` in WPCore; the dialogs
+  are in the same package in WPGUI.
+- To merge the latest changes from the original project: `git fetch upstream && git merge upstream/master` (the
+  `upstream` remote points to https://github.com/Captain-Chaos/WorldPainter).

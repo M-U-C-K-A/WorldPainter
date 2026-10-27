@@ -5,3 +5,5 @@ exporttimings.csv
 target
 *.code-workspace
 exports
+# Native packages built by packaging/package.sh
+/dist/

@@ -9,8 +9,6 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.joran.JoranConfigurator;
 import ch.qos.logback.core.joran.spi.JoranException;
 import ch.qos.logback.core.util.StatusPrinter;
-import com.jidesoft.plaf.LookAndFeelFactory;
-import com.jidesoft.utils.Lm;
 import org.intellij.lang.annotations.Language;
 import org.pepsoft.util.*;
 import org.pepsoft.util.plugins.PluginManager;
@@ -21,6 +19,7 @@ import org.pepsoft.worldpainter.plugins.PlatformManager;
 import org.pepsoft.worldpainter.plugins.Plugin;
 import org.pepsoft.worldpainter.plugins.WPPluginManager;
 import org.pepsoft.worldpainter.util.BetterAction;
+import org.pepsoft.worldpainter.util.ThemeUtils;
 import org.pepsoft.worldpainter.vo.EventVO;
 import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
@@ -82,10 +81,10 @@ public class Main {
         if (SystemUtils.isMac()) {
             // Use the Mac style top of screen menu bar
             System.setProperty("apple.laf.useScreenMenuBar", "true");
+            // Use the application name in the menu bar and follow the system light/dark appearance for window title bars
+            System.setProperty("apple.awt.application.name", "WorldPainter");
+            System.setProperty("apple.awt.application.appearance", "system");
         }
-        // Work around a bug in the JIDE Docking Framework which otherwise causes duplicate mouse events on focus
-        // switches resulting in uncommanded edits
-        System.setProperty("docking.focusWorkaround1", "true");
         // Disable Java2D's automatic UI scaling, as it does not do a good job with the editor view; we want to do it
         // ourselves
         System.setProperty("sun.java2d.uiScale.enabled", "false");
@@ -422,19 +421,7 @@ public class Main {
             world = null;
         }
 
-        // Install JIDE licence, if present
-        InputStream in = ClassLoader.getSystemResourceAsStream("jide_licence.properties");
-        if (in != null) {
-            try {
-                Properties jideLicenceProps = new Properties();
-                jideLicenceProps.load(in);
-                Lm.verifyLicense(jideLicenceProps.getProperty("companyName"), jideLicenceProps.getProperty("projectName"), jideLicenceProps.getProperty("licenceKey"));
-            } finally {
-                in.close();
-            }
-        }
-
-        final Configuration.LookAndFeel lookAndFeel = (config.getLookAndFeel() != null) ? config.getLookAndFeel() : Configuration.LookAndFeel.SYSTEM;
+        final Configuration.LookAndFeel lookAndFeel = (config.getLookAndFeel() != null) ? config.getLookAndFeel() : Configuration.LookAndFeel.MODERN_AUTO;
         SwingUtilities.invokeLater(() -> {
             Configuration myConfig = Configuration.getInstance();
             if (myConfig.isSafeMode()) {
@@ -443,46 +430,19 @@ public class Main {
             } else {
                 // Install configured look and feel
                 try {
-                    String laf;
-                    switch (lookAndFeel) {
-                        case SYSTEM:
-                            laf = UIManager.getSystemLookAndFeelClassName();
-                            break;
-                        case METAL:
-                            laf = "javax.swing.plaf.metal.MetalLookAndFeel";
-                            break;
-                        case NIMBUS:
-                            laf = "javax.swing.plaf.nimbus.NimbusLookAndFeel";
-                            break;
-                        case DARK_METAL:
-                            laf = "org.netbeans.swing.laf.dark.DarkMetalLookAndFeel";
-                            IconUtils.setTheme("dark_metal");
-                            break;
-                        case DARK_NIMBUS:
-                            laf = "org.netbeans.swing.laf.dark.DarkNimbusLookAndFeel";
-                            IconUtils.setTheme("dark_nimbus");
-                            break;
-                        default:
-                            throw new InternalError();
-                    }
-                    logger.debug("Installing look and feel: " + laf);
-                    UIManager.setLookAndFeel(laf);
-                    LookAndFeelFactory.installJideExtension();
-                    if (((lookAndFeel == Configuration.LookAndFeel.DARK_METAL)
-                            || (lookAndFeel == Configuration.LookAndFeel.DARK_NIMBUS))) {
-                        // Patch some things to make dark themes look better
+                    logger.debug("Installing look and feel: " + lookAndFeel);
+                    ThemeUtils.installLookAndFeel(lookAndFeel, getUIScale());
+                    if (ThemeUtils.isDarkTheme()) {
+                        // Use the light-on-dark icons and match the background of the editor to the theme
+                        IconUtils.setTheme("dark_metal");
                         VoidRenderer.setColour(UIManager.getColor("Panel.background").getRGB());
-                        if (lookAndFeel == Configuration.LookAndFeel.DARK_METAL) {
-                            UIManager.put("ContentContainer.background", UIManager.getColor("desktop"));
-                            UIManager.put("JideTabbedPane.foreground", new Color(222, 222, 222));
-                        }
                     }
                 } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {
                     logger.warn("Could not install selected look and feel", e);
                 }
 
-                if (getUIScale() != 1.0f) {
-                    // Scale the look and feel to the UI
+                if ((getUIScale() != 1.0f) && (! ThemeUtils.isModernTheme())) {
+                    // Scale the look and feel to the UI (the modern themes scale themselves)
                     GUIUtils.scaleLookAndFeel(getUIScale());
                 }
             }

@@ -319,11 +319,12 @@
               <Properties>
                 <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
                   <StringArray count="5">
-                    <StringItem index="0" value="System"/>
-                    <StringItem index="1" value="Metal"/>
-                    <StringItem index="2" value="Nimbus"/>
-                    <StringItem index="3" value="Dark Metal"/>
-                    <StringItem index="4" value="Dark Nimbus"/>
+                    <StringItem index="0" value="Modern (follow system)"/>
+                    <StringItem index="1" value="Modern light"/>
+                    <StringItem index="2" value="Modern dark"/>
+                    <StringItem index="3" value="System"/>
+                    <StringItem index="4" value="Metal"/>
+                    <StringItem index="5" value="Nimbus"/>
                   </StringArray>
                 </Property>
               </Properties>

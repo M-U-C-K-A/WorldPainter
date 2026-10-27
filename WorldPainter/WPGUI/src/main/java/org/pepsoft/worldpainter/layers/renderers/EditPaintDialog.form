@@ -276,7 +276,7 @@
         <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="sliderOpacityStateChanged"/>
       </Events>
     </Component>
-    <Component class="com.jidesoft.swing.JideLabel" name="labelOpacity">
+    <Component class="org.pepsoft.worldpainter.util.VerticalLabel" name="labelOpacity">
       <Properties>
         <Property name="text" type="java.lang.String" value="Opacity"/>
       </Properties>

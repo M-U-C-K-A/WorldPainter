@@ -2,14 +2,13 @@ package org.pepsoft.worldpainter;
 
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.AtomicDouble;
-import com.jidesoft.docking.DockContext;
-import com.jidesoft.docking.DockableFrame;
 import org.jetbrains.annotations.NotNull;
 import org.pepsoft.minecraft.Material;
 import org.pepsoft.util.DesktopUtils;
 import org.pepsoft.util.IconUtils;
 import org.pepsoft.util.MathUtils;
 import org.pepsoft.util.swing.BetterJPopupMenu;
+import org.pepsoft.worldpainter.docking.DockableFrame;
 import org.pepsoft.worldpainter.importing.CustomItemsTreeModel;
 import org.pepsoft.worldpainter.layers.*;
 import org.pepsoft.worldpainter.layers.annotation.CustomAnnotationLayerDialog;
@@ -333,7 +332,6 @@ public class CustomLayerController implements PropertyChangeListener {
         // Show the palette if it is not showing yet
         if (palette != null) {
             app.dockingManager.addFrame(palette.getDockableFrame());
-            app.dockingManager.dockFrame(palette.getDockableFrame().getKey(), DockContext.DOCK_SIDE_WEST, 3);
             if (activate) {
                 app.dockingManager.activateFrame(palette.getDockableFrame().getKey());
             }
@@ -896,7 +894,6 @@ public class CustomLayerController implements PropertyChangeListener {
             }
             Palette destPalette = paletteManager.create(name);
             app.dockingManager.addFrame(destPalette.getDockableFrame());
-            app.dockingManager.dockFrame(destPalette.getDockableFrame().getKey(), DockContext.DOCK_SIDE_WEST, 3);
             moveLayerToPalette(layer, destPalette);
             app.dockingManager.activateFrame(destPalette.getDockableFrame().getKey());
             destPalette.addPropertyChangeListener(this);

@@ -1,39 +1,68 @@
 ![Frame 21799](https://github.com/M-U-C-K-A/WorldPainter/assets/96072629/41ebb073-3513-466a-8a15-3ab3770ef1f5)
-# WorldPainter
+# WorldPainter — édition modernisée
 [![Made by](https://img.shields.io/badge/Made%20by-Captain--Chaos-blueviolet)](https://github.com/Captain-Chaos)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-WorldPainter is an interactive map generator for Minecraft. It allows you to "paint" landscapes using similar tools as a regular paint program. Sculpt and mould the terrain, paint materials, trees, snow and ice, etc. onto it, and much more.
+WorldPainter est un générateur de cartes interactif pour Minecraft : on « peint » des paysages avec des outils semblables à ceux d'un logiciel de dessin (sculpter le relief, peindre les matériaux, les arbres, la neige, etc.).
 
-## Distributing
+Ce fork reprend la dernière version du projet d'origine ([Captain-Chaos/WorldPainter](https://github.com/Captain-Chaos/WorldPainter)) et la modernise.
 
-WorldPainter is open source software, licensed under the GPL version 3. This means that if you distribute it, original or in modified form, you must also distribute it (including your changes) as open source under the GPL version 3 (or later). See the [LICENSE](LICENSE) file for details.
+## Nouveautés de ce fork
 
-## Building
+### À jour avec Minecraft
+- Basé sur WorldPainter 2.27 : export pour **Minecraft 1.20.5 à 1.21.11 et 26.1 et suivantes**. Minecraft 26.2 et 26.3 convertissent automatiquement à l'ouverture les cartes exportées au format 26.1.
+- Le dépôt d'origine est configuré comme remote `upstream` pour récupérer facilement ses futures mises à jour.
 
-WorldPainter is a Maven project and easy to build from the command line with Maven, or using your favourite IDE. However there are some missing dependencies which are not in Maven Central which you will have to install locally first. See the [BUILDING](BUILDING.md) file for details.
+### Génération procédurale — menu **Generate › Procedural terrain…** (⇧⌘G)
+- Une pile de **couches de bruit** à combiner : relief doux (fractal), crêtes montagneuses, collines arrondies, cellules (volcans, cratères), dunes.
+- Pour chaque couche : taille des reliefs, hauteur, niveau de détail, rugosité, netteté des sommets, déformation (warp), couverture (pour créer des chaînes ou des îles séparées), direction (dunes).
+- Terrasses, niveau de la mer, et **règles de surface** (type de terrain selon l'altitude et la pente : neige en altitude, roche sur les pentes raides, plages au bord de l'eau…).
+- 8 préréglages : Minecraft-like, Plaines, Collines, Montagnes alpines, Archipel, Canyons de mesa, Dunes, Îles volcaniques.
+- **Aperçu en relief en temps réel**, graine aléatoire ou fixe.
+- Application à toute la carte ou **seulement à la sélection, avec des bords adoucis**, en mode Remplacer, Ajouter du relief, Monter seulement ou Creuser seulement.
+- Calcul en parallèle sur tous les cœurs du processeur, sans couture entre les tuiles : utilisable sur de très grandes cartes.
 
-## Download
+### Fondu des bords — menu **Generate › Blend map edges…**
+Fini les falaises brutes au bord d'une carte de 200 × 200 : le terrain rejoint progressivement le paysage qui l'entoure.
+- **Zone de transition** réglable (16 à 4096 blocs), placée à l'extérieur de la carte (qui est alors agrandie), à l'intérieur (le bord existant est adouci) ou à cheval sur le bord.
+- **Cible** : un terrain procédural (par défaut *Minecraft-like*, proche du terrain que Minecraft génère au-delà de la carte) ou un niveau plat.
+- Forme de la courbe (linéaire, en S, douce côté carte ou côté cible) et **irrégularité** pour éviter une transition trop géométrique.
+- Le relief du bord est flouté progressivement avec la distance : pas de stries, pas de cassure aux coins.
+- Minecraft termine ensuite lui-même le raccord sur les derniers blocs grâce à son système de *chunk blending*.
 
-To download WorldPainter, please visit the [official website](https://www.worldpainter.net/). Below are the available versions:
+![Avant / après le fondu des bords](docs/images/edge-blending.png)
 
-|        OS             |     Architecture           | WorldPainter                                           | Java                                                   |
-|---------------------|----------------|--------------------------------------------------------|--------------------------------------------------------|
-| Windows             | 64-bit         | [Download installer (.exe)](https://www.worldpainter.org/files/worldpainter_2.21.3.exe)    | [64-bit Java 17 LTS](https://www.java.com)                    |
-|                     | 32-bit         | [Download installer (.exe)](https://www.worldpainter.org/files/worldpainter_32_2.21.3.exe) | [32-bit Java 8](https://www.java.com)                      |
-| Mac OS X            | Intel          | [Download installer (.dmg)](https://www.worldpainter.org/files/worldpainter_2.21.3.dmg)    | [Intel Java 17 LTS](https://www.java.com)                  |
-|                     | Arm (M1/M2)    |                                                        | [Arm Java 17 LTS](https://www.java.com)                    |
-| Linux/UNIX          | Debian         | [Download DEB package](https://www.worldpainter.org/files/worldpainter_2.21.3.deb)        |                                                        |
-|                     | Red Hat        | [Download RPM package](https://www.worldpainter.org/files/worldpainter_2.21.3.rpm)        |                                                        |
-|                     | Other          | [Download installer (.sh)](https://www.worldpainter.org/files/worldpainter_2.21.3.sh)     |                                                        |
+### Interface plus moderne
+- Thèmes **FlatLaf** clair et sombre, avec un mode **automatique qui suit le réglage du système** (par défaut), variantes natives macOS, couleur d'accent, icônes claires en mode sombre. Les anciens thèmes restent disponibles dans les préférences.
+- **Nouveau système de panneaux** (remplace JIDE, une bibliothèque commerciale qui empêchait de compiler le projet librement) : panneaux à gauche et à droite, regroupés en onglets compacts, redimensionnables, détachables dans une fenêtre, masquables et ré-affichables via **View › Panels**, disposition mémorisée par carte.
 
+### Grands terrains et toutes les plateformes
+- Passage à **Java 21**.
+- Application **native avec Java intégré** (rien à installer) : `.app`/`.dmg` pour macOS (Apple Silicon et Intel), Windows, `.deb`/`.rpm` pour Linux.
+- L'application empaquetée peut utiliser **jusqu'à 75 % de la mémoire** de la machine (contre 25 % par défaut pour Java), ce qui permet de charger des cartes environ trois fois plus grandes.
+- Intégration continue GitHub Actions : tests et paquets pour les quatre plateformes à chaque push.
 
-> [!WARNING]  
-> Download the proper version of Java [here](https://www.java.com/), if required. You may already have it, so try it without first.
+## Compiler et lancer
 
+Il suffit d'un JDK 21 et de Maven. Toutes les dépendances se téléchargent automatiquement. Voir [BUILDING.md](BUILDING.md) pour le détail.
 
+```bash
+cd WorldPainter
+mvn -DskipTests install
+mvn -pl WPGUI exec:exec
+```
 
-## Contributors
+Pour créer l'application macOS (dans `dist/`) :
 
+```bash
+packaging/package.sh        # dist/WorldPainter.app
+packaging/package.sh dmg    # image disque à distribuer
+```
+
+## Distribution
+
+WorldPainter est un logiciel libre sous licence GPL version 3. Si vous le distribuez, tel quel ou modifié, vous devez aussi distribuer le code source (avec vos modifications) sous GPL version 3 (ou ultérieure). Voir le fichier [LICENSE](LICENSE).
+
+## Contributeurs
 
 [![Contributors](https://contrib.rocks/image?repo=Captain-Chaos/WorldPainter)](https://github.com/Captain-Chaos/WorldPainter/graphs/contributors)

@@ -111,7 +111,7 @@
 
       <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
       <SubComponents>
-        <Component class="com.jidesoft.swing.CheckBoxTree" name="treeCustomItems">
+        <Component class="org.pepsoft.worldpainter.util.CheckBoxTree" name="treeCustomItems">
           <Properties>
             <Property name="selectionModel" type="javax.swing.tree.TreeSelectionModel" editor="org.netbeans.modules.form.ComponentChooserEditor">
               <ComponentRef name="null"/>

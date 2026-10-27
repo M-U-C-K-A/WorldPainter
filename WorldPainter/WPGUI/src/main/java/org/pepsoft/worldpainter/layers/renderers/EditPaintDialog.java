@@ -201,7 +201,7 @@ public class EditPaintDialog extends WorldPainterDialog {
         buttonClear = new javax.swing.JButton();
         jLabel1 = new javax.swing.JLabel();
         sliderOpacity = new javax.swing.JSlider();
-        labelOpacity = new com.jidesoft.swing.JideLabel();
+        labelOpacity = new org.pepsoft.worldpainter.util.VerticalLabel();
         radioButtonSolidColour = new javax.swing.JRadioButton();
         radioButtonPattern = new javax.swing.JRadioButton();
         buttonSelectSolidColour = new javax.swing.JButton();
@@ -487,7 +487,7 @@ public class EditPaintDialog extends WorldPainterDialog {
     private org.pepsoft.worldpainter.util.IconEditor iconEditor1;
     private javax.swing.JButton jButton1;
     private javax.swing.JLabel jLabel1;
-    private com.jidesoft.swing.JideLabel labelOpacity;
+    private org.pepsoft.worldpainter.util.VerticalLabel labelOpacity;
     private javax.swing.JPanel panelColours;
     private javax.swing.JRadioButton radioButtonPattern;
     private javax.swing.JRadioButton radioButtonSolidColour;
