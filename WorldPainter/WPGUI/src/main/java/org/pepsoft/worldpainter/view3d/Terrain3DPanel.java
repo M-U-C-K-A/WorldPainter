@@ -33,7 +33,6 @@ public class Terrain3DPanel extends JPanel {
         super(new BorderLayout());
         view = new Terrain3DView();
         view.setHoverListener(this::hoverChanged);
-        view.setTargetListener(this::requestDetail);
         infoCard = new InfoCard();
         legend = new Legend();
 
@@ -98,7 +97,7 @@ public class Terrain3DPanel extends JPanel {
         });
         toolBar.add(topButton);
         blocksButton = new JToggleButton(Icons.get("package", 18));
-        blocksButton.setToolTipText(App.richToolTip("Blocks", "Preview the land as Minecraft will show it: every block a one metre cube, at its exact height, around the centre of the view", null));
+        blocksButton.setToolTipText(App.richToolTip("Blocks", "Preview the land as Minecraft will show it: every block a one metre cube, at its exact height", null));
         blocksButton.addActionListener(e -> {
             view.setBlocks(blocksButton.isSelected());
             exaggerationSlider.setEnabled(! blocksButton.isSelected());
@@ -201,38 +200,39 @@ public class Terrain3DPanel extends JPanel {
     }
 
     /**
-     * In block mode, load the blocks around the centre of the view at full resolution, unless they are already loaded.
+     * In block mode, load the whole map at full resolution (one column per block), once per version of the map.
      */
     private void requestDetail() {
         final TerrainModel model = view.getModel();
-        if ((! blocksButton.isSelected()) || (dimension == null) || (model == null)) {
-            return;
-        }
-        final Point target = view.getTargetBlock();
-        final Rectangle extent = TerrainModel.getBlockExtent(dimension);
-        if ((detailArea != null) && covers(detailArea, extent, target)) {
+        if ((! blocksButton.isSelected()) || (dimension == null) || (model == null) || (detailArea != null)) {
             return;
         }
         if (detailLoading) {
             detailPending = true;
             return;
         }
-        final Rectangle area = new Rectangle(target.x - DETAIL_SIZE / 2, target.y - DETAIL_SIZE / 2, DETAIL_SIZE, DETAIL_SIZE).intersection(extent);
-        if (area.isEmpty()) {
-            return;
+        final Rectangle area = TerrainModel.getBlockExtent(dimension);
+        int step = 1;
+        while (((long) area.width / step) * (area.height / step) > MAX_BLOCK_COLUMNS) {
+            step *= 2;
         }
+        final int finalStep = step;
         final Dimension dimension = this.dimension;
         final TerrainModel overview = model;
         detailLoading = true;
+        statusLabel.setText("Building blocks…");
+        statusLabel.setVisible(true);
+        revalidate();
         new SwingWorker<TerrainModel, Void>() {
             @Override
             protected TerrainModel doInBackground() throws Exception {
-                return new TerrainModel(dimension, colourScheme, null, area, 1);
+                return new TerrainModel(dimension, colourScheme, null, area, finalStep);
             }
 
             @Override
             protected void done() {
                 detailLoading = false;
+                statusLabel.setVisible(false);
                 try {
                     final TerrainModel detail = get();
                     if ((dimension == Terrain3DPanel.this.dimension) && (view.getModel() == overview)) {
@@ -248,18 +248,6 @@ public class Terrain3DPanel extends JPanel {
                 }
             }
         }.execute();
-    }
-
-    /**
-     * Whether a loaded area still covers a target well: it is at least a quarter of the area away from every edge which
-     * is not also an edge of the map.
-     */
-    private static boolean covers(Rectangle area, Rectangle extent, Point target) {
-        final int margin = DETAIL_SIZE / 4;
-        return ((target.x - area.x >= margin) || (area.x <= extent.x))
-                && ((area.x + area.width - target.x >= margin) || (area.x + area.width >= extent.x + extent.width))
-                && ((target.y - area.y >= margin) || (area.y <= extent.y))
-                && ((area.y + area.height - target.y >= margin) || (area.y + area.height >= extent.y + extent.height));
     }
 
     private void hoverChanged(boolean over, int x, int y) {
@@ -325,9 +313,9 @@ public class Terrain3DPanel extends JPanel {
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(Terrain3DPanel.class);
     /**
-     * The size of the area around the centre of the view which is shown block by block, in blocks.
+     * The largest number of block columns shown one by one in block mode; larger maps use columns of 2 x 2 blocks.
      */
-    private static final int DETAIL_SIZE = 768;
+    private static final int MAX_BLOCK_COLUMNS = 4_200_000;
     private static final long serialVersionUID = 1L;
 
     /**
