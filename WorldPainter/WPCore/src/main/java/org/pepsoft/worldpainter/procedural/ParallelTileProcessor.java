@@ -10,10 +10,12 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 /**
- * Processes a set of tiles on all available processor cores, reporting progress and supporting cancellation. Events
- * are inhibited on the tiles for the duration of the operation and released afterwards on the calling thread.
+ * Processes a set of tiles (or other work items) on all available processor cores, reporting progress and supporting
+ * cancellation. Events are inhibited on the tiles for the duration of the operation and released afterwards on the
+ * calling thread.
  */
 public final class ParallelTileProcessor {
     private ParallelTileProcessor() {
@@ -25,7 +27,22 @@ public final class ParallelTileProcessor {
             return;
         }
         tiles.forEach(Tile::inhibitEvents);
-        final int threads = Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(), tiles.size()));
+        try {
+            forEach(tiles, task::process, progressReceiver);
+        } finally {
+            tiles.forEach(Tile::releaseEvents);
+        }
+    }
+
+    /**
+     * Perform a task for each of a collection of items on all available processor cores, reporting progress and
+     * supporting cancellation.
+     */
+    public static <T> void forEach(Collection<T> items, Consumer<? super T> task, ProgressReceiver progressReceiver) throws OperationCancelled {
+        if (items.isEmpty()) {
+            return;
+        }
+        final int threads = Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(), items.size()));
         final ExecutorService executor = Executors.newFixedThreadPool(threads, runnable -> {
             final Thread thread = new Thread(runnable, "Procedural tile processor");
             thread.setDaemon(true);
@@ -34,19 +51,19 @@ public final class ParallelTileProcessor {
         });
         final AtomicInteger done = new AtomicInteger();
         final AtomicBoolean cancelled = new AtomicBoolean();
-        final List<Future<?>> futures = new ArrayList<>(tiles.size());
+        final List<Future<?>> futures = new ArrayList<>(items.size());
         try {
-            for (Tile tile: tiles) {
+            for (T item: items) {
                 futures.add(executor.submit(() -> {
                     if (! cancelled.get()) {
-                        task.process(tile);
+                        task.accept(item);
                     }
                     done.incrementAndGet();
                     return null;
                 }));
             }
             executor.shutdown();
-            final int total = tiles.size();
+            final int total = items.size();
             while (! executor.awaitTermination(100, TimeUnit.MILLISECONDS)) {
                 if (progressReceiver != null) {
                     try {
@@ -79,7 +96,6 @@ public final class ParallelTileProcessor {
             }
         } finally {
             executor.shutdownNow();
-            tiles.forEach(Tile::releaseEvents);
         }
     }
 
