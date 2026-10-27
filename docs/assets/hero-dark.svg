@@ -16,8 +16,8 @@
 </style>
 <text x="64" y="118" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="13" letter-spacing="3" fill="#fb923c">MINECRAFT MAP EDITOR · MODERNISED EDITION</text>
 <text x="60" y="198" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="78" font-weight="800" letter-spacing="-2" fill="#fafafa">WorldPainter</text>
-<text x="64" y="240" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#a1a1aa">Paint Minecraft worlds like a landscape artist.</text>
-<text x="64" y="268" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#a1a1aa">Procedural terrain, soft map edges, a modern editor.</text>
+<text x="64" y="240" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#a1a1aa">Paint complete Minecraft worlds, faster.</text>
+<text x="64" y="268" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#a1a1aa">3D preview, seed finder, soft map edges, a modern editor.</text>
 <rect x="64" y="296" width="128" height="28" rx="7" fill="#18181b" stroke="#3f3f46"/>
 <text x="75" y="315" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="12.5" fill="#fafafa">Minecraft 26.x</text>
 <rect x="202.39999999999998" y="296" width="75" height="28" rx="7" fill="#18181b" stroke="#3f3f46"/>
@@ -395,12 +395,12 @@
 </g>
 <g class="float2">
 <polygon points="1000.0,300.0 1150.0,274.0 1150.0,364.0 1000.0,390.0" fill="#18181b" fill-opacity="0.92" stroke="#fafafa" stroke-opacity="0.7"/>
-<text transform="translate(1012,316) skewY(-10)" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="11" fill="#fb923c">[ PROCEDURAL ]</text>
-<text transform="translate(1012,336) skewY(-10)" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="10" fill="#a1a1aa">ridges</text>
+<text transform="translate(1012,316) skewY(-10)" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="11" fill="#fb923c">[ 3D VIEW ]</text>
+<text transform="translate(1012,336) skewY(-10)" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="10" fill="#a1a1aa">height</text>
 <g transform="translate(1060,322) skewY(-10)"><rect width="76" height="4" rx="2" fill="#3f3f46"/><rect class="bar1" width="76" height="4" rx="2" fill="#fafafa"/></g>
-<text transform="translate(1012,353) skewY(-10)" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="10" fill="#a1a1aa">warp</text>
+<text transform="translate(1012,353) skewY(-10)" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="10" fill="#a1a1aa">slope</text>
 <g transform="translate(1060,339) skewY(-10)"><rect width="76" height="4" rx="2" fill="#3f3f46"/><rect class="bar2" width="76" height="4" rx="2" fill="#fafafa"/></g>
-<text transform="translate(1012,370) skewY(-10)" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="10" fill="#a1a1aa">detail</text>
+<text transform="translate(1012,370) skewY(-10)" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="10" fill="#a1a1aa">biome</text>
 <g transform="translate(1060,356) skewY(-10)"><rect width="76" height="4" rx="2" fill="#3f3f46"/><rect class="bar3" width="76" height="4" rx="2" fill="#fafafa"/></g>
 </g>
 <path class="draw" d="M 1020 304 L 970.9 262.5" stroke="#a1a1aa" stroke-width="1"/>

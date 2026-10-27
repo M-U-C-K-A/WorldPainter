@@ -516,7 +516,8 @@ public class DockingManager {
             this.side = side;
             setLayout(new ColumnLayout());
             edgeHandle = new ResizeHandle(HORIZONTAL, delta -> {
-                final int width = Math.max(MIN_COLUMN_WIDTH, getWidth() + ((side == Side.WEST) ? delta : -delta));
+                // The stored width excludes the resize handle itself
+                final int width = Math.max(MIN_COLUMN_WIDTH, getWidth() - HANDLE_SIZE + ((side == Side.WEST) ? delta : -delta));
                 columnWidths.put(side, width);
                 revalidate();
             });
@@ -666,7 +667,7 @@ public class DockingManager {
                 tabbedPane.putClientProperty("JTabbedPane.showContentSeparator", Boolean.TRUE);
                 for (FrameInfo info: frameInfos) {
                     info.frame.setVisible(true);
-                    tabbedPane.addTab(info.frame.getTitle(), info.frame.getFrameIcon(), info.frame, info.frame.getTitle());
+                    tabbedPane.addTab(info.frame.getTitle(), info.frame.getFrameIcon(), info.frame, (info.frame.getToolTipText() != null) ? info.frame.getToolTipText() : info.frame.getTitle());
                 }
                 final String selectedKey = selectedKeys.get(id);
                 if (selectedKey != null) {

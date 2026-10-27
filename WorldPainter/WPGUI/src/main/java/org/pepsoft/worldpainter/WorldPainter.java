@@ -336,6 +336,25 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
         return unmodifiableSet(hiddenLayers);
     }
 
+    /**
+     * Show (in a faded "ghost" style) the biomes Minecraft will generate around the map, or stop showing them.
+     *
+     * @param source The biome generator for the world seed, or {@code null} to stop showing the surroundings.
+     * @param margin The width in blocks of the area around the map to show.
+     */
+    public void setSurroundings(org.pepsoft.worldpainter.vanilla.VanillaBiomeSource source, int margin) {
+        surroundingsSource = source;
+        surroundingsMargin = margin;
+        refreshTiles();
+    }
+
+    /**
+     * The provider currently showing the surroundings of the map, if any.
+     */
+    public org.pepsoft.worldpainter.vanilla.SurroundingsTileProvider getSurroundings() {
+        return surroundings;
+    }
+
     public void refreshTiles() {
         if (dimension != null) {
             int biomeAlgorithm = -1;
@@ -361,10 +380,16 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
                     }
                 }
             }
-            if (biomeAlgorithm != -1) {
+            if ((surroundingsSource != null) && (anchor.equals(NORMAL_DETAIL)) && (dimension.getTileCount() > 0)) {
+                // Show the terrain Minecraft will generate around the map
+                surroundings = new org.pepsoft.worldpainter.vanilla.SurroundingsTileProvider(surroundingsSource, dimension, surroundingsMargin);
+                setTileProvider(LAYER_BIOMES, surroundings);
+            } else if (biomeAlgorithm != -1) {
+                surroundings = null;
                 final BiomesTileProvider biomesTileProvider = new BiomesTileProvider(biomeAlgorithm, minecraftSeed, colourScheme, 0, true);
                 setTileProvider(LAYER_BIOMES, biomesTileProvider);
             } else {
+                surroundings = null;
                 removeTileProvider(LAYER_BIOMES);
             }
 
@@ -1085,6 +1110,9 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
     private static final Logger logger = LoggerFactory.getLogger(WorldPainter.class);
     private static final long serialVersionUID = 1L;
 
+    private org.pepsoft.worldpainter.vanilla.VanillaBiomeSource surroundingsSource;
+    private int surroundingsMargin = 300;
+    private volatile org.pepsoft.worldpainter.vanilla.SurroundingsTileProvider surroundings;
     private static final int LAYER_BIOMES     = -3;
     private static final int LAYER_BORDER     = -2;
     private static final int LAYER_BACKGROUND = -1;

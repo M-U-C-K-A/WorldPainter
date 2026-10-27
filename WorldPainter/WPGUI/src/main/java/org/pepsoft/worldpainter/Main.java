@@ -456,6 +456,10 @@ public class Main {
             UIManager.put("Slider.paintValue", Boolean.FALSE);
 
             final App app = App.getInstance();
+            if (Taskbar.isTaskbarSupported() && Taskbar.getTaskbar().isSupported(Taskbar.Feature.ICON_IMAGE)) {
+                // Show the application icon in the Dock when not running as a packaged application
+                Taskbar.getTaskbar().setIconImage(App.ICON);
+            }
             app.setVisible(true);
             // Swing quirk:
             if (myConfig.isMaximised() && (System.getProperty("org.pepsoft.worldpainter.size") == null)) {

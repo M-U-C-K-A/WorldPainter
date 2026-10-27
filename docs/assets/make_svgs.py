@@ -98,8 +98,8 @@ def hero(theme):
     # Text block
     body.append(f'<text x="64" y="118" font-family="{MONO}" font-size="13" letter-spacing="3" fill="{t["accent"]}">MINECRAFT MAP EDITOR · MODERNISED EDITION</text>')
     body.append(f'<text x="60" y="198" font-family="{SANS}" font-size="78" font-weight="800" letter-spacing="-2" fill="{t["fg"]}">WorldPainter</text>')
-    body.append(f'<text x="64" y="240" font-family="{SANS}" font-size="20" fill="{t["muted"]}">Paint Minecraft worlds like a landscape artist.</text>')
-    body.append(f'<text x="64" y="268" font-family="{SANS}" font-size="20" fill="{t["muted"]}">Procedural terrain, soft map edges, a modern editor.</text>')
+    body.append(f'<text x="64" y="240" font-family="{SANS}" font-size="20" fill="{t["muted"]}">Paint complete Minecraft worlds, faster.</text>')
+    body.append(f'<text x="64" y="268" font-family="{SANS}" font-size="20" fill="{t["muted"]}">3D preview, seed finder, soft map edges, a modern editor.</text>')
     x = 64
     for label in ["Minecraft 26.x", "Java 21", "macOS · Windows · Linux", "GPL-3.0"]:
         width = 22 + len(label) * 7.6
@@ -125,8 +125,8 @@ def hero(theme):
     body.append('<g class="float2">')
     card = [(cx, cy), (cx + 150, cy - 26), (cx + 150, cy + 64), (cx, cy + 90)]
     body.append(f'<polygon points="{pts(card)}" fill="{t["chip"]}" fill-opacity="0.92" stroke="{t["fg"]}" stroke-opacity="0.7"/>')
-    body.append(f'<text transform="translate({cx + 12},{cy + 16}) skewY(-10)" font-family="{MONO}" font-size="11" fill="{t["accent"]}">[ PROCEDURAL ]</text>')
-    for i, (label, cls) in enumerate([("ridges", "bar1"), ("warp", "bar2"), ("detail", "bar3")]):
+    body.append(f'<text transform="translate({cx + 12},{cy + 16}) skewY(-10)" font-family="{MONO}" font-size="11" fill="{t["accent"]}">[ 3D VIEW ]</text>')
+    for i, (label, cls) in enumerate([("height", "bar1"), ("slope", "bar2"), ("biome", "bar3")]):
         yy = cy + 36 + i * 17
         body.append(f'<text transform="translate({cx + 12},{yy}) skewY(-10)" font-family="{MONO}" font-size="10" fill="{t["muted"]}">{label}</text>')
         body.append(f'<g transform="translate({cx + 60},{yy - 14}) skewY(-10)"><rect width="76" height="4" rx="2" fill="{t["faint"]}"/><rect class="{cls}" width="76" height="4" rx="2" fill="{t["fg"]}"/></g>')
@@ -281,6 +281,174 @@ def interface(theme):
     return svg(w, h, "\n".join(body), style)
 
 
+def slope_colour(degrees):
+    """The slope ramp of the 3D view: blue when flat, through green and yellow, to red from 60 degrees."""
+    stops = [(0, (59, 130, 246)), (15, (34, 197, 94)), (30, (234, 179, 8)), (45, (249, 115, 22)), (60, (220, 38, 38))]
+    degrees = max(0, min(60, degrees))
+    for (d0, c0), (d1, c1) in zip(stops, stops[1:]):
+        if degrees <= d1:
+            f = (degrees - d0) / (d1 - d0)
+            return "#%02x%02x%02x" % tuple(round(a + (b - a) * f) for a, b in zip(c0, c1))
+    return "#dc2626"
+
+
+def view3d(theme):
+    t = THEMES[theme]
+    w, h = 620, 430
+    style = """
+.pill { animation: pill 10s steps(1) infinite; }
+@keyframes pill { 0% { transform: translateX(0px); } 20% { transform: translateX(78px); } 40% { transform: translateX(156px); } 60% { transform: translateX(234px); } 80% { transform: translateX(312px); } }
+.heightmode { animation: heightmode 10s steps(1) infinite; }
+@keyframes heightmode { 0%, 19.99% { opacity: 0; } 20%, 39.99% { opacity: 1; } 40%, 100% { opacity: 0; } }
+.slopemode { animation: slopemode 10s steps(1) infinite; }
+@keyframes slopemode { 0%, 39.99% { opacity: 0; } 40%, 59.99% { opacity: 1; } 60%, 100% { opacity: 0; } }
+.reliefmode { animation: reliefmode 10s steps(1) infinite; }
+@keyframes reliefmode { 0%, 79.99% { opacity: 0; } 80%, 100% { opacity: 1; } }
+.draw { stroke-dasharray: 5 5; animation: dash 1.4s linear infinite; }
+@keyframes dash { to { stroke-dashoffset: -20; } }
+.probe { animation: probe 2.4s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes probe { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(2.0); opacity: 0; } }
+"""
+    body = []
+    # View mode chips, with a highlight that steps through them
+    modes = ["Terrain", "Height", "Slope", "Biome", "Relief"]
+    body.append(f'<rect class="pill" x="24" y="22" width="70" height="26" rx="7" fill="{t["accent"]}" fill-opacity="0.22" stroke="{t["accent"]}"/>')
+    for i, label in enumerate(modes):
+        x = 24 + i * 78
+        body.append(f'<rect x="{x}" y="22" width="70" height="26" rx="7" stroke="{t["faint"]}"/>')
+        body.append(f'<text x="{x + 35}" y="39.5" text-anchor="middle" font-family="{MONO}" font-size="12" fill="{t["fg"]}">{label}</text>')
+
+    n, s, ox, oy = 8, 26, 250, 150
+    body.append(dotted_plane(t, n, s, ox, oy, margin=1))
+    body.append(blocky_terrain(t, n, s, ox, oy))
+
+    def top_face(x, y):
+        hgt = terrain_height(x, y)
+        return [iso(x, y, hgt, s, ox, oy), iso(x + 1, y, hgt, s, ox, oy), iso(x + 1, y + 1, hgt, s, ox, oy), iso(x, y + 1, hgt, s, ox, oy)]
+
+    def order():
+        for d in range(2 * n - 1):
+            for x in range(n):
+                y = d - x
+                if 0 <= y < n:
+                    yield x, y
+
+    # Height mode: tint the top faces by height
+    layer = []
+    for x, y in order():
+        f = min(1.0, terrain_height(x, y) / 3.5)
+        layer.append(f'<polygon points="{pts(top_face(x, y))}" fill="{t["accent"]}" fill-opacity="{0.08 + 0.6 * f:.2f}"/>')
+    body.append('<g class="heightmode">' + "\n".join(layer) + '</g>')
+    # Slope mode: colour the top faces by steepness
+    layer = []
+    for x, y in order():
+        hgt = terrain_height(x, y)
+        dx = terrain_height(min(n - 1, x + 1), y) - terrain_height(max(0, x - 1), y)
+        dy = terrain_height(x, min(n - 1, y + 1)) - terrain_height(x, max(0, y - 1))
+        degrees = math.degrees(math.atan(math.hypot(dx, dy) / 2 * 1.4))
+        layer.append(f'<polygon points="{pts(top_face(x, y))}" fill="{slope_colour(degrees)}" fill-opacity="0.75"/>')
+    body.append('<g class="slopemode">' + "\n".join(layer) + '</g>')
+    # Relief mode: contour hairlines on the top faces
+    layer = []
+    for x, y in order():
+        hgt = terrain_height(x, y)
+        if hgt >= 1:
+            a, b = iso(x + 0.15, y + 0.5, hgt, s, ox, oy), iso(x + 0.85, y + 0.5, hgt, s, ox, oy)
+            layer.append(f'<path d="M {a[0]:.1f} {a[1]:.1f} L {b[0]:.1f} {b[1]:.1f}" stroke="{t["fg"]}" stroke-width="1.2"/>')
+    body.append('<g class="reliefmode">' + "\n".join(layer) + '</g>')
+
+    # Probe on a block, with a leader to the info card
+    hgt = terrain_height(4, 3)
+    px, py = iso(4.5, 3.5, hgt, s, ox, oy)
+    body.append(f'<ellipse class="probe" cx="{px:.1f}" cy="{py:.1f}" rx="14" ry="8" stroke="{t["accent"]}" stroke-width="1.5"/>')
+    body.append(f'<circle cx="{px:.1f}" cy="{py:.1f}" r="3" fill="{t["accent"]}"/>')
+    cx, cy = 440, 300
+    body.append(f'<path class="draw" d="M {px:.1f} {py:.1f} L {cx:.1f} {cy + 20:.1f}" stroke="{t["muted"]}"/>')
+    body.append(f'<rect x="{cx}" y="{cy}" width="160" height="96" rx="9" fill="{t["chip"]}" fill-opacity="0.94" stroke="{t["faint"]}"/>')
+    for i, (key, value) in enumerate([("height", "Y 131"), ("slope", "38°"), ("biome", "Plains"), ("water", "dry")]):
+        yy = cy + 24 + i * 19
+        body.append(f'<text x="{cx + 14}" y="{yy}" font-family="{MONO}" font-size="11.5" fill="{t["muted"]}">{key}</text>')
+        body.append(f'<text x="{cx + 76}" y="{yy}" font-family="{MONO}" font-size="11.5" fill="{t["fg"]}">{value}</text>')
+    body.append(f'<text x="24" y="{h - 16}" font-family="{MONO}" font-size="12" fill="{t["muted"]}">hover any block: height, slope, terrain, biome, water, layers</text>')
+    return svg(w, h, "\n".join(body), style)
+
+
+def surroundings(theme):
+    t = THEMES[theme]
+    w, h = 620, 372
+    style = """
+.ghost { animation: ghost 4s ease-in-out infinite; }
+@keyframes ghost { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+.scan { animation: scan 6s linear infinite; }
+@keyframes scan { 0% { transform: translate(0px, 0px); } 100% { transform: translate(250px, -144px); } }
+.bar { animation: bar 6s ease-out infinite; transform-box: fill-box; transform-origin: left; }
+@keyframes bar { 0% { transform: scaleX(0.05); } 80%, 100% { transform: scaleX(0.97); } }
+.draw { stroke-dasharray: 5 5; animation: dash 1.4s linear infinite; }
+@keyframes dash { to { stroke-dashoffset: -20; } }
+"""
+    s, ox, oy = 21, 300, 60
+    n, m0, m1 = 12, 4, 8  # Ghost area, and the map within it
+    regions = {"ocean": (11.0, 2.0), "desert": (0.5, 10.5), "plains": (7.0, 11.5), "taiga": (1.5, 1.0), "forest": (11.5, 9.0)}
+    names = list(regions)
+
+    def region(x, y):
+        return min(names, key=lambda r: (x + 0.5 - regions[r][0]) ** 2 + (y + 0.5 - regions[r][1]) ** 2 * 0.8 + 3 * math.sin(x * 0.9 + y * 0.6) * (r == "ocean"))
+
+    def in_map(x, y):
+        return m0 <= x < m1 and m0 <= y < m1
+
+    body = []
+    ghost = []
+    for x in range(n):
+        for y in range(n):
+            if in_map(x, y):
+                continue
+            distance = max(m0 - x, x - m1 + 1, m0 - y, y - m1 + 1, 0)
+            cell = [iso(x, y, 0, s, ox, oy), iso(x + 1, y, 0, s, ox, oy), iso(x + 1, y + 1, 0, s, ox, oy), iso(x, y + 1, 0, s, ox, oy)]
+            ghost.append(f'<polygon points="{pts(cell)}" fill="{t["fill"]}" fill-opacity="{0.07 - 0.012 * distance:.3f}"/>')
+            r = region(x, y)
+            # Hairlines along the boundaries between regions
+            if x + 1 < n and not in_map(x + 1, y) and region(x + 1, y) != r:
+                a, b = iso(x + 1, y, 0, s, ox, oy), iso(x + 1, y + 1, 0, s, ox, oy)
+                ghost.append(f'<path d="M {a[0]:.1f} {a[1]:.1f} L {b[0]:.1f} {b[1]:.1f}" stroke="{t["fg"]}" stroke-opacity="0.7"/>')
+            if y + 1 < n and not in_map(x, y + 1) and region(x, y + 1) != r:
+                a, b = iso(x, y + 1, 0, s, ox, oy), iso(x + 1, y + 1, 0, s, ox, oy)
+                ghost.append(f'<path d="M {a[0]:.1f} {a[1]:.1f} L {b[0]:.1f} {b[1]:.1f}" stroke="{t["fg"]}" stroke-opacity="0.7"/>')
+    outer = [iso(0, 0, 0, s, ox, oy), iso(n, 0, 0, s, ox, oy), iso(n, n, 0, s, ox, oy), iso(0, n, 0, s, ox, oy)]
+    ghost.append(f'<polygon points="{pts(outer)}" stroke="{t["muted"]}" stroke-dasharray="3 5"/>')
+    for name, (rx, ry) in regions.items():
+        lx, ly = iso(min(n - 1.2, max(1.2, rx)), min(n - 1.2, max(1.2, ry)), 0, s, ox, oy)
+        ghost.append(f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="middle" font-family="{MONO}" font-size="11.5" fill="{t["fg"]}">{name}</text>')
+    body.append('<g class="ghost">' + "\n".join(ghost) + '</g>')
+
+    # The map itself
+    square = [iso(m0, m0, 0, s, ox, oy), iso(m1, m0, 0, s, ox, oy), iso(m1, m1, 0, s, ox, oy), iso(m0, m1, 0, s, ox, oy)]
+    body.append(f'<polygon points="{pts(square)}" fill="{t["accent"]}" fill-opacity="0.16" stroke="{t["fg"]}" stroke-width="1.3"/>')
+    for k in range(1, 4):
+        line = [iso(m0 + u / 10 * (m1 - m0), m0 + k + 0.3 * math.sin(u / 2 + k), 0, s, ox, oy) for u in range(0, 11)]
+        body.append(f'<polyline points="{pts(line)}" stroke="{t["fg"]}" stroke-opacity="0.5"/>')
+    mx, my = iso((m0 + m1) / 2, (m0 + m1) / 2, 0, s, ox, oy)
+    body.append(f'<text x="{mx:.1f}" y="{my + 4:.1f}" text-anchor="middle" font-family="{MONO}" font-size="12" fill="{t["fg"]}">[ YOUR MAP ]</text>')
+
+    # Margin bracket
+    a, b = iso(n + 0.7, m1, 0, s, ox, oy), iso(n + 0.7, n, 0, s, ox, oy)
+    body.append(f'<path class="draw" d="M {a[0]:.1f} {a[1]:.1f} L {b[0]:.1f} {b[1]:.1f}" stroke="{t["accent"]}"/>')
+    body.append(f'<text x="{a[0] + 10:.1f}" y="{a[1] + 4:.1f}" font-family="{MONO}" font-size="11.5" fill="{t["fg"]}">margin · 64 to 1024 blocks</text>')
+
+    # Seed search card
+    cx, cy = 24, 24
+    body.append(f'<rect x="{cx}" y="{cy}" width="196" height="74" rx="9" fill="{t["chip"]}" fill-opacity="0.94" stroke="{t["faint"]}"/>')
+    body.append(f'<text x="{cx + 14}" y="{cy + 24}" font-family="{MONO}" font-size="11.5" fill="{t["muted"]}">seed</text>')
+    body.append(f'<text x="{cx + 60}" y="{cy + 24}" font-family="{MONO}" font-size="11.5" fill="{t["fg"]}">975</text>')
+    body.append(f'<text x="{cx + 14}" y="{cy + 46}" font-family="{MONO}" font-size="11.5" fill="{t["muted"]}">match</text>')
+    body.append(f'<rect x="{cx + 60}" y="{cy + 39}" width="120" height="5" rx="2.5" fill="{t["faint"]}"/>')
+    body.append(f'<rect class="bar" x="{cx + 60}" y="{cy + 39}" width="120" height="5" rx="2.5" fill="{t["accent"]}"/>')
+    body.append(f'<text x="{cx + 14}" y="{cy + 64}" font-family="{MONO}" font-size="10.5" fill="{t["muted"]}">searching around the edges…</text>')
+
+    body.append(f'<text x="24" y="{h - 16}" font-family="{MONO}" font-size="12" fill="{t["muted"]}">the land Minecraft will generate around the map, for the world seed</text>')
+    return svg(w, h, "\n".join(body), style)
+
+
 def divider(theme):
     t = THEMES[theme]
     w, h = 1200, 24
@@ -293,7 +461,7 @@ def divider(theme):
 
 if __name__ == "__main__":
     for theme in THEMES:
-        for name, function in [("hero", hero), ("procedural", procedural), ("edges", edges), ("interface", interface), ("divider", divider)]:
+        for name, function in [("hero", hero), ("view3d", view3d), ("surroundings", surroundings), ("procedural", procedural), ("edges", edges), ("interface", interface), ("divider", divider)]:
             path = os.path.join(OUT, f"{name}-{theme}.svg")
             with open(path, "w") as f:
                 f.write(function(theme))

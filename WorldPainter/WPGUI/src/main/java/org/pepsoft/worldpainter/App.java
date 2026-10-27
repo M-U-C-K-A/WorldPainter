@@ -61,6 +61,11 @@ import org.pepsoft.worldpainter.tools.scripts.ScriptRunner;
 import com.formdev.flatlaf.FlatClientProperties;
 import org.pepsoft.util.swing.TiledImageViewer;
 import org.pepsoft.worldpainter.brushes.TerrainStamps;
+import org.pepsoft.worldpainter.vanilla.SeedSearchDialog;
+import org.pepsoft.worldpainter.view3d.Terrain3DPanel;
+import org.pepsoft.worldpainter.vanilla.SurroundingsTileProvider;
+import org.pepsoft.worldpainter.vanilla.VanillaBiomeSource;
+import org.pepsoft.worldpainter.vanilla.VanillaBiomes;
 import org.pepsoft.worldpainter.docking.DockableFrame;
 import org.pepsoft.worldpainter.docking.DockingManager;
 import org.pepsoft.worldpainter.docking.Side;
@@ -121,6 +126,7 @@ import static org.pepsoft.util.swing.ProgressDialog.NOT_CANCELABLE;
 import static org.pepsoft.util.swing.ProgressDialog.NO_FOCUS_STEALING;
 import static org.pepsoft.worldpainter.App.TerrainMode.SHOW_TERRAIN;
 import static org.pepsoft.worldpainter.Constants.*;
+import static org.pepsoft.worldpainter.DefaultPlugin.ATTRIBUTE_MC_VERSION;
 import static org.pepsoft.worldpainter.DefaultPlugin.JAVA_MCREGION;
 import static org.pepsoft.worldpainter.Dimension.Anchor.*;
 import static org.pepsoft.worldpainter.Dimension.Role.*;
@@ -154,7 +160,7 @@ public final class App extends JFrame implements BrushControl,
             throw new IllegalArgumentException("Already instantiated");
         }
 
-        setIconImage(ICON);
+        setIconImages(ICONS);
 
         fullWindowContent = SystemUtils.isMac() && ThemeUtils.isModernTheme();
         if (fullWindowContent) {
@@ -693,6 +699,10 @@ public final class App extends JFrame implements BrushControl,
                 }
             }
 
+            updateSurroundingsPanel();
+            if (showing3D) {
+                terrain3DPanel.setDimension(dimension, selectedColourScheme);
+            }
             if (! refreshTerrainMode()) {
                 view.refreshTiles();
             }
@@ -777,7 +787,9 @@ public final class App extends JFrame implements BrushControl,
             } else {
                 setTextIfDifferent(materialLabel, outsideDimensionLabel);
             }
-            setTextIfDifferent(biomeLabel, " ");
+            final SurroundingsTileProvider surroundings = view.getSurroundings();
+            final int vanillaBiome = (surroundings != null) ? surroundings.getBiomeAt(x, y) : -1;
+            setTextIfDifferent(biomeLabel, (vanillaBiome != -1) ? ("Minecraft will generate: " + VanillaBiomes.getDisplayName(vanillaBiome)) : " ");
             return;
         }
         if (tile.getBitLayerValue(NotPresent.INSTANCE, xInTile, yInTile) || tile.getBitLayerValue(NotPresentBlock.INSTANCE, xInTile, yInTile)) {
@@ -2720,7 +2732,12 @@ public final class App extends JFrame implements BrushControl,
         // Set up docking framework
         dockingManager = new DockingManager(this);
         getContentPane().add(dockingManager.getMainContainer(), BorderLayout.CENTER);
-        dockingManager.getWorkspace().add(viewContainer, BorderLayout.CENTER);
+        // The workspace shows either the map or the integrated 3D view
+        workspaceCards = new JPanel(new CardLayout());
+        workspaceCards.add(viewContainer, WORKSPACE_MAP);
+        terrain3DPanel = new Terrain3DPanel();
+        workspaceCards.add(terrain3DPanel, WORKSPACE_3D);
+        dockingManager.getWorkspace().add(workspaceCards, BorderLayout.CENTER);
 
         setJMenuBar(createMenuBar());
         
@@ -2734,17 +2751,24 @@ public final class App extends JFrame implements BrushControl,
 
         dockingManager.addFrame(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", Side.WEST, 2).withIcon(Icons.get("sliders-horizontal")).expand().scrollable().build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createLayerPanel(), "Layers", Side.WEST, 3).withIcon(Icons.get("layers")).scrollable().build());
+        // The four kinds of things that can be painted, each with a short explanation, from the most basic to the most
+        // specialised
+        // (the layer panel must be created first, since the terrain panel mirrors its terrain solo check box)
+        final JPanel layerPanel = createLayerPanel();
+        dockingManager.addFrame(new DockableFrameBuilder(createTerrainPanel(), "Terrain", Side.WEST, 3).withIcon(Icons.get("mountain-snow"))
+                .withDescription("The block type of the ground surface: grass, sand, stone, snow\u2026").build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createTerrainPanel(), "Terrain", Side.WEST, 3).withIcon(Icons.get("mountain-snow")).build());
+        dockingManager.addFrame(new DockableFrameBuilder(layerPanel, "Layers", Side.WEST, 3).withIcon(Icons.get("layers"))
+                .withDescription("Features added on top of or under the terrain: trees, caves, ores, frost\u2026 Toggle their visibility with the eye.").scrollable().build());
 
-        biomesPanelFrame = new DockableFrameBuilder(createBiomesPanelContainer(), "Biomes", Side.WEST, 3).withIcon(Icons.get("trees")).scrollable().build();
+        biomesPanelFrame = new DockableFrameBuilder(createBiomesPanelContainer(), "Biomes", Side.WEST, 3).withIcon(Icons.get("trees"))
+                .withDescription("The Minecraft biome of each area (grass colour, weather, mobs). Chosen automatically from the terrain unless you paint one.").scrollable().build();
         dockingManager.addFrame(biomesPanelFrame);
 
-        dockingManager.addFrame(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", Side.WEST, 3).withIcon(Icons.get("message-square-text")).build());
+        dockingManager.addFrame(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", Side.WEST, 3).withIcon(Icons.get("message-square-text"))
+                .withDescription("Coloured markings for planning the map. They are not exported, unless you enable that in the export settings.").build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createBrushPanel(), "Brushes", Side.EAST, 1).withIcon(Icons.get("brush")).build());
-        dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel("Terrain Stamps", new BrushGroup("Terrain Stamps", null, TerrainStamps.createBrushes())), "Terrain Stamps", Side.EAST, 1).withId("terrainStamps").withIcon(Icons.get("stamp")).scrollable().build());
+        dockingManager.addFrame(new DockableFrameBuilder(createBrushPanel(), "Brushes", Side.EAST, 1).withIcon(Icons.get("brush")).scrollable().build());
 
         if (customBrushes.containsKey(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
             dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(CUSTOM_BRUSHES_DEFAULT_TITLE, customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE)), "Custom Brushes", Side.EAST, 1).withId("customBrushesDefault").scrollable().build());
@@ -2757,6 +2781,9 @@ public final class App extends JFrame implements BrushControl,
         }
         
         dockingManager.addFrame(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", Side.EAST, 2).withId("brushSettings").withIcon(Icons.get("settings-2")).build());
+
+        dockingManager.addFrame(new DockableFrameBuilder(createSurroundingsPanel(), "Surroundings", Side.EAST, 2).withId("surroundings").withIcon(Icons.get("map"))
+                .withDescription("The world seed, and a preview of the land Minecraft will generate around the map.").scrollable().build());
 
         infoPanel = createInfoPanel();
         dockingManager.addFrame(new DockableFrameBuilder(infoPanel, "Info", Side.EAST, 2).withId("infoPanel").expand().withIcon(Icons.get("info")).build());
@@ -3366,9 +3393,10 @@ public final class App extends JFrame implements BrushControl,
         Configuration config = Configuration.getInstance();
         constraints.anchor = GridBagConstraints.FIRST_LINE_START;
         constraints.weightx = 0.0;
-        JCheckBox checkBox = new JCheckBox("Show:");
-        checkBox.setHorizontalTextPosition(SwingConstants.LEADING);
-        checkBox.setToolTipText("Uncheck to hide biomes from view (it will still be exported)");
+        JCheckBox checkBox = new JCheckBox("Show biomes");
+        styleIconToggle(checkBox, Icons.muted("eye-off", 16), Icons.get("eye", 16));
+        checkBox.setIconTextGap(6);
+        checkBox.setToolTipText(richToolTip("Show biomes", "Show or hide the painted biomes on the map (they are exported either way)", null));
         checkBox.addActionListener(e -> {
             if (checkBox.isSelected()) {
                 hiddenLayers.remove(Biome.INSTANCE);
@@ -3383,9 +3411,10 @@ public final class App extends JFrame implements BrushControl,
             biomesPanelContainer.add(checkBox, constraints);
         }
 
-        JCheckBox soloCheckBox = new JCheckBox("Solo:");
-        soloCheckBox.setHorizontalTextPosition(SwingConstants.LEADING);
-        soloCheckBox.setToolTipText("<html>Check to show <em>only</em> the biomes (the other layers are still exported)</html>");
+        JCheckBox soloCheckBox = new JCheckBox("Solo");
+        styleIconToggle(soloCheckBox, Icons.muted("focus", 16), Icons.accent("focus", 16));
+        soloCheckBox.setIconTextGap(6);
+        soloCheckBox.setToolTipText(richToolTip("Solo", "Show <em>only</em> the biomes (the other layers are still exported)", null));
         soloCheckBox.addActionListener(new SoloCheckboxHandler(soloCheckBox, Biome.INSTANCE));
         layerSoloCheckBoxes.put(Biome.INSTANCE, soloCheckBox);
         if (! config.isEasyMode()) {
@@ -3420,10 +3449,11 @@ public final class App extends JFrame implements BrushControl,
         Configuration config = Configuration.getInstance();
         constraints.anchor = GridBagConstraints.FIRST_LINE_START;
         constraints.weightx = 0.0;
-        JCheckBox checkBox = new JCheckBox("Show:");
-        checkBox.setHorizontalTextPosition(SwingConstants.LEADING);
+        JCheckBox checkBox = new JCheckBox("Show annotations");
+        styleIconToggle(checkBox, Icons.muted("eye-off", 16), Icons.get("eye", 16));
+        checkBox.setIconTextGap(6);
         checkBox.setSelected(true);
-        checkBox.setToolTipText("Uncheck to hide annotations from view");
+        checkBox.setToolTipText(richToolTip("Show annotations", "Show or hide the annotations on the map", null));
         checkBox.addActionListener(e -> {
             if (checkBox.isSelected()) {
                 hiddenLayers.remove(Annotations.INSTANCE);
@@ -3438,9 +3468,10 @@ public final class App extends JFrame implements BrushControl,
             layerPanel.add(checkBox, constraints);
         }
 
-        JCheckBox soloCheckBox = new JCheckBox("Solo:");
-        soloCheckBox.setHorizontalTextPosition(SwingConstants.LEADING);
-        soloCheckBox.setToolTipText("<html>Check to show <em>only</em> the annotations (the other layers are still exported)</html>");
+        JCheckBox soloCheckBox = new JCheckBox("Solo");
+        styleIconToggle(soloCheckBox, Icons.muted("focus", 16), Icons.accent("focus", 16));
+        soloCheckBox.setIconTextGap(6);
+        soloCheckBox.setToolTipText(richToolTip("Solo", "Show <em>only</em> the annotations (the other layers are still exported)", null));
         soloCheckBox.addActionListener(new SoloCheckboxHandler(soloCheckBox, Annotations.INSTANCE));
         layerSoloCheckBoxes.put(Annotations.INSTANCE, soloCheckBox);
         if (! config.isEasyMode()) {
@@ -3622,28 +3653,193 @@ public final class App extends JFrame implements BrushControl,
         return customTerrainPanel;
     }
     
-    private JPanel createBrushPanel() {
-        JPanel optionsPanel = new JPanel();
-        optionsPanel.setLayout(new GridBagLayout());
-        // A small set of versatile brushes; the Terrain Stamps palette provides shaped landforms
-        JPanel brushPanel = new JPanel(new GridLayout(0, 3, 2, 2));
-        brushPanel.add(createBrushButton(SymmetricBrush.COSINE_CIRCLE));
-        brushPanel.add(createBrushButton(SymmetricBrush.PLATEAU_CIRCLE));
-        brushPanel.add(createBrushButton(SymmetricBrush.LINEAR_CIRCLE));
-        brushPanel.add(createBrushButton(SymmetricBrush.CONSTANT_CIRCLE));
-        brushPanel.add(createBrushButton(SymmetricBrush.CONSTANT_SQUARE));
-        brushPanel.add(createBrushButton(new BitmapBrush(App.class.getResourceAsStream("resources/brush_noise.png"), strings.getString("noise"))));
+    /**
+     * The brushes panel: a few basic shapes, followed by the terrain stamps for sculpting recognisable landforms.
+     */
+    /**
+     * The surroundings panel: the world seed, and a preview of the land Minecraft will generate around the map for
+     * that seed.
+     */
+    private JPanel createSurroundingsPanel() {
+        final JPanel panel = new JPanel(new GridBagLayout());
+        final GridBagConstraints constraints = new GridBagConstraints();
+        constraints.gridwidth = GridBagConstraints.REMAINDER;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        constraints.weightx = 1.0;
+        constraints.insets = new Insets(2, 4, 2, 4);
 
-        GridBagConstraints constraints = new GridBagConstraints();
+        showSurroundingsCheckBox = new JCheckBox("Show what lies beyond the map");
+        showSurroundingsCheckBox.setToolTipText(richToolTip("Surroundings", "Show, in a faded style, the biomes Minecraft will generate around the map for this seed, to anticipate what the edges of the map will border on", null));
+        showSurroundingsCheckBox.addActionListener(e -> applySurroundings());
+        panel.add(showSurroundingsCheckBox, constraints);
+
+        final JPanel marginPanel = new JPanel(new BorderLayout(6, 0));
+        marginPanel.add(new JLabel("Margin"), BorderLayout.WEST);
+        surroundingsMarginSlider = new JSlider(64, 1024, 300);
+        surroundingsMarginSlider.setToolTipText(richToolTip("Margin", "How far beyond the edges of the map to show, in blocks", null));
+        final JLabel marginLabel = new JLabel("300");
+        surroundingsMarginSlider.addChangeListener(e -> {
+            marginLabel.setText(Integer.toString(surroundingsMarginSlider.getValue()));
+            if (! surroundingsMarginSlider.getValueIsAdjusting()) {
+                applySurroundings();
+            }
+        });
+        marginPanel.add(surroundingsMarginSlider, BorderLayout.CENTER);
+        marginPanel.add(marginLabel, BorderLayout.EAST);
+        panel.add(marginPanel, constraints);
+
+        constraints.insets = new Insets(10, 4, 2, 4);
+        panel.add(createSectionLabel("World seed"), constraints);
+        constraints.insets = new Insets(2, 4, 2, 4);
+        final JPanel seedPanel = new JPanel(new BorderLayout(4, 0));
+        seedField = new JTextField();
+        seedField.setToolTipText(richToolTip("World seed", "The seed Minecraft uses to generate the world around the map. Type a number or any text, then press Enter", null));
+        seedField.addActionListener(e -> setSeedFromField());
+        seedField.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusLost(java.awt.event.FocusEvent e) {
+                setSeedFromField();
+            }
+        });
+        seedPanel.add(seedField, BorderLayout.CENTER);
+        final JButton randomSeedButton = new JButton(Icons.get("sparkles", 16));
+        randomSeedButton.setToolTipText(richToolTip("Random seed", "Pick a new random world seed", null));
+        randomSeedButton.addActionListener(e -> setSeed(new Random().nextLong()));
+        seedPanel.add(randomSeedButton, BorderLayout.EAST);
+        panel.add(seedPanel, constraints);
+
+        findSeedButton = new JButton("Find a matching seed\u2026", Icons.get("search", 16));
+        findSeedButton.setToolTipText(richToolTip("Find a matching seed", "Search for a seed for which the land around the map matches the biomes along its edges (for instance spruce forest where the map has spruce, ocean where it has water)", null));
+        findSeedButton.addActionListener(e -> findMatchingSeed());
+        panel.add(findSeedButton, constraints);
+
+        surroundingsNoteLabel = new JLabel(" ");
+        surroundingsNoteLabel.putClientProperty(FlatClientProperties.STYLE, "font: -1; foreground: $WorldPainter.mutedForeground");
+        panel.add(surroundingsNoteLabel, constraints);
+        return panel;
+    }
+
+    /**
+     * Whether the biomes Minecraft generates around the map can be predicted for the current dimension (only for the
+     * surface of Minecraft 1.18+ maps with the default or large biomes generator).
+     */
+    private boolean isSurroundingsSupported() {
+        if ((world == null) || (dimension == null) || (! dimension.getAnchor().equals(NORMAL_DETAIL))) {
+            return false;
+        }
+        final org.pepsoft.util.Version version = world.getPlatform().getAttribute(ATTRIBUTE_MC_VERSION);
+        final Generator generator = dimension.getGenerator().getType();
+        return (version != null) && version.isAtLeast(new org.pepsoft.util.Version(1, 18)) && ((generator == Generator.DEFAULT) || (generator == Generator.LARGE_BIOMES));
+    }
+
+    private void updateSurroundingsPanel() {
+        if (seedField == null) {
+            return;
+        }
+        final boolean supported = isSurroundingsSupported();
+        seedField.setText((dimension != null) ? Long.toString(dimension.getMinecraftSeed()) : "");
+        seedField.setEnabled(dimension != null);
+        showSurroundingsCheckBox.setEnabled(supported);
+        surroundingsMarginSlider.setEnabled(supported);
+        findSeedButton.setEnabled(supported);
+        surroundingsNoteLabel.setText(supported ? "<html>Biomes as generated by Minecraft 1.18 to 26.x.</html>" : "<html>Available for the surface of Minecraft 1.18+ maps with the Default or Large Biomes world type.</html>");
+        applySurroundings();
+    }
+
+    private void applySurroundings() {
+        if (view == null) {
+            return;
+        }
+        if ((showSurroundingsCheckBox != null) && showSurroundingsCheckBox.isSelected() && isSurroundingsSupported()) {
+            final boolean large = dimension.getGenerator().getType() == Generator.LARGE_BIOMES;
+            view.setSurroundings(new VanillaBiomeSource(dimension.getMinecraftSeed(), large), surroundingsMarginSlider.getValue());
+        } else if (view.getSurroundings() != null) {
+            view.setSurroundings(null, 0);
+        }
+    }
+
+    private void setSeedFromField() {
+        if ((dimension == null) || (seedField == null)) {
+            return;
+        }
+        final String text = seedField.getText().trim();
+        if (text.isEmpty()) {
+            return;
+        }
+        long seed;
+        try {
+            seed = Long.parseLong(text);
+        } catch (NumberFormatException e) {
+            // Like Minecraft, use the hash code of a non numeric seed
+            seed = text.hashCode();
+        }
+        if (seed != dimension.getMinecraftSeed()) {
+            setSeed(seed);
+        }
+    }
+
+    private void setSeed(long seed) {
+        if (dimension == null) {
+            return;
+        }
+        dimension.setMinecraftSeed(seed);
+        seedField.setText(Long.toString(seed));
+        applySurroundings();
+    }
+
+    private void findMatchingSeed() {
+        if (! isSurroundingsSupported()) {
+            DesktopUtils.beep();
+            return;
+        }
+        final boolean large = dimension.getGenerator().getType() == Generator.LARGE_BIOMES;
+        final SeedSearchDialog dialog = new SeedSearchDialog(this, dimension, large, dimension.getMinecraftSeed());
+        dialog.setVisible(true);
+        if (! dialog.isCancelled()) {
+            setSeed(dialog.getSelectedSeed());
+            if (! showSurroundingsCheckBox.isSelected()) {
+                showSurroundingsCheckBox.setSelected(true);
+                applySurroundings();
+            }
+        }
+    }
+
+    private JPanel createBrushPanel() {
+        final JPanel optionsPanel = new JPanel(new GridBagLayout());
+        final GridBagConstraints constraints = new GridBagConstraints();
         constraints.gridwidth = GridBagConstraints.REMAINDER;
         constraints.anchor = GridBagConstraints.FIRST_LINE_START;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
         constraints.weightx = 1.0;
-        constraints.insets = new Insets(1, 1, 1, 1);
-        optionsPanel.add(brushPanel, constraints);
+        constraints.insets = new Insets(2, 4, 2, 4);
+
+        optionsPanel.add(createSectionLabel("Basic"), constraints);
+        final JPanel basicPanel = new JPanel(new GridLayout(0, 3, 2, 2));
+        basicPanel.add(createBrushButton(SymmetricBrush.COSINE_CIRCLE));
+        basicPanel.add(createBrushButton(SymmetricBrush.PLATEAU_CIRCLE));
+        basicPanel.add(createBrushButton(SymmetricBrush.CONSTANT_SQUARE));
+        optionsPanel.add(basicPanel, constraints);
+
+        constraints.insets = new Insets(10, 4, 2, 4);
+        optionsPanel.add(createSectionLabel("Terrain stamps"), constraints);
+        constraints.insets = new Insets(2, 4, 2, 4);
+        final JPanel stampsPanel = new JPanel(new GridLayout(0, 3, 2, 2));
+        for (Brush stamp: TerrainStamps.createBrushes()) {
+            stampsPanel.add(createBrushButton(stamp));
+        }
+        optionsPanel.add(stampsPanel, constraints);
 
         optionsPanel.putClientProperty(KEY_ICON, createBrushThumbnail(SymmetricBrush.COSINE_CIRCLE, Math.round(16 * getUIScale())));
-
         return optionsPanel;
+    }
+
+    /**
+     * A small, muted, upper case label introducing a section of a panel.
+     */
+    static JLabel createSectionLabel(String text) {
+        final JLabel label = new JLabel(text.toUpperCase());
+        label.putClientProperty(FlatClientProperties.STYLE, "font: -2 bold; foreground: $WorldPainter.mutedForeground");
+        return label;
     }
 
     private JPanel createCustomBrushPanel(String title, BrushGroup brushGroup) {
@@ -4243,7 +4439,7 @@ public final class App extends JFrame implements BrushControl,
 
         menu.addSeparator();
         
-        menuItem = new JMenuItem(strings.getString("show.3d.view") + "...");
+        menuItem = new JMenuItem("Block 3D view (separate window)...");
         menuItem.addActionListener(e -> {
             Point focusPoint = view.getViewCentreInWorldCoords();
             if (threeDeeFrame != null) {
@@ -4731,8 +4927,20 @@ public final class App extends JFrame implements BrushControl,
 //        toolBar.add(Box.createHorizontalGlue());
 //        toolBar.add(ACTION_SHOW_HELP_PICKER);
 
-        // Zoom and theme controls on the right
+        // Map/3D switch, zoom and theme controls on the right
         final JToolBar rightToolBar = createHeaderToolBar();
+        final ButtonGroup workspaceGroup = new ButtonGroup();
+        mapViewButton = new JToggleButton("Map", Icons.get("map", 16), true);
+        mapViewButton.setToolTipText(richToolTip("Map", "Paint and edit the map from above", null));
+        mapViewButton.addActionListener(e -> showWorkspace(false));
+        workspaceGroup.add(mapViewButton);
+        rightToolBar.add(mapViewButton);
+        final JToggleButton threeDeeButton = new JToggleButton("3D", Icons.get("box", 16));
+        threeDeeButton.setToolTipText(richToolTip("3D view", "See the map in perspective, with height, slope, biome and relief views and details of every block", null));
+        threeDeeButton.addActionListener(e -> showWorkspace(true));
+        workspaceGroup.add(threeDeeButton);
+        rightToolBar.add(threeDeeButton);
+        rightToolBar.addSeparator();
         rightToolBar.add(ACTION_ZOOM_OUT);
         headerZoomLabel = new JLabel("100%", SwingConstants.CENTER);
         headerZoomLabel.setPreferredSize(new java.awt.Dimension(Math.round(52 * getUIScale()), headerZoomLabel.getPreferredSize().height));
@@ -4773,6 +4981,17 @@ public final class App extends JFrame implements BrushControl,
         header.add(headerTitleLabel, BorderLayout.CENTER);
         header.add(rightToolBar, BorderLayout.EAST);
         return header;
+    }
+
+    /**
+     * Switch the workspace between the map and the integrated 3D view.
+     */
+    private void showWorkspace(boolean threeDee) {
+        showing3D = threeDee;
+        ((CardLayout) workspaceCards.getLayout()).show(workspaceCards, threeDee ? WORKSPACE_3D : WORKSPACE_MAP);
+        if (threeDee && (dimension != null)) {
+            terrain3DPanel.setDimension(dimension, selectedColourScheme);
+        }
     }
 
     private static JToolBar createHeaderToolBar() {
@@ -5599,6 +5818,18 @@ public final class App extends JFrame implements BrushControl,
             }
         }
         return new ImageIcon(image);
+    }
+
+    private static List<Image> loadAppIcons() {
+        final List<Image> icons = new ArrayList<>();
+        for (int size: new int[] {256, 128, 64, 32, 16}) {
+            try (InputStream in = App.class.getResourceAsStream("icons/app-icon-" + size + ".png")) {
+                icons.add(ImageIO.read(in));
+            } catch (IOException e) {
+                throw new RuntimeException("I/O error loading application icon", e);
+            }
+        }
+        return Collections.unmodifiableList(icons);
     }
 
     private static Icon loadScaledIcon(@NonNls String name) {
@@ -7057,7 +7288,16 @@ public final class App extends JFrame implements BrushControl,
     private Operation activeOperation;
     private File lastSelectedFile;
     private JLabel heightLabel, slopeLabel, locationLabel, waterLabel, materialLabel, radiusLabel, zoomLabel, biomeLabel, levelLabel, brushRotationLabel;
-    private JLabel headerTitleLabel, headerZoomLabel;
+    private JLabel headerTitleLabel, headerZoomLabel, surroundingsNoteLabel;
+    private JPanel workspaceCards;
+    private Terrain3DPanel terrain3DPanel;
+    private JToggleButton mapViewButton;
+    private boolean showing3D;
+    private static final String WORKSPACE_MAP = "map", WORKSPACE_3D = "3d";
+    private JCheckBox showSurroundingsCheckBox;
+    private JSlider surroundingsMarginSlider;
+    private JTextField seedField;
+    private JButton findSeedButton;
     private JButton themeToggleButton;
     private final boolean fullWindowContent;
     private int radius = 50;
@@ -7093,7 +7333,11 @@ public final class App extends JFrame implements BrushControl,
     private String outsideDimensionLabel;
     private TerrainMode terrainMode = SHOW_TERRAIN;
 
-    public static final Image ICON = IconUtils.loadScaledImage("org/pepsoft/worldpainter/icons/shovel-icon.png");
+    /**
+     * The application icon in several sizes, largest first.
+     */
+    public static final List<Image> ICONS = loadAppIcons();
+    public static final Image ICON = ICONS.get(0);
     
     public static final int DEFAULT_MAX_RADIUS = 300;
 

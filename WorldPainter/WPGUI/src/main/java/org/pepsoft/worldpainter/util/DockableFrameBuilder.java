@@ -49,6 +49,15 @@ public class DockableFrameBuilder {
         return this;
     }
 
+    /**
+     * Add a title and a short explanation of what the panel is for at the top of the panel, also used as the tooltip of
+     * its tab.
+     */
+    public DockableFrameBuilder withDescription(String description) {
+        this.description = description;
+        return this;
+    }
+
     public DockableFrameBuilder scrollable() {
         scrollable = true;
         return this;
@@ -82,9 +91,16 @@ public class DockableFrameBuilder {
         } else {
             dockableFrame.add(panel, BorderLayout.CENTER);
         }
+        if (description != null) {
+            // A fixed width makes the text wrap instead of widening the dock
+            final JLabel header = new JLabel("<html><div style=\"width: " + Math.round(170 * getUIScale()) + "px\"><b>" + title + "</b><br>" + description + "</div></html>");
+            header.putClientProperty("FlatLaf.style", "font: -1");
+            header.setBorder(new HairlineBorder(false, false, true, false, new Insets(6, 8, 6, 8)));
+            dockableFrame.add(header, BorderLayout.NORTH);
+        }
 
         dockableFrame.setTitle(title);
-        dockableFrame.setToolTipText(title);
+        dockableFrame.setToolTipText((description != null) ? ("<html><b>" + title + "</b><br><div style=\"width: 220px\">" + description + "</div></html>") : title);
 
         // Try to find an icon to use for the tab
         if ((icon == null) && (component instanceof Container)) {
@@ -129,6 +145,7 @@ public class DockableFrameBuilder {
     private Icon icon;
     private int margin = 2;
     private boolean scrollable;
+    private String description;
 
     private static Icon findIcon(Container container) {
         if (container instanceof JComponent) {
