@@ -33,6 +33,7 @@ public class Terrain3DPanel extends JPanel {
         super(new BorderLayout());
         view = new Terrain3DView();
         view.setHoverListener(this::hoverChanged);
+        view.setTargetListener(this::requestDetail);
         infoCard = new InfoCard();
         legend = new Legend();
 
@@ -62,7 +63,7 @@ public class Terrain3DPanel extends JPanel {
         toolBar.add(contoursButton);
         toolBar.addSeparator();
         toolBar.add(new JLabel("Height ×"));
-        final JSlider exaggerationSlider = new JSlider(5, 40, 10);
+        exaggerationSlider = new JSlider(5, 40, 10);
         exaggerationSlider.setToolTipText(App.richToolTip("Vertical exaggeration", "Stretch the heights to make the relief easier to read", null));
         exaggerationSlider.setPreferredSize(new java.awt.Dimension(110, exaggerationSlider.getPreferredSize().height));
         final JLabel exaggerationLabel = new JLabel("1.0");
@@ -96,9 +97,13 @@ public class Terrain3DPanel extends JPanel {
             view.setPitchDegrees(90);
         });
         toolBar.add(topButton);
-        final JToggleButton blocksButton = new JToggleButton(Icons.get("package", 18));
-        blocksButton.setToolTipText(App.richToolTip("Blocks", "Show every column as a Minecraft block, at its exact height in whole blocks, instead of a smooth surface", null));
-        blocksButton.addActionListener(e -> view.setBlocks(blocksButton.isSelected()));
+        blocksButton = new JToggleButton(Icons.get("package", 18));
+        blocksButton.setToolTipText(App.richToolTip("Blocks", "Preview the land as Minecraft will show it: every block a one metre cube, at its exact height, around the centre of the view", null));
+        blocksButton.addActionListener(e -> {
+            view.setBlocks(blocksButton.isSelected());
+            exaggerationSlider.setEnabled(! blocksButton.isSelected());
+            requestDetail();
+        });
         toolBar.add(blocksButton);
         final JToggleButton orthographicButton = new JToggleButton(Icons.get("box", 18));
         orthographicButton.setToolTipText(App.richToolTip("Orthographic", "Show the land without perspective: parallel lines stay parallel and sizes do not shrink with distance", null));
@@ -183,6 +188,8 @@ public class Terrain3DPanel extends JPanel {
                         view.setModel(model);
                         builtFor = dimension;
                         builtAtChange = changeNo;
+                        detailArea = null;
+                        requestDetail();
                     }
                     statusLabel.setVisible(false);
                 } catch (InterruptedException | ExecutionException e) {
@@ -193,14 +200,76 @@ public class Terrain3DPanel extends JPanel {
         }.execute();
     }
 
-    private void hoverChanged(int sample) {
+    /**
+     * In block mode, load the blocks around the centre of the view at full resolution, unless they are already loaded.
+     */
+    private void requestDetail() {
         final TerrainModel model = view.getModel();
-        if ((sample < 0) || (model == null) || (dimension == null)) {
+        if ((! blocksButton.isSelected()) || (dimension == null) || (model == null)) {
+            return;
+        }
+        final Point target = view.getTargetBlock();
+        final Rectangle extent = TerrainModel.getBlockExtent(dimension);
+        if ((detailArea != null) && covers(detailArea, extent, target)) {
+            return;
+        }
+        if (detailLoading) {
+            detailPending = true;
+            return;
+        }
+        final Rectangle area = new Rectangle(target.x - DETAIL_SIZE / 2, target.y - DETAIL_SIZE / 2, DETAIL_SIZE, DETAIL_SIZE).intersection(extent);
+        if (area.isEmpty()) {
+            return;
+        }
+        final Dimension dimension = this.dimension;
+        final TerrainModel overview = model;
+        detailLoading = true;
+        new SwingWorker<TerrainModel, Void>() {
+            @Override
+            protected TerrainModel doInBackground() throws Exception {
+                return new TerrainModel(dimension, colourScheme, null, area, 1);
+            }
+
+            @Override
+            protected void done() {
+                detailLoading = false;
+                try {
+                    final TerrainModel detail = get();
+                    if ((dimension == Terrain3DPanel.this.dimension) && (view.getModel() == overview)) {
+                        view.setDetail(detail);
+                        detailArea = area;
+                    }
+                } catch (InterruptedException | ExecutionException e) {
+                    logger.error("Could not load the blocks for the 3D view", e);
+                }
+                if (detailPending) {
+                    detailPending = false;
+                    requestDetail();
+                }
+            }
+        }.execute();
+    }
+
+    /**
+     * Whether a loaded area still covers a target well: it is at least a quarter of the area away from every edge which
+     * is not also an edge of the map.
+     */
+    private static boolean covers(Rectangle area, Rectangle extent, Point target) {
+        final int margin = DETAIL_SIZE / 4;
+        return ((target.x - area.x >= margin) || (area.x <= extent.x))
+                && ((area.x + area.width - target.x >= margin) || (area.x + area.width >= extent.x + extent.width))
+                && ((target.y - area.y >= margin) || (area.y <= extent.y))
+                && ((area.y + area.height - target.y >= margin) || (area.y + area.height >= extent.y + extent.height));
+    }
+
+    private void hoverChanged(boolean over, int x, int y) {
+        final TerrainModel model = view.getModel();
+        if ((! over) || (model == null) || (dimension == null)) {
             infoCard.setLines(null);
             return;
         }
-        final int sx = sample % model.width, sy = sample / model.width;
-        final int x = model.x0 + sx * model.step, y = model.y0 + sy * model.step;
+        final int sx = Math.max(0, Math.min(model.width - 1, (x - model.x0) / model.step)), sy = Math.max(0, Math.min(model.height - 1, (y - model.y0) / model.step));
+        final int sample = sy * model.width + sx;
         final Tile tile = dimension.getTile(x >> TILE_SIZE_BITS, y >> TILE_SIZE_BITS);
         if (tile == null) {
             infoCard.setLines(null);
@@ -243,6 +312,10 @@ public class Terrain3DPanel extends JPanel {
     }
 
     private final Terrain3DView view;
+    private final JToggleButton blocksButton;
+    private final JSlider exaggerationSlider;
+    private Rectangle detailArea;
+    private boolean detailLoading, detailPending;
     private final InfoCard infoCard;
     private final Legend legend;
     private final JLabel helpLabel, statusLabel;
@@ -251,6 +324,10 @@ public class Terrain3DPanel extends JPanel {
     private long builtAtChange = -1;
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(Terrain3DPanel.class);
+    /**
+     * The size of the area around the centre of the view which is shown block by block, in blocks.
+     */
+    private static final int DETAIL_SIZE = 768;
     private static final long serialVersionUID = 1L;
 
     /**

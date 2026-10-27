@@ -20,18 +20,22 @@ import static org.pepsoft.worldpainter.Constants.TILE_SIZE_MASK;
  * samples.
  */
 final class TerrainModel {
+    /**
+     * Sample the whole dimension, as finely as the sample budget allows.
+     */
     TerrainModel(Dimension dimension, ColourScheme colourScheme, ProgressReceiver progressReceiver) throws OperationCancelled {
-        final Rectangle extent = dimension.getExtent(); // In tiles
-        x0 = extent.x << TILE_SIZE_BITS;
-        y0 = extent.y << TILE_SIZE_BITS;
-        final int blocksWide = extent.width << TILE_SIZE_BITS, blocksHigh = extent.height << TILE_SIZE_BITS;
-        int step = 1;
-        while (((long) blocksWide / step) * (blocksHigh / step) > MAX_SAMPLES) {
-            step *= 2;
-        }
+        this(dimension, colourScheme, progressReceiver, getBlockExtent(dimension), getStep(getBlockExtent(dimension)));
+    }
+
+    /**
+     * Sample an area of the dimension (in blocks) every {@code step} blocks.
+     */
+    TerrainModel(Dimension dimension, ColourScheme colourScheme, ProgressReceiver progressReceiver, Rectangle area, int step) throws OperationCancelled {
+        x0 = area.x;
+        y0 = area.y;
         this.step = step;
-        width = blocksWide / step;
-        height = blocksHigh / step;
+        width = Math.max(1, area.width / step);
+        height = Math.max(1, area.height / step);
         minHeight = dimension.getMinHeight();
         maxHeight = dimension.getMaxHeight();
         heights = new float[width * height];
@@ -108,6 +112,19 @@ final class TerrainModel {
         if (progressReceiver != null) {
             progressReceiver.setProgress(1.0f);
         }
+    }
+
+    static Rectangle getBlockExtent(Dimension dimension) {
+        final Rectangle extent = dimension.getExtent(); // In tiles
+        return new Rectangle(extent.x << TILE_SIZE_BITS, extent.y << TILE_SIZE_BITS, extent.width << TILE_SIZE_BITS, extent.height << TILE_SIZE_BITS);
+    }
+
+    private static int getStep(Rectangle area) {
+        int step = 1;
+        while (((long) area.width / step) * (area.height / step) > MAX_SAMPLES) {
+            step *= 2;
+        }
+        return step;
     }
 
     boolean isPresent(int sx, int sy) {

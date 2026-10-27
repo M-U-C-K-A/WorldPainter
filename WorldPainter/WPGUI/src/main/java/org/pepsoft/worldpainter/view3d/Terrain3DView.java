@@ -11,7 +11,6 @@ import java.awt.event.MouseWheelEvent;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.util.Arrays;
-import java.util.function.IntConsumer;
 import java.util.stream.IntStream;
 
 /**
@@ -62,6 +61,7 @@ class Terrain3DView extends JComponent {
             public void mouseReleased(MouseEvent e) {
                 interacting = false;
                 repaint();
+                targetChanged();
             }
 
             @Override
@@ -72,7 +72,7 @@ class Terrain3DView extends JComponent {
             @Override
             public void mouseExited(MouseEvent e) {
                 if (hoverListener != null) {
-                    hoverListener.accept(-1);
+                    hoverListener.hover(false, 0, 0);
                 }
             }
 
@@ -90,9 +90,10 @@ class Terrain3DView extends JComponent {
                     if (point != null) {
                         targetX = point[0];
                         targetY = point[1];
-                        targetH = point[2] / exaggeration;
+                        targetH = point[2] / verticalScale();
                         distance = Math.max(MIN_DISTANCE, distance * 0.6);
                         repaint();
+                        targetChanged();
                     }
                 }
             }
@@ -107,6 +108,7 @@ class Terrain3DView extends JComponent {
     void setModel(TerrainModel model) {
         final boolean first = this.model == null;
         this.model = model;
+        detail = null;
         maxDistance = Math.max(model.width, model.height) * 4.0;
         if (first || (targetX > model.width) || (targetY > model.height)) {
             resetView();
@@ -134,6 +136,7 @@ class Terrain3DView extends JComponent {
         distance = ((w > 0) && (h > 0)) ? (radius * 1.1 * focal(w) / (Math.min(w, h) / 2.0)) : (radius * 2.8);
         distance = Math.min(maxDistance, distance);
         repaint();
+        targetChanged();
     }
 
     void rotateBy(double degrees) {
@@ -172,9 +175,47 @@ class Terrain3DView extends JComponent {
         repaint();
     }
 
+    /**
+     * The vertical exaggeration in effect: none in block mode, where blocks are cubes.
+     */
+    private float verticalScale() {
+        return blocks ? 1.0f : exaggeration;
+    }
+
     void setExaggeration(float exaggeration) {
         this.exaggeration = exaggeration;
         repaint();
+    }
+
+    /**
+     * Set the full resolution model of the area around the centre of the view, used for the block mode.
+     */
+    void setDetail(TerrainModel detail) {
+        this.detail = detail;
+        if (blocks) {
+            invalidateMesh();
+            repaint();
+        }
+    }
+
+    /**
+     * The block coordinates of the point the camera looks at.
+     */
+    Point getTargetBlock() {
+        return (model != null) ? new Point(model.x0 + (int) Math.floor(targetX * model.step), model.y0 + (int) Math.floor(targetY * model.step)) : null;
+    }
+
+    /**
+     * Set a listener which is notified when the point the camera looks at moves.
+     */
+    void setTargetListener(Runnable targetListener) {
+        this.targetListener = targetListener;
+    }
+
+    private void targetChanged() {
+        if (targetListener != null) {
+            targetListener.run();
+        }
     }
 
     void setBlocks(boolean blocks) {
@@ -189,9 +230,9 @@ class Terrain3DView extends JComponent {
     }
 
     /**
-     * Set a listener which is notified of the sample under the mouse (or -1).
+     * Set a listener which is notified of the block column under the mouse.
      */
-    void setHoverListener(IntConsumer hoverListener) {
+    void setHoverListener(HoverListener hoverListener) {
         this.hoverListener = hoverListener;
     }
 
@@ -200,7 +241,7 @@ class Terrain3DView extends JComponent {
     /**
      * Calculate the colour of every sample for the current mode, including shading.
      */
-    private int[] calculateColours() {
+    private int[] calculateColours(TerrainModel model) {
         final int n = model.width * model.height;
         final int[] result = new int[n];
         final float range = Math.max(1, model.highestHeight - model.lowestHeight);
@@ -228,7 +269,7 @@ class Terrain3DView extends JComponent {
                     colour = shade(model.colours[i], 0.45f + 0.6f * shade);
                     break;
             }
-            if (isWater(i)) {
+            if (isWater(model, i)) {
                 final float depth = Math.min(1, (model.waterLevels[i] - h) / 24f);
                 final int water = blend(0x4a8fe7, 0x1d3f8f, depth);
                 colour = (mode == Mode.TERRAIN) ? water : blend(colour, water, 0.55f + 0.35f * depth);
@@ -238,15 +279,15 @@ class Terrain3DView extends JComponent {
         return result;
     }
 
-    private boolean isWater(int sample) {
+    private boolean isWater(TerrainModel model, int sample) {
         return showWater && (mode != Mode.SLOPE) && (model.waterLevels[sample] > model.heights[sample]);
     }
 
     /**
      * The height of the surface shown for a sample, in blocks: the terrain, or the water surface.
      */
-    private float surfaceHeight(int sample) {
-        return isWater(sample) ? model.waterLevels[sample] : model.heights[sample];
+    private float surfaceHeight(TerrainModel model, int sample) {
+        return isWater(model, sample) ? model.waterLevels[sample] : model.heights[sample];
     }
 
     // Mesh
@@ -271,16 +312,23 @@ class Terrain3DView extends JComponent {
     }
 
     /**
-     * Build a mesh of the height field as Minecraft would show it: every column a flat topped block at a whole number
-     * of blocks of height, with vertical sides down to its lower neighbours (or to the base of the model at the edges).
-     * Large models use columns of two, four, ... samples so that the number of columns stays within a budget.
+     * Build a mesh of the land as Minecraft will show it: every block column a flat topped stack of one metre cubes, up
+     * to a whole number of blocks, with vertical sides down to its lower neighbours (or to the base of the model at the
+     * edges). The columns come from the full resolution detail model around the centre of the view when it is
+     * available; otherwise (or beyond the budget, while dragging) columns of several blocks are used.
      */
     private Mesh buildBlockMesh(int columnBudget) {
-        final int[] colours = calculateColours();
+        final TerrainModel model = (detail != null) ? detail : this.model;
+        final TerrainModel overview = this.model;
+        final int[] colours = calculateColours(model);
         int stride = 1;
         while (((long) (model.width / stride)) * (model.height / stride) > columnBudget) {
             stride *= 2;
         }
+        // Size and position of the columns in the coordinates of the overview model, in which the camera works
+        final float unit = (float) model.step / overview.step;
+        final float offsetX = (float) (model.x0 - overview.x0) / overview.step, offsetY = (float) (model.y0 - overview.y0) / overview.step;
+        final float base = (float) Math.floor(overview.lowestHeight);
         final int nx = (model.width + stride - 1) / stride, ny = (model.height + stride - 1) / stride;
         // The height of the top of each column in blocks above the lowest point, or NaN where there is no land
         final float[] tops = new float[nx * ny];
@@ -289,7 +337,7 @@ class Terrain3DView extends JComponent {
             for (int gx = 0; gx < nx; gx++) {
                 final int sample = (gy * stride) * model.width + gx * stride;
                 samples[gy * nx + gx] = sample;
-                tops[gy * nx + gx] = model.present[sample] ? ((float) Math.floor(surfaceHeight(sample)) + 1 - (float) Math.floor(model.lowestHeight)) : Float.NaN;
+                tops[gy * nx + gx] = model.present[sample] ? ((float) Math.floor(surfaceHeight(model, sample)) + 1 - base) : Float.NaN;
             }
         }
         // Neighbours: north, east, south, west, with the light falling on sides facing that way (from the north west)
@@ -318,20 +366,21 @@ class Terrain3DView extends JComponent {
                 if (Float.isNaN(top)) {
                     continue;
                 }
-                final float x0 = gx * stride, y0 = gy * stride, x1 = Math.min(model.width, x0 + stride), y1 = Math.min(model.height, y0 + stride);
+                final float x0 = offsetX + gx * stride * unit, y0 = offsetY + gy * stride * unit;
+                final float x1 = offsetX + Math.min(model.width, (gx + 1) * stride) * unit, y1 = offsetY + Math.min(model.height, (gy + 1) * stride) * unit;
                 final int colour = colours[samples[gy * nx + gx]];
                 v = addQuad(mesh, v, t, x0, y0, top, x1, y0, top, x1, y1, top, x0, y1, top, colour, colour);
                 t += 2;
             }
         }
-        mesh.wallTriangleStart = t;
         for (int gy = 0; gy < ny; gy++) {
             for (int gx = 0; gx < nx; gx++) {
                 final float top = tops[gy * nx + gx];
                 if (Float.isNaN(top)) {
                     continue;
                 }
-                final float x0 = gx * stride, y0 = gy * stride, x1 = Math.min(model.width, x0 + stride), y1 = Math.min(model.height, y0 + stride);
+                final float x0 = offsetX + gx * stride * unit, y0 = offsetY + gy * stride * unit;
+                final float x1 = offsetX + Math.min(model.width, (gx + 1) * stride) * unit, y1 = offsetY + Math.min(model.height, (gy + 1) * stride) * unit;
                 final int colour = colours[samples[gy * nx + gx]];
                 for (int d = 0; d < 4; d++) {
                     final int ngx = gx + dxs[d], ngy = gy + dys[d];
@@ -351,7 +400,8 @@ class Terrain3DView extends JComponent {
                 }
             }
         }
-        mesh.floor = -Math.max(6f, Math.max(model.width, model.height) * 0.025f) * model.step;
+        mesh.wallTriangleStart = t;
+        mesh.floor = -Math.max(6f, Math.max(overview.width, overview.height) * 0.025f) * overview.step;
         return mesh;
     }
 
@@ -388,7 +438,7 @@ class Terrain3DView extends JComponent {
      * base of the model.
      */
     private Mesh buildMesh(int cellBudget) {
-        final int[] colours = calculateColours();
+        final int[] colours = calculateColours(model);
         int stride = 1;
         while (((long) (model.width / stride)) * (model.height / stride) > cellBudget) {
             stride *= 2;
@@ -438,7 +488,7 @@ class Terrain3DView extends JComponent {
                 mesh.x[v] = xs[gx] + 0.5f;
                 mesh.y[v] = ys[gy] + 0.5f;
                 if (sample >= 0) {
-                    mesh.h[v] = surfaceHeight(sample) - model.lowestHeight;
+                    mesh.h[v] = surfaceHeight(model, sample) - model.lowestHeight;
                     mesh.colour[v] = colours[sample];
                 }
             }
@@ -544,6 +594,7 @@ class Terrain3DView extends JComponent {
             image = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
             depthBuffer = new float[w * h];
             heightBuffer = new float[w * h];
+            faceBuffer = new int[w * h];
         }
         camera = new Camera(w, h);
         render(getMesh(interacting), camera, ((DataBufferInt) image.getRaster().getDataBuffer()).getData(), w, h);
@@ -567,14 +618,17 @@ class Terrain3DView extends JComponent {
         }
         Arrays.fill(depthBuffer, 0);
         Arrays.fill(heightBuffer, Float.NaN);
+        Arrays.fill(faceBuffer, 0);
 
         // Transform all vertices to the camera, and project them
         final int n = mesh.vertexCount;
         final float[] cz = new float[n], sx = new float[n], sy = new float[n], depth = new float[n], q = new float[n];
         final float[] cx = new float[n], cy = new float[n];
         final int[] colour = new int[n];
-        final float vertical = exaggeration / model.step, floor = mesh.floor / model.step;
-        final double fogStart = distance * 0.85, fogEnd = distance * 2.6;
+        final float vertical = verticalScale() / model.step, floor = mesh.floor / model.step;
+        // Haze only the far distance, also when zoomed in close
+        final double size = Math.max(model.width, model.height);
+        final double fogStart = Math.max(distance * 0.85, size * 0.6), fogEnd = fogStart + Math.max(distance * 1.75, size);
         final int fogColour = skyBottom;
         IntStream.range(0, (n + 4095) / 4096).parallel().forEach(chunk -> {
             for (int v = chunk * 4096; v < Math.min(n, (chunk + 1) * 4096); v++) {
@@ -648,7 +702,7 @@ class Terrain3DView extends JComponent {
                     final int t = list.values[i];
                     final int a = mesh.triangles[t * 3], b = mesh.triangles[t * 3 + 1], c = mesh.triangles[t * 3 + 2];
                     final boolean wall = t >= wallStart;
-                    rasteriser.triangle(sx[a], sy[a], depth[a], q[a], colour[a], wall ? Float.NaN : mesh.h[a],
+                    rasteriser.triangle(t / 2 + 1, sx[a], sy[a], depth[a], q[a], colour[a], wall ? Float.NaN : mesh.h[a],
                             sx[b], sy[b], depth[b], q[b], colour[b], wall ? Float.NaN : mesh.h[b],
                             sx[c], sy[c], depth[c], q[c], colour[c], wall ? Float.NaN : mesh.h[c]);
                 }
@@ -661,9 +715,45 @@ class Terrain3DView extends JComponent {
             }
         });
 
+        if (blocks) {
+            drawBlockEdges(pixels, w, h, camera);
+        }
         if (showContours) {
             drawContours(pixels, w, h);
         }
+    }
+
+    /**
+     * Darken the edges of the blocks (between faces, and between blocks stacked on the sides of columns), when the
+     * blocks are large enough on the screen for that to be useful.
+     */
+    private void drawBlockEdges(int[] pixels, int w, int h, Camera camera) {
+        final float unit = 1.0f / model.step; // The size of a block in model coordinates
+        final float[] heights = heightBuffer, depths = depthBuffer;
+        final int[] faces = faceBuffer;
+        IntStream.range(0, h - 1).parallel().forEach(y -> {
+            for (int x = 0; x < w - 1; x++) {
+                final int i = y * w + x;
+                final int face = faces[i];
+                if (face == 0) {
+                    continue;
+                }
+                final double pixelsPerBlock = camera.orthographic ? (camera.scale * unit) : (camera.focal * depths[i] * unit);
+                if (pixelsPerBlock < 4) {
+                    continue;
+                }
+                boolean edge = (faces[i + 1] != face) || (faces[i + w] != face);
+                if ((! edge) && (! Float.isNaN(heights[i]))) {
+                    // Block tops are at whole heights, so shift a little to avoid rounding noise on them
+                    final int level = (int) Math.floor(heights[i] - 0.02f);
+                    edge = ((! Float.isNaN(heights[i + w])) && ((int) Math.floor(heights[i + w] - 0.02f) != level))
+                            || ((! Float.isNaN(heights[i + 1])) && ((int) Math.floor(heights[i + 1] - 0.02f) != level));
+                }
+                if (edge) {
+                    pixels[i] = shade(pixels[i], 1 - 0.3f * (float) Math.min(1, (pixelsPerBlock - 4) / 8));
+                }
+            }
+        });
     }
 
     /**
@@ -724,24 +814,33 @@ class Terrain3DView extends JComponent {
                 camera.h + camera.uh * yc + camera.fh * zc};
     }
 
-    /**
-     * The sample shown at a location in the component, or -1.
-     */
-    int sampleAt(int x, int y) {
-        final double[] point = worldPointAt(x, y);
-        if ((point == null) || (model == null)) {
-            return -1;
+    private void updateHover(int x, int y) {
+        if (hoverListener == null) {
+            return;
         }
-        final int sx = Math.max(0, Math.min(model.width - 1, (int) Math.floor(point[0])));
-        final int sy = Math.max(0, Math.min(model.height - 1, (int) Math.floor(point[1])));
-        final int sample = sy * model.width + sx;
-        return model.present[sample] ? sample : -1;
+        final double[] point = worldPointAt(x, y);
+        final Camera camera = this.camera;
+        if ((point == null) || (model == null) || (camera == null)) {
+            hoverListener.hover(false, 0, 0);
+            return;
+        }
+        // Step a little into the surface, so that a point on the side of a block belongs to that block
+        final double px = point[0] + camera.fx * 0.001, py = point[1] + camera.fy * 0.001;
+        final int sx = Math.max(0, Math.min(model.width - 1, (int) Math.floor(px))), sy = Math.max(0, Math.min(model.height - 1, (int) Math.floor(py)));
+        if (! model.present[sy * model.width + sx]) {
+            hoverListener.hover(false, 0, 0);
+            return;
+        }
+        hoverListener.hover(true, model.x0 + (int) Math.floor(px * model.step), model.y0 + (int) Math.floor(py * model.step));
     }
 
-    private void updateHover(int x, int y) {
-        if (hoverListener != null) {
-            hoverListener.accept(sampleAt(x, y));
-        }
+    interface HoverListener {
+        /**
+         * @param over Whether the mouse is over the land.
+         * @param x The X coordinate of the block column under the mouse.
+         * @param y The Y (Minecraft Z) coordinate of the block column under the mouse.
+         */
+        void hover(boolean over, int x, int y);
     }
 
     // Utilities
@@ -767,22 +866,24 @@ class Terrain3DView extends JComponent {
         return (r << 16) | (g << 8) | b;
     }
 
-    private TerrainModel model;
+    private TerrainModel model, detail;
     private Mesh mesh, coarseMesh;
     private volatile Camera camera;
     private float[] depthBuffer, heightBuffer;
+    private int[] faceBuffer;
     private BufferedImage image;
     private Mode mode = Mode.TERRAIN;
     private boolean showWater = true, showContours, interacting, orthographic, blocks;
     private float exaggeration = 1.0f;
     private double targetX, targetY, targetH, yaw, pitch, distance = 200, maxDistance = 1000;
-    private IntConsumer hoverListener;
+    private HoverListener hoverListener;
+    private Runnable targetListener;
 
     static final int[] HEIGHT_RAMP = {0x2e6b3f, 0x5f9e4a, 0xa9c56b, 0xe6d79a, 0xc39a68, 0x8b6a52, 0xf5f5f4};
     static final int[] SLOPE_RAMP = {0x3b82f6, 0x22c55e, 0xeab308, 0xf97316, 0xdc2626};
     static final int CONTOUR_INTERVAL = 8;
     private static final int EARTH = 0x6b5442;
-    private static final int CELL_BUDGET = 1_100_000, COARSE_CELL_BUDGET = 150_000, BLOCK_BUDGET = 600_000, COARSE_BLOCK_BUDGET = 100_000;
+    private static final int CELL_BUDGET = 1_100_000, COARSE_CELL_BUDGET = 150_000, BLOCK_BUDGET = 650_000, COARSE_BLOCK_BUDGET = 200_000;
     private static final double MIN_PITCH = Math.toRadians(-45), MAX_PITCH = Math.toRadians(89.5), MIN_DISTANCE = 4;
     private static final float NEAR = 0.5f, ORTHO_DEPTH = 1.0e6f;
     private static final long serialVersionUID = 1L;
@@ -823,14 +924,14 @@ class Terrain3DView extends JComponent {
             ux = sinPitch * sinYaw;
             uy = -sinPitch * cosYaw;
             uh = cosPitch;
-            final double th = targetH * exaggeration;
+            final double th = targetH * verticalScale();
             x = targetX - fx * distance;
             y = targetY - fy * distance;
             // Below the horizontal the camera may end up under the land: keep it above the surface instead
             double cameraH = th - fh * distance;
             final int csx = (int) Math.floor(x), csy = (int) Math.floor(y);
             if ((csx >= 0) && (csy >= 0) && (csx < model.width) && (csy < model.height) && model.present[csy * model.width + csx]) {
-                cameraH = Math.max(cameraH, (surfaceHeight(csy * model.width + csx) - model.lowestHeight + 2) * exaggeration / model.step);
+                cameraH = Math.max(cameraH, (surfaceHeight(model, csy * model.width + csx) - model.lowestHeight + 2) * verticalScale() / model.step);
             }
             this.h = cameraH;
         }
@@ -879,7 +980,7 @@ class Terrain3DView extends JComponent {
             this.y1 = y1;
         }
 
-        void triangle(float x0, float y0, float d0, float q0, int c0, float h0,
+        void triangle(int face, float x0, float y0, float d0, float q0, int c0, float h0,
                       float x1, float y1, float d1, float q1, int c1, float h1,
                       float x2, float y2, float d2, float q2, int c2, float h2) {
             final float area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
@@ -918,6 +1019,7 @@ class Terrain3DView extends JComponent {
                     depthBuffer[i] = d;
                     pixels[i] = (((int) (l0 * r0 + l1 * r1 + l2 * r2)) << 16) | (((int) (l0 * g0 + l1 * g1 + l2 * g2)) << 8) | ((int) (l0 * b0 + l1 * b1 + l2 * b2));
                     heightBuffer[i] = heights ? (l0 * hq0 + l1 * hq1 + l2 * hq2) / (l0 * q0 + l1 * q1 + l2 * q2) : Float.NaN;
+                    faceBuffer[i] = face;
                 }
             }
         }
@@ -959,7 +1061,7 @@ class Terrain3DView extends JComponent {
                 d[k] = 1 / pz[k];
             }
             for (int k = 1; k < count - 1; k++) {
-                triangle(sx[0], sy[0], d[0], d[0], pc[0], ph[0], sx[k], sy[k], d[k], d[k], pc[k], ph[k], sx[k + 1], sy[k + 1], d[k + 1], d[k + 1], pc[k + 1], ph[k + 1]);
+                triangle(t / 2 + 1, sx[0], sy[0], d[0], d[0], pc[0], ph[0], sx[k], sy[k], d[k], d[k], pc[k], ph[k], sx[k + 1], sy[k + 1], d[k + 1], d[k + 1], pc[k + 1], ph[k + 1]);
             }
         }
 
