@@ -57,10 +57,13 @@ public class Terrain3DPanel extends JPanel {
         waterButton.setToolTipText(App.richToolTip("Water", "Show water and lava surfaces", null));
         waterButton.addActionListener(e -> view.setShowWater(waterButton.isSelected()));
         toolBar.add(waterButton);
-        final JToggleButton wavesButton = new JToggleButton(Icons.get("waves", 18), true);
-        wavesButton.setToolTipText(App.richToolTip("Moving water", "Animate the waves and the reflections of the sky and the sun on the water", null));
-        wavesButton.addActionListener(e -> view.setAnimateWater(wavesButton.isSelected()));
-        toolBar.add(wavesButton);
+        final JToggleButton shadersButton = new JToggleButton(Icons.get("sun", 18));
+        shadersButton.setToolTipText(App.richToolTip("Shaders", "Light the land with the sun, with shadows, and show moving water reflecting the sky. Set the sun with the globe at the bottom right", null));
+        shadersButton.addActionListener(e -> {
+            view.setShaders(shadersButton.isSelected());
+            sunControl.setVisible(shadersButton.isSelected());
+        });
+        toolBar.add(shadersButton);
         final JToggleButton contoursButton = new JToggleButton(Icons.get("chart-spline", 18));
         contoursButton.setToolTipText(App.richToolTip("Contour lines", "Draw a line every " + Terrain3DView.CONTOUR_INTERVAL + " blocks of height", null));
         contoursButton.addActionListener(e -> view.setShowContours(contoursButton.isSelected()));
@@ -149,6 +152,7 @@ public class Terrain3DPanel extends JPanel {
         layers.add(legend, JLayeredPane.PALETTE_LAYER);
         layers.add(helpLabel, JLayeredPane.PALETTE_LAYER);
         sunControl = new SunControl();
+        sunControl.setVisible(false);
         layers.add(sunControl, JLayeredPane.PALETTE_LAYER);
         layers.add(statusLabel, JLayeredPane.MODAL_LAYER);
         add(layers, BorderLayout.CENTER);
