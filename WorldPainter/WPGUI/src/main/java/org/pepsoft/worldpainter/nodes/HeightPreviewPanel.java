@@ -1,0 +1,152 @@
+package org.pepsoft.worldpainter.nodes;
+
+import org.pepsoft.worldpainter.util.ThemeUtils;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.geom.RoundRectangle2D;
+import java.awt.image.BufferedImage;
+
+/**
+ * Shows a rendered preview of a height map, with a badge while a new one is being rendered. Also contains the
+ * renderers for the previews and the node thumbnails.
+ */
+public class HeightPreviewPanel extends JComponent {
+    public HeightPreviewPanel() {
+        setPreferredSize(new Dimension(PREFERRED_SIZE, PREFERRED_SIZE));
+        setMinimumSize(new Dimension(160, 160));
+    }
+
+    public void setImage(BufferedImage image) {
+        this.image = image;
+        repaint();
+    }
+
+    public void setRendering(boolean rendering) {
+        this.rendering = rendering;
+        repaint();
+    }
+
+    /**
+     * Set a message to show instead of the image, or {@code null} to show the image.
+     */
+    public void setMessage(String message) {
+        this.message = message;
+        repaint();
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        final Graphics2D g2 = (Graphics2D) g.create();
+        try {
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            final int size = Math.min(getWidth(), getHeight()) - 1;
+            final int x = (getWidth() - size) / 2, y = (getHeight() - size) / 2;
+            final RoundRectangle2D frame = new RoundRectangle2D.Double(x, y, size, size, 12, 12);
+            g2.setColor(ThemeUtils.getCanvasBackground());
+            g2.fill(frame);
+            if ((image != null) && (message == null)) {
+                final Shape oldClip = g2.getClip();
+                g2.clip(frame);
+                g2.drawImage(image, x, y, size, size, null);
+                g2.setClip(oldClip);
+            } else if (message != null) {
+                g2.setColor(ThemeUtils.getColour("WorldPainter.mutedForeground", Color.GRAY));
+                final FontMetrics metrics = g2.getFontMetrics();
+                g2.drawString(message, x + (size - metrics.stringWidth(message)) / 2f, y + size / 2f);
+            }
+            g2.setColor(ThemeUtils.getColour("WorldPainter.border", Color.LIGHT_GRAY));
+            g2.draw(frame);
+            if (rendering) {
+                final String text = "Rendering\u2026";
+                g2.setFont(getFont().deriveFont(11.5f));
+                final FontMetrics metrics = g2.getFontMetrics();
+                final int width = metrics.stringWidth(text) + 16;
+                g2.setColor(new Color(0, 0, 0, 140));
+                g2.fill(new RoundRectangle2D.Double(x + 8, y + 8, width, 22, 11, 11));
+                g2.setColor(Color.WHITE);
+                g2.drawString(text, x + 16, y + 8 + (22 + metrics.getAscent()) / 2f - 2);
+            }
+        } finally {
+            g2.dispose();
+        }
+    }
+
+    /**
+     * Render heights as a shaded relief map with hypsometric tints and water.
+     *
+     * @param heights    The heights in blocks, in row major order.
+     * @param size       The width and height of the image.
+     * @param step       The distance between samples in blocks, to calibrate the shading.
+     * @param waterLevel The water level, below which water is shown.
+     */
+    public static BufferedImage renderRelief(float[] heights, int size, double step, int waterLevel) {
+        final BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+        final double shadeFactor = 0.9 / Math.max(step, 0.25);
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                final float h = heights[x + y * size];
+                final int colour;
+                if (h < waterLevel) {
+                    colour = blend(0x5b8fd6, 0x1e3a74, Math.min(1.0f, (waterLevel - h) / 40f));
+                } else {
+                    colour = elevationColour(h - waterLevel);
+                }
+                // Light from the north west
+                final float west = heights[Math.max(0, x - 1) + y * size], north = heights[x + Math.max(0, y - 1) * size];
+                final float east = heights[Math.min(size - 1, x + 1) + y * size], south = heights[x + Math.min(size - 1, y + 1) * size];
+                final double shade = (h < waterLevel) ? 1.0 : Math.max(0.45, Math.min(1.35, 1.0 + ((north - south) + (west - east)) * shadeFactor * 0.5));
+                image.setRGB(x, y, shade(colour, shade));
+            }
+        }
+        return image;
+    }
+
+    /**
+     * Render values as greyscale, with zero black and one white.
+     */
+    public static BufferedImage renderGreyscale(float[] values, int size) {
+        final BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+        for (int i = 0; i < values.length; i++) {
+            final int grey = Math.max(0, Math.min(255, Math.round(values[i] * 255)));
+            image.setRGB(i % size, i / size, (grey << 16) | (grey << 8) | grey);
+        }
+        return image;
+    }
+
+    private static int elevationColour(float heightAboveWater) {
+        // Beach, lowland green, upland olive, rock brown, grey and snow
+        for (int i = 1; i < ELEVATION_STOPS.length; i++) {
+            if (heightAboveWater < ELEVATION_STOPS[i]) {
+                final float t = (heightAboveWater - ELEVATION_STOPS[i - 1]) / (ELEVATION_STOPS[i] - ELEVATION_STOPS[i - 1]);
+                return blend(ELEVATION_COLOURS[i - 1], ELEVATION_COLOURS[i], Math.max(0, t));
+            }
+        }
+        return ELEVATION_COLOURS[ELEVATION_COLOURS.length - 1];
+    }
+
+    private static int blend(int colour1, int colour2, float t) {
+        final int r = (int) (((colour1 >> 16) & 0xff) * (1 - t) + ((colour2 >> 16) & 0xff) * t);
+        final int g = (int) (((colour1 >> 8) & 0xff) * (1 - t) + ((colour2 >> 8) & 0xff) * t);
+        final int b = (int) ((colour1 & 0xff) * (1 - t) + (colour2 & 0xff) * t);
+        return (r << 16) | (g << 8) | b;
+    }
+
+    private static int shade(int colour, double factor) {
+        final int r = (int) Math.min(255, ((colour >> 16) & 0xff) * factor);
+        final int g = (int) Math.min(255, ((colour >> 8) & 0xff) * factor);
+        final int b = (int) Math.min(255, (colour & 0xff) * factor);
+        return (r << 16) | (g << 8) | b;
+    }
+
+    private BufferedImage image;
+    private boolean rendering;
+    private String message;
+
+    private static final int PREFERRED_SIZE = 340;
+    private static final float[] ELEVATION_STOPS = {0, 3, 30, 80, 140, 190, 240};
+    private static final int[] ELEVATION_COLOURS = {0xd9c88f, 0x7fb069, 0x5c8f45, 0x8a8a4e, 0x8c6d4f, 0x9a9a9a, 0xf4f4f4};
+    private static final long serialVersionUID = 1L;
+}

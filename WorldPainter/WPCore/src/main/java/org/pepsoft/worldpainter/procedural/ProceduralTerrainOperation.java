@@ -5,14 +5,10 @@ import org.pepsoft.util.ProgressReceiver.OperationCancelled;
 import org.pepsoft.worldpainter.Dimension;
 import org.pepsoft.worldpainter.Terrain;
 import org.pepsoft.worldpainter.Tile;
-import org.pepsoft.worldpainter.selection.SelectionBlock;
-import org.pepsoft.worldpainter.selection.SelectionChunk;
 
 import java.awt.*;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE;
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE_BITS;
@@ -84,21 +80,9 @@ public class ProceduralTerrainOperation {
 
     public void apply(Dimension dimension, ProgressReceiver progressReceiver) throws OperationCancelled {
         final ProceduralTerrain terrain = new ProceduralTerrain(settings);
-        final Set<Point> tileCoords = new HashSet<>(dimension.getTileCoords());
-        final Set<Point> selectedTileCoords = new HashSet<>();
-        if (selectionOnly) {
-            for (Point coords: tileCoords) {
-                if (dimension.getTile(coords).containsOneOf(SelectionBlock.INSTANCE, SelectionChunk.INSTANCE)) {
-                    selectedTileCoords.add(coords);
-                }
-            }
-        }
-        final int featherTiles = (feather > 0) ? (feather + TILE_SIZE - 1) >> TILE_SIZE_BITS : 0;
         final List<Tile> tiles = new ArrayList<>();
-        for (Point coords: tileCoords) {
-            if ((! selectionOnly) || isNear(coords, selectedTileCoords, featherTiles)) {
-                tiles.add(dimension.getTileForEditing(coords));
-            }
+        for (Point coords: selectionOnly ? SelectionWeights.affectedTiles(dimension, feather) : dimension.getTileCoords()) {
+            tiles.add(dimension.getTileForEditing(coords));
         }
         ParallelTileProcessor.process(tiles, tile -> processTile(dimension, terrain, tile), progressReceiver);
     }
@@ -107,7 +91,7 @@ public class ProceduralTerrainOperation {
         final int x0 = tile.getX() << TILE_SIZE_BITS, y0 = tile.getY() << TILE_SIZE_BITS;
         final int minHeight = tile.getMinHeight(), maxHeight = tile.getMaxHeight() - 1;
         final int baseHeight = settings.getBaseHeight();
-        final float[] weights = selectionOnly ? selectionWeights(dimension, x0, y0) : null;
+        final float[] weights = selectionOnly ? SelectionWeights.forTile(dimension, x0, y0, feather) : null;
         final float[] generated = new float[TILE_SIZE * TILE_SIZE];
         terrain.getHeights(x0, y0, TILE_SIZE, TILE_SIZE, generated);
         final float[] heights = new float[TILE_SIZE * TILE_SIZE];
@@ -163,58 +147,6 @@ public class ProceduralTerrainOperation {
                 }
             }
         }
-    }
-
-    /**
-     * Calculate how much each block of a tile is selected (0-1), taking the feather width into account.
-     */
-    private float[] selectionWeights(Dimension dimension, int x0, int y0) {
-        final float[] weights = new float[TILE_SIZE * TILE_SIZE];
-        if (feather <= 0) {
-            for (int y = 0; y < TILE_SIZE; y++) {
-                for (int x = 0; x < TILE_SIZE; x++) {
-                    weights[x | (y << TILE_SIZE_BITS)] = isSelected(dimension, x0 + x, y0 + y) ? 1.0f : 0.0f;
-                }
-            }
-            return weights;
-        }
-        // Box blur the selection mask using a summed area table, then smooth the result
-        final int r = feather / 2 + 1, size = TILE_SIZE + 2 * r;
-        final int[] sat = new int[(size + 1) * (size + 1)];
-        for (int y = 0; y < size; y++) {
-            int rowSum = 0;
-            for (int x = 0; x < size; x++) {
-                if (isSelected(dimension, x0 - r + x, y0 - r + y)) {
-                    rowSum++;
-                }
-                sat[(y + 1) * (size + 1) + x + 1] = sat[y * (size + 1) + x + 1] + rowSum;
-            }
-        }
-        final float area = (2 * r + 1) * (2 * r + 1);
-        for (int y = 0; y < TILE_SIZE; y++) {
-            for (int x = 0; x < TILE_SIZE; x++) {
-                // Window [x - r, x + r] in tile coordinates is [x, x + 2r] in grid coordinates
-                final int gx1 = x, gy1 = y, gx2 = x + 2 * r + 1, gy2 = y + 2 * r + 1;
-                final int sum = sat[gy2 * (size + 1) + gx2] - sat[gy1 * (size + 1) + gx2] - sat[gy2 * (size + 1) + gx1] + sat[gy1 * (size + 1) + gx1];
-                weights[x | (y << TILE_SIZE_BITS)] = (float) ProceduralTerrain.smoothStep(0, 1, sum / area);
-            }
-        }
-        return weights;
-    }
-
-    private static boolean isSelected(Dimension dimension, int x, int y) {
-        return dimension.getBitLayerValueAt(SelectionChunk.INSTANCE, x, y) || dimension.getBitLayerValueAt(SelectionBlock.INSTANCE, x, y);
-    }
-
-    private static boolean isNear(Point coords, Set<Point> tileCoords, int distance) {
-        for (int dx = -distance; dx <= distance; dx++) {
-            for (int dy = -distance; dy <= distance; dy++) {
-                if (tileCoords.contains(new Point(coords.x + dx, coords.y + dy))) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     private static int clampedIndex(int x, int y) {

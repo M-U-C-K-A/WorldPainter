@@ -135,6 +135,16 @@ Un seul panneau **Brushes**, sans menu caché :
 - **9 tampons de relief** générés procéduralement, pour sculpter en un geste avec les outils de hauteur : pic, chaîne de montagnes, massif, volcan, rebord de cratère, mesa, dunes, collines, dôme érodé.
 - Les pinceaux personnalisés (dossier `brushes` de la configuration) restent pris en charge.
 
+### Éditeur de nœuds
+
+**Generate › Node graph terrain…** (<kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>N</kbd>), dans l'esprit de Gaia ou World Machine : on relie des nœuds sur un canevas et on voit le résultat.
+
+- **Générateurs** : bruit de Perlin, bruit à crêtes, bruit « billow », dunes, cellules (Voronoï), dégradé (radial, carré ou linéaire, ajusté à la carte), constante, image en niveaux de gris importée.
+- **Combinaisons** : ajouter, soustraire, multiplier, maximum, minimum, mélange avec masque. **Filtres** : courbe éditable, terrasses, bornage, flou, érosion (ravines ramifiées qui descendent les pentes) et érosion thermique.
+- Chaque nœud affiche une **vignette** de son résultat ; aperçu en relief de la sortie ou du nœud sélectionné.
+- Application à toute la carte ou à la **sélection avec bords adoucis**, annulable, avec repeinture des terrains selon le thème. Le graphe est **enregistré avec le monde**.
+- Exemples prêts à l'emploi : collines, montagnes érodées, archipel, mesa. Évaluation par tuiles en parallèle, identique au bit près à un calcul d'un seul tenant : aucune couture.
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/divider-dark.svg">
   <img alt="" src="docs/assets/divider-light.svg" width="100%">

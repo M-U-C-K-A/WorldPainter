@@ -95,43 +95,25 @@ public final class ProceduralTerrain {
     private final SurfaceRule[] rules;
     private final SimplexNoise jitterNoise;
 
-    private static final double LACUNARITY = 2.0;
-    private static final double TANH_GAIN = 1.8, TANH_NORM = Math.tanh(TANH_GAIN);
-
     private static final class CompiledLayer {
         CompiledLayer(NoiseLayer layer, long seed) {
-            type = layer.getType();
             blendMode = layer.getBlendMode();
             final long layerSeed = seed + layer.getSeedOffset() * 0x9E3779B97F4A7C15L;
-            noise = new SimplexNoise(layerSeed);
-            warpNoise = (layer.getWarp() > 0) ? new SimplexNoise(layerSeed + 1) : null;
+            noise = new FractalNoise(layerSeed, layer.getType(), layer.getScale(), layer.getOctaves(), layer.getRoughness(), layer.getWarp(), layer.getDirection());
             maskNoise = (layer.getCoverage() < 1.0f) ? new SimplexNoise(layerSeed + 2) : null;
             scale = layer.getScale();
             amplitude = layer.getAmplitude();
-            octaves = Math.max(1, Math.min(layer.getOctaves(), 10));
-            roughness = layer.getRoughness();
             sharpness = layer.getSharpness();
-            warp = layer.getWarp();
             coverage = layer.getCoverage();
-            final double angle = Math.toRadians(layer.getDirection());
-            cos = Math.cos(angle);
-            sin = Math.sin(angle);
-            double norm = 0, amp = 1;
-            for (int i = 0; i < octaves; i++) {
-                norm += amp;
-                amp *= roughness;
-            }
-            normalisation = norm;
         }
 
         float apply(double x, double y, float total) {
-            if (warpNoise != null) {
-                final double wx = warpNoise.noise(x / (scale * 0.75), y / (scale * 0.75));
-                final double wy = warpNoise.noise(x / (scale * 0.75) + 31.7, y / (scale * 0.75) - 47.3);
-                x += wx * warp;
-                y += wy * warp;
+            if (noise.isWarped()) {
+                final double wx = noise.warpX(x, y), wy = noise.warpY(x, y);
+                x += wx;
+                y += wy;
             }
-            double value = value(x / scale, y / scale);
+            double value = noise.value(x / scale, y / scale);
             if (sharpness != 1.0f) {
                 value = Math.pow(value, sharpness);
             }
@@ -156,85 +138,10 @@ public final class ProceduralTerrain {
             }
         }
 
-        /**
-         * @return A value between zero and one.
-         */
-        private double value(double x, double y) {
-            switch (type) {
-                case FBM: {
-                    double sum = 0, amp = 1, frequency = 1;
-                    for (int i = 0; i < octaves; i++) {
-                        sum += noise.noise(x * frequency + i * 17.31, y * frequency - i * 9.13) * amp;
-                        amp *= roughness;
-                        frequency *= LACUNARITY;
-                    }
-                    return 0.5 + 0.5 * Math.tanh(TANH_GAIN * sum / normalisation) / TANH_NORM;
-                }
-                case RIDGED: {
-                    double sum = 0, amp = 1, frequency = 1, weight = 1;
-                    for (int i = 0; i < octaves; i++) {
-                        double r = 1 - Math.abs(noise.noise(x * frequency + i * 17.31, y * frequency - i * 9.13));
-                        r *= r * weight;
-                        weight = Math.min(Math.max(r * 2, 0), 1);
-                        sum += r * amp;
-                        amp *= roughness;
-                        frequency *= LACUNARITY;
-                    }
-                    return Math.min(1.0, sum / normalisation * 1.25);
-                }
-                case BILLOW: {
-                    double sum = 0, amp = 1, frequency = 1;
-                    for (int i = 0; i < octaves; i++) {
-                        sum += Math.abs(noise.noise(x * frequency + i * 17.31, y * frequency - i * 9.13)) * amp;
-                        amp *= roughness;
-                        frequency *= LACUNARITY;
-                    }
-                    return Math.min(1.0, sum / normalisation * 1.6);
-                }
-                case CELLS: {
-                    final double[] f = CELLULAR_BUFFER.get();
-                    noise.cellular(x, y, f);
-                    double value = Math.max(0, 1 - f[0]);
-                    if (octaves > 1) {
-                        // Add some fractal detail
-                        double sum = 0, amp = roughness, frequency = LACUNARITY * 2;
-                        for (int i = 1; i < octaves; i++) {
-                            sum += noise.noise(x * frequency + i * 17.31, y * frequency - i * 9.13) * amp;
-                            amp *= roughness;
-                            frequency *= LACUNARITY;
-                        }
-                        value = Math.min(1, Math.max(0, value + sum * 0.25));
-                    }
-                    return value;
-                }
-                case DUNES: {
-                    final double u = x * cos + y * sin;
-                    final double variation = noise.noise(x * 0.35, y * 0.35);
-                    double phase = u + variation * 0.6;
-                    phase -= Math.floor(phase);
-                    // Gentle windward slope, steep lee slope
-                    final double profile = (phase < 0.75) ? smoothStep(0, 0.75, phase) : smoothStep(1, 0.75, phase);
-                    double detail = 0, amp = 1, frequency = 2;
-                    for (int i = 1; i < octaves; i++) {
-                        amp *= roughness;
-                        detail += noise.noise(x * frequency + i * 17.31, y * frequency - i * 9.13) * amp;
-                        frequency *= LACUNARITY;
-                    }
-                    return Math.min(1, Math.max(0, profile * (0.75 + 0.25 * noise.noise(x * 0.15 + 50, y * 0.15)) + detail * 0.15));
-                }
-                default:
-                    throw new InternalError();
-            }
-        }
-
-        private final NoiseLayer.Type type;
         private final NoiseLayer.BlendMode blendMode;
-        private final SimplexNoise noise, warpNoise, maskNoise;
-        private final float scale, amplitude, roughness, sharpness, warp, coverage;
-        private final int octaves;
-        private final double normalisation, cos, sin;
-
-        private static final ThreadLocal<double[]> CELLULAR_BUFFER = ThreadLocal.withInitial(() -> new double[2]);
+        private final FractalNoise noise;
+        private final SimplexNoise maskNoise;
+        private final float scale, amplitude, sharpness, coverage;
     }
 
     static double smoothStep(double edge0, double edge1, double x) {
