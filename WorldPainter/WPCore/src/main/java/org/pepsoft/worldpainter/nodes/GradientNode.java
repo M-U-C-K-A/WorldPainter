@@ -93,7 +93,7 @@ public class GradientNode extends Node {
     public static final NumberParameter CENTRE_X = new NumberParameter("centreX", "Centre X", "The X coordinate of the centre", 0, -1000000, 1000000, 1, false, "blocks");
     public static final NumberParameter CENTRE_Y = new NumberParameter("centreY", "Centre Y", "The Y coordinate of the centre", 0, -1000000, 1000000, 1, false, "blocks");
     public static final NumberParameter SIZE = new NumberParameter("size", "Radius", "The distance from the centre at which the gradient reaches zero (or half the length of a linear gradient)", 1024, 16, 65536, 1, true, "blocks");
-    public static final NumberParameter ANGLE = new NumberParameter("angle", "Direction", "The direction in which a linear gradient rises (0° = east, 90° = south)", 0, 0, 360, 1, false, "°");
+    public static final NumberParameter ANGLE = new NumberParameter("angle", "Direction", "The direction in which a linear gradient rises (0\u00b0 = east, 90\u00b0 = south)", 0, 0, 360, 1, false, "\u00b0");
     public static final BooleanParameter SMOOTH = new BooleanParameter("smooth", "Smooth", "Ease the gradient in and out instead of changing linearly", true);
 
     private static final long serialVersionUID = 1L;

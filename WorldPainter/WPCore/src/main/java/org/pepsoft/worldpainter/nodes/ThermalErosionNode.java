@@ -94,7 +94,7 @@ public class ThermalErosionNode extends ErosionNode {
         System.arraycopy(next, 0, heights, 0, heights.length);
     }
 
-    public static final NumberParameter ANGLE = new NumberParameter("angle", "Max slope", "Slopes steeper than this crumble", 40, 5, 85, 1, false, "°");
+    public static final NumberParameter ANGLE = new NumberParameter("angle", "Max slope", "Slopes steeper than this crumble", 40, 5, 85, 1, false, "\u00b0");
     public static final NumberParameter STRENGTH = new NumberParameter("strength", "Strength", "How quickly steep slopes crumble", 0.5, 0, 1, 0.01, false, null);
 
     private static final int[] DX = {-1, 0, 1, -1, 1, -1, 0, 1}, DY = {-1, -1, -1, 0, 0, 1, 1, 1};

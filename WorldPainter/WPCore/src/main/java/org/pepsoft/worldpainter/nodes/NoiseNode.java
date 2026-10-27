@@ -66,7 +66,7 @@ public class NoiseNode extends Node {
     public static final NumberParameter OCTAVES = new NumberParameter("octaves", "Detail", "The number of levels of finer detail which are added", 6, 1, 10, 1, false, null);
     public static final NumberParameter ROUGHNESS = new NumberParameter("roughness", "Roughness", "How strong the finer detail is", 0.5, 0, 1, 0.01, false, null);
     public static final NumberParameter WARP = new NumberParameter("warp", "Warp", "How much the shapes are twisted, for a more organic look", 0, 0, 2048, 1, false, "blocks");
-    public static final NumberParameter DIRECTION = new NumberParameter("direction", "Direction", "The direction of the ridges", 45, 0, 180, 1, false, "°");
+    public static final NumberParameter DIRECTION = new NumberParameter("direction", "Direction", "The direction of the ridges", 45, 0, 180, 1, false, "\u00b0");
 
     private static final long serialVersionUID = 1L;
 

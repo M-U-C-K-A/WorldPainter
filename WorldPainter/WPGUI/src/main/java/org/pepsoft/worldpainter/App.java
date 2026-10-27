@@ -64,6 +64,7 @@ import org.pepsoft.worldpainter.brushes.TerrainStamps;
 import org.pepsoft.worldpainter.docking.DockableFrame;
 import org.pepsoft.worldpainter.docking.DockingManager;
 import org.pepsoft.worldpainter.docking.Side;
+import org.pepsoft.worldpainter.nodes.NodeGraphDialog;
 import org.pepsoft.worldpainter.procedural.EdgeBlendDialog;
 import org.pepsoft.worldpainter.procedural.ProceduralTerrainDialog;
 import org.pepsoft.worldpainter.util.*;
@@ -4298,6 +4299,12 @@ public final class App extends JFrame implements BrushControl,
         menuItem.addActionListener(e -> showProceduralTerrain());
         menu.add(menuItem);
 
+        menuItem = new JMenuItem("Node graph terrain\u2026", Icons.get("workflow"));
+        menuItem.setToolTipText("Design a height map by wiring noise, filter and erosion nodes together, with a live preview, and apply it to the whole map or the selection");
+        menuItem.setAccelerator(getKeyStroke(VK_N, PLATFORM_COMMAND_MASK | SHIFT_DOWN_MASK));
+        menuItem.addActionListener(e -> showNodeGraph());
+        menu.add(menuItem);
+
         menuItem = new JMenuItem("Blend map edges\u2026");
         menuItem.setToolTipText("Progressively blend the edges of the map into the surrounding terrain instead of ending in a cliff");
         menuItem.addActionListener(e -> showEdgeBlend());
@@ -4314,6 +4321,19 @@ public final class App extends JFrame implements BrushControl,
         }
         cancelPaintSelection();
         final ProceduralTerrainDialog dialog = new ProceduralTerrainDialog(this, dimension, view, selectedColourScheme, view.getViewCentreInWorldCoords(), selectionState.getValue());
+        dialog.setVisible(true);
+        if ((! dialog.isCancelled()) && (threeDeeFrame != null)) {
+            threeDeeFrame.refresh(true);
+        }
+    }
+
+    private void showNodeGraph() {
+        if ((world == null) || (dimension == null)) {
+            DesktopUtils.beep();
+            return;
+        }
+        cancelPaintSelection();
+        final NodeGraphDialog dialog = new NodeGraphDialog(this, dimension, view, view.getViewCentreInWorldCoords(), selectionState.getValue());
         dialog.setVisible(true);
         if ((! dialog.isCancelled()) && (threeDeeFrame != null)) {
             threeDeeFrame.refresh(true);
