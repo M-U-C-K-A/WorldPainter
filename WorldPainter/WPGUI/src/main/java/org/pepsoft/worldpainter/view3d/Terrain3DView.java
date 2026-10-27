@@ -10,13 +10,14 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
+import java.util.Arrays;
 import java.util.function.IntConsumer;
+import java.util.stream.IntStream;
 
 /**
- * An interactive 3D view of a {@link TerrainModel}, rendered in software as a lit height field seen in perspective
- * (rendering screen column by screen column, front to back, with occlusion), which is fast enough for interactive
- * rotation of maps of a million samples. A pick buffer records which sample each pixel shows, so that the location
- * under the mouse is known exactly.
+ * An interactive 3D view of a {@link TerrainModel}. The height field is turned into a triangle mesh (with walls down to
+ * a base, like a diorama) which is projected with a true perspective (or orthographic) camera and rasterised in software
+ * with a depth buffer, on all cores. The depth buffer also tells exactly which location is under the mouse.
  */
 class Terrain3DView extends JComponent {
     Terrain3DView() {
@@ -35,17 +36,23 @@ class Terrain3DView extends JComponent {
                 final int dx = e.getX() - lastX, dy = e.getY() - lastY;
                 lastX = e.getX();
                 lastY = e.getY();
+                if (model == null) {
+                    return;
+                }
                 if (SwingUtilities.isRightMouseButton(e) || e.isShiftDown()) {
-                    // Pan
-                    // Drag the ground: right moves the target left, down moves it away from the camera
-                    final double scale = distance / focal() * 1.2;
-                    final double fx = Math.sin(yaw), fy = -Math.cos(yaw), rx = Math.cos(yaw), ry = Math.sin(yaw);
-                    targetX += (-dx * rx + dy * fx / Math.max(0.2, Math.sin(pitch))) * scale;
-                    targetY += (-dx * ry + dy * fy / Math.max(0.2, Math.sin(pitch))) * scale;
+                    // Pan: drag the ground along with the mouse
+                    final double scale = distance / focal(getWidth());
+                    final double rx = Math.cos(yaw), ry = Math.sin(yaw); // Right
+                    final double gx = Math.sin(yaw), gy = -Math.cos(yaw); // Forward along the ground
+                    final double along = 1 / Math.max(0.25, Math.sin(pitch));
+                    targetX += (-dx * rx + dy * gx * along) * scale;
+                    targetY += (-dx * ry + dy * gy * along) * scale;
+                    targetX = Math.max(0, Math.min(model.width, targetX));
+                    targetY = Math.max(0, Math.min(model.height, targetY));
                 } else {
                     // Orbit
                     yaw += dx * 0.008;
-                    pitch = Math.max(Math.toRadians(8), Math.min(Math.toRadians(80), pitch + dy * 0.006));
+                    pitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, pitch + dy * 0.006));
                 }
                 interacting = true;
                 repaint();
@@ -71,7 +78,7 @@ class Terrain3DView extends JComponent {
 
             @Override
             public void mouseWheelMoved(MouseWheelEvent e) {
-                distance = Math.max(8, Math.min(maxDistance, distance * Math.pow(1.12, e.getPreciseWheelRotation())));
+                distance = Math.max(MIN_DISTANCE, Math.min(maxDistance, distance * Math.pow(1.12, e.getPreciseWheelRotation())));
                 repaint();
             }
 
@@ -79,11 +86,12 @@ class Terrain3DView extends JComponent {
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) {
                     // Focus on the clicked location
-                    final int sample = sampleAt(e.getX(), e.getY());
-                    if (sample >= 0) {
-                        targetX = (sample % model.width) + 0.5;
-                        targetY = (sample / model.width) + 0.5;
-                        distance = Math.max(8, distance * 0.6);
+                    final double[] point = worldPointAt(e.getX(), e.getY());
+                    if (point != null) {
+                        targetX = point[0];
+                        targetY = point[1];
+                        targetH = point[2] / exaggeration;
+                        distance = Math.max(MIN_DISTANCE, distance * 0.6);
                         repaint();
                     }
                 }
@@ -99,11 +107,11 @@ class Terrain3DView extends JComponent {
     void setModel(TerrainModel model) {
         final boolean first = this.model == null;
         this.model = model;
-        maxDistance = Math.max(model.width, model.height) * 3.0;
+        maxDistance = Math.max(model.width, model.height) * 4.0;
         if (first || (targetX > model.width) || (targetY > model.height)) {
             resetView();
         }
-        rebuildColours();
+        invalidateMesh();
         repaint();
     }
 
@@ -117,9 +125,14 @@ class Terrain3DView extends JComponent {
         }
         targetX = model.width / 2.0;
         targetY = model.height / 2.0;
+        targetH = (model.highestHeight - model.lowestHeight) / 3.0 / model.step;
         yaw = Math.toRadians(-35);
-        pitch = Math.toRadians(38);
-        distance = Math.max(model.width, model.height) * 1.75;
+        pitch = Math.toRadians(35);
+        // Far enough for the whole model to fit in the view
+        final double radius = Math.sqrt(model.width * model.width + model.height * model.height) / 2;
+        final int w = getWidth(), h = getHeight();
+        distance = ((w > 0) && (h > 0)) ? (radius * 1.1 * focal(w) / (Math.min(w, h) / 2.0)) : (radius * 2.8);
+        distance = Math.min(maxDistance, distance);
         repaint();
     }
 
@@ -128,8 +141,13 @@ class Terrain3DView extends JComponent {
         repaint();
     }
 
+    void setYawDegrees(double degrees) {
+        yaw = Math.toRadians(degrees);
+        repaint();
+    }
+
     void setPitchDegrees(double degrees) {
-        pitch = Math.toRadians(degrees);
+        pitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, Math.toRadians(degrees)));
         repaint();
     }
 
@@ -139,24 +157,28 @@ class Terrain3DView extends JComponent {
 
     void setMode(Mode mode) {
         this.mode = mode;
-        rebuildColours();
+        invalidateMesh();
         repaint();
     }
 
     void setShowWater(boolean showWater) {
         this.showWater = showWater;
-        rebuildColours();
+        invalidateMesh();
         repaint();
     }
 
     void setShowContours(boolean showContours) {
         this.showContours = showContours;
-        rebuildColours();
         repaint();
     }
 
     void setExaggeration(float exaggeration) {
         this.exaggeration = exaggeration;
+        repaint();
+    }
+
+    void setOrthographic(boolean orthographic) {
+        this.orthographic = orthographic;
         repaint();
     }
 
@@ -167,13 +189,12 @@ class Terrain3DView extends JComponent {
         this.hoverListener = hoverListener;
     }
 
+    // Colours
+
     /**
-     * Recalculate the colour of every sample for the current mode, including shading and contour lines.
+     * Calculate the colour of every sample for the current mode, including shading.
      */
-    private void rebuildColours() {
-        if (model == null) {
-            return;
-        }
+    private int[] calculateColours() {
         final int n = model.width * model.height;
         final int[] result = new int[n];
         final float range = Math.max(1, model.highestHeight - model.lowestHeight);
@@ -195,31 +216,195 @@ class Terrain3DView extends JComponent {
                     colour = shade((model.biomes[i] >= 0) ? VanillaBiomes.getColour(VanillaBiomes.fromWorldPainterBiome(model.biomes[i])) : 0x808080, 0.5f + 0.5f * shade);
                     break;
                 case RELIEF:
-                    colour = shade(0xd6d3d1, shade);
+                    colour = shade(0xd6d3d1, 0.2f + 0.85f * shade);
                     break;
                 default:
-                    colour = shade(model.colours[i], shade);
+                    colour = shade(model.colours[i], 0.45f + 0.6f * shade);
                     break;
             }
-            if (showContours && isContour(i)) {
-                colour = shade(colour, 0.62f);
-            }
-            if (showWater && (model.waterLevels[i] > h) && (mode != Mode.SLOPE)) {
+            if (isWater(i)) {
                 final float depth = Math.min(1, (model.waterLevels[i] - h) / 24f);
                 final int water = blend(0x4a8fe7, 0x1d3f8f, depth);
                 colour = (mode == Mode.TERRAIN) ? water : blend(colour, water, 0.55f + 0.35f * depth);
             }
             result[i] = colour;
         }
-        sampleColours = result;
+        return result;
     }
 
-    private boolean isContour(int i) {
-        final int sx = i % model.width, sy = i / model.width;
-        final int band = (int) Math.floor(model.heights[i] / CONTOUR_INTERVAL);
-        return ((sx + 1 < model.width) && model.present[i + 1] && ((int) Math.floor(model.heights[i + 1] / CONTOUR_INTERVAL) != band))
-                || ((sy + 1 < model.height) && model.present[i + model.width] && ((int) Math.floor(model.heights[i + model.width] / CONTOUR_INTERVAL) != band));
+    private boolean isWater(int sample) {
+        return showWater && (mode != Mode.SLOPE) && (model.waterLevels[sample] > model.heights[sample]);
     }
+
+    /**
+     * The height of the surface shown for a sample, in blocks: the terrain, or the water surface.
+     */
+    private float surfaceHeight(int sample) {
+        return isWater(sample) ? model.waterLevels[sample] : model.heights[sample];
+    }
+
+    // Mesh
+
+    private void invalidateMesh() {
+        mesh = null;
+        coarseMesh = null;
+    }
+
+    private Mesh getMesh(boolean coarse) {
+        if (coarse) {
+            if (coarseMesh == null) {
+                coarseMesh = buildMesh(COARSE_CELL_BUDGET);
+            }
+            return coarseMesh;
+        } else {
+            if (mesh == null) {
+                mesh = buildMesh(CELL_BUDGET);
+            }
+            return mesh;
+        }
+    }
+
+    /**
+     * Build a triangle mesh of the height field, using every sample or (for large models) every second, fourth, ...
+     * sample so that the number of cells stays within a budget, plus walls from the edges of the surface down to the
+     * base of the model.
+     */
+    private Mesh buildMesh(int cellBudget) {
+        final int[] colours = calculateColours();
+        int stride = 1;
+        while (((long) (model.width / stride)) * (model.height / stride) > cellBudget) {
+            stride *= 2;
+        }
+        // The sample coordinates of the grid lines, always including the last row and column
+        final int[] xs = gridLines(model.width, stride), ys = gridLines(model.height, stride);
+        final int nx = xs.length, ny = ys.length;
+        final int gridVertices = nx * ny;
+        final int[] samples = new int[gridVertices];
+        for (int gy = 0; gy < ny; gy++) {
+            for (int gx = 0; gx < nx; gx++) {
+                final int sample = ys[gy] * model.width + xs[gx];
+                samples[gy * nx + gx] = model.present[sample] ? sample : -1;
+            }
+        }
+
+        // Count the cells and the wall segments, to size the arrays
+        int cells = 0, walls = 0;
+        for (int gy = 0; gy < ny - 1; gy++) {
+            for (int gx = 0; gx < nx - 1; gx++) {
+                if (isCell(samples, nx, gx, gy)) {
+                    cells++;
+                }
+            }
+        }
+        // Wall segments: grid edges with a cell on one side only
+        for (int gy = 0; gy < ny; gy++) {
+            for (int gx = 0; gx < nx - 1; gx++) {
+                if (isCell(samples, nx, gx, gy - 1, ny) != isCell(samples, nx, gx, gy, ny)) {
+                    walls++;
+                }
+            }
+        }
+        for (int gx = 0; gx < nx; gx++) {
+            for (int gy = 0; gy < ny - 1; gy++) {
+                if (isCell(samples, nx, gx - 1, gy, ny) != isCell(samples, nx, gx, gy, ny)) {
+                    walls++;
+                }
+            }
+        }
+
+        final Mesh mesh = new Mesh(gridVertices + walls * 4, (cells + walls) * 2);
+        // Surface vertices
+        for (int gy = 0; gy < ny; gy++) {
+            for (int gx = 0; gx < nx; gx++) {
+                final int v = gy * nx + gx, sample = samples[v];
+                mesh.x[v] = xs[gx] + 0.5f;
+                mesh.y[v] = ys[gy] + 0.5f;
+                if (sample >= 0) {
+                    mesh.h[v] = surfaceHeight(sample) - model.lowestHeight;
+                    mesh.colour[v] = colours[sample];
+                }
+            }
+        }
+        int t = 0;
+        for (int gy = 0; gy < ny - 1; gy++) {
+            for (int gx = 0; gx < nx - 1; gx++) {
+                if (isCell(samples, nx, gx, gy)) {
+                    final int a = gy * nx + gx, b = a + 1, c = a + nx + 1, d = a + nx;
+                    // Split the cell along the diagonal that best follows the surface
+                    if (Math.abs(mesh.h[a] - mesh.h[c]) <= Math.abs(mesh.h[b] - mesh.h[d])) {
+                        mesh.setTriangle(t++, a, b, c);
+                        mesh.setTriangle(t++, a, c, d);
+                    } else {
+                        mesh.setTriangle(t++, a, b, d);
+                        mesh.setTriangle(t++, b, c, d);
+                    }
+                }
+            }
+        }
+        mesh.wallTriangleStart = t;
+        // Walls, with their own vertices so that they can be coloured as earth and lit by their direction. Faces
+        // turned towards the light (from the north west) are lighter
+        int v = gridVertices;
+        for (int gy = 0; gy < ny; gy++) {
+            for (int gx = 0; gx < nx - 1; gx++) {
+                final boolean above = isCell(samples, nx, gx, gy - 1, ny), below = isCell(samples, nx, gx, gy, ny);
+                if (above != below) {
+                    v = addWall(mesh, v, t, gy * nx + gx, gy * nx + gx + 1, above ? 0.6f : 0.95f);
+                    t += 2;
+                }
+            }
+        }
+        for (int gx = 0; gx < nx; gx++) {
+            for (int gy = 0; gy < ny - 1; gy++) {
+                final boolean left = isCell(samples, nx, gx - 1, gy, ny), right = isCell(samples, nx, gx, gy, ny);
+                if (left != right) {
+                    v = addWall(mesh, v, t, gy * nx + gx, (gy + 1) * nx + gx, left ? 0.7f : 0.9f);
+                    t += 2;
+                }
+            }
+        }
+        mesh.floor = -Math.max(6f, Math.max(model.width, model.height) * 0.025f) * model.step;
+        return mesh;
+    }
+
+    private int addWall(Mesh mesh, int v, int t, int top1, int top2, float light) {
+        for (int i = 0; i < 2; i++) {
+            final int top = (i == 0) ? top1 : top2;
+            final int surface = mesh.colour[top];
+            final int wallTop = shade(blend(surface, EARTH, 0.35f), 0.85f * light), wallBottom = shade(EARTH, 0.55f * light);
+            mesh.x[v + i * 2] = mesh.x[top];
+            mesh.y[v + i * 2] = mesh.y[top];
+            mesh.h[v + i * 2] = mesh.h[top];
+            mesh.colour[v + i * 2] = wallTop;
+            mesh.x[v + i * 2 + 1] = mesh.x[top];
+            mesh.y[v + i * 2 + 1] = mesh.y[top];
+            mesh.h[v + i * 2 + 1] = Float.NaN; // The base of the model
+            mesh.colour[v + i * 2 + 1] = wallBottom;
+        }
+        mesh.setTriangle(t, v, v + 2, v + 3);
+        mesh.setTriangle(t + 1, v, v + 3, v + 1);
+        return v + 4;
+    }
+
+    private static int[] gridLines(int size, int stride) {
+        final int count = (size - 1) / stride + 1 + (((size - 1) % stride != 0) ? 1 : 0);
+        final int[] lines = new int[count];
+        for (int i = 0; i < count; i++) {
+            lines[i] = Math.min(size - 1, i * stride);
+        }
+        return lines;
+    }
+
+    private static boolean isCell(int[] samples, int nx, int gx, int gy) {
+        final int a = gy * nx + gx;
+        return (samples[a] >= 0) && (samples[a + 1] >= 0) && (samples[a + nx] >= 0) && (samples[a + nx + 1] >= 0);
+    }
+
+    private static boolean isCell(int[] samples, int nx, int gx, int gy, int ny) {
+        return (gx >= 0) && (gy >= 0) && (gx < nx - 1) && (gy < ny - 1) && isCell(samples, nx, gx, gy);
+    }
+
+    // Rendering
 
     @Override
     protected void paintComponent(Graphics g) {
@@ -227,140 +412,212 @@ class Terrain3DView extends JComponent {
         if ((width <= 0) || (height <= 0)) {
             return;
         }
-        if ((model == null) || (sampleColours == null)) {
+        if (model == null) {
             g.setColor(ThemeUtils.getCanvasBackground());
             g.fillRect(0, 0, width, height);
             return;
         }
-        // Render at half resolution while the user is dragging, for responsiveness
-        final int divisor = interacting ? 2 : 1;
-        final int w = Math.max(1, width / divisor), h = Math.max(1, height / divisor);
+        // Render at the resolution of the screen (which may be higher than that of the component on high DPI displays),
+        // except while the user is dragging, when a lower resolution and a coarser mesh keep the view responsive
+        final Graphics2D g2 = (Graphics2D) g;
+        final double scale = interacting ? 1.0 : Math.max(1.0, Math.min(2.0, g2.getTransform().getScaleX()));
+        final int w = Math.max(1, (int) Math.round(width * scale)), h = Math.max(1, (int) Math.round(height * scale));
         if ((image == null) || (image.getWidth() != w) || (image.getHeight() != h)) {
             image = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
-            pick = new int[w * h];
+            depthBuffer = new float[w * h];
+            heightBuffer = new float[w * h];
         }
-        render(((DataBufferInt) image.getRaster().getDataBuffer()).getData(), w, h);
-        final Graphics2D g2 = (Graphics2D) g;
+        camera = new Camera(w, h);
+        render(getMesh(interacting), camera, ((DataBufferInt) image.getRaster().getDataBuffer()).getData(), w, h);
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g2.drawImage(image, 0, 0, width, height, null);
     }
 
-    private double focal() {
-        return Math.max(getWidth(), 1) * 0.9;
+    /**
+     * The focal length in pixels for a view of a particular width: a horizontal field of view of about 45 degrees,
+     * which looks natural without distorting the land at the edges of the view.
+     */
+    private static double focal(int width) {
+        return Math.max(width, 1) * 1.2;
+    }
+
+    private void render(Mesh mesh, Camera camera, int[] pixels, int w, int h) {
+        final boolean dark = ThemeUtils.isDarkTheme();
+        final int skyTop = dark ? 0x0b1220 : 0xdbeafe, skyBottom = dark ? 0x18181b : 0xf8fafc;
+        for (int y = 0; y < h; y++) {
+            Arrays.fill(pixels, y * w, (y + 1) * w, blend(skyTop, skyBottom, (float) y / h));
+        }
+        Arrays.fill(depthBuffer, 0);
+        Arrays.fill(heightBuffer, Float.NaN);
+
+        // Transform all vertices to the camera, and project them
+        final int n = mesh.vertexCount;
+        final float[] cz = new float[n], sx = new float[n], sy = new float[n], depth = new float[n], q = new float[n];
+        final float[] cx = new float[n], cy = new float[n];
+        final int[] colour = new int[n];
+        final float vertical = exaggeration / model.step, floor = mesh.floor / model.step;
+        final double fogStart = distance * 0.85, fogEnd = distance * 2.6;
+        final int fogColour = skyBottom;
+        IntStream.range(0, (n + 4095) / 4096).parallel().forEach(chunk -> {
+            for (int v = chunk * 4096; v < Math.min(n, (chunk + 1) * 4096); v++) {
+                final double wx = mesh.x[v], wy = mesh.y[v], wh = Float.isNaN(mesh.h[v]) ? floor : mesh.h[v] * vertical;
+                final double dx = wx - camera.x, dy = wy - camera.y, dh = wh - camera.h;
+                final double xc = dx * camera.rx + dy * camera.ry;
+                final double yc = dx * camera.ux + dy * camera.uy + dh * camera.uh;
+                final double zc = dx * camera.fx + dy * camera.fy + dh * camera.fh;
+                cx[v] = (float) xc;
+                cy[v] = (float) yc;
+                cz[v] = (float) zc;
+                if (orthographic) {
+                    sx[v] = (float) (camera.centreX + camera.scale * xc);
+                    sy[v] = (float) (camera.centreY - camera.scale * yc);
+                    depth[v] = (float) (ORTHO_DEPTH - zc);
+                    q[v] = 1;
+                } else if (zc > NEAR) {
+                    sx[v] = (float) (camera.centreX + camera.focal * xc / zc);
+                    sy[v] = (float) (camera.centreY - camera.focal * yc / zc);
+                    depth[v] = (float) (1 / zc);
+                    q[v] = depth[v];
+                }
+                final float fog = (float) Math.max(0, Math.min(0.6, (zc - fogStart) / (fogEnd - fogStart)));
+                colour[v] = (fog > 0) ? blend(mesh.colour[v], fogColour, fog) : mesh.colour[v];
+            }
+        });
+
+        // Sort the triangles into horizontal bands of the screen, then rasterise the bands in parallel
+        final int bandCount = Math.max(1, Math.min(h / 8, Runtime.getRuntime().availableProcessors() * 3));
+        final int bandHeight = (h + bandCount - 1) / bandCount;
+        final int triangles = mesh.triangleCount;
+        final int chunkCount = Math.max(1, Math.min(64, triangles / 20000 + 1));
+        final IntList[][] bins = new IntList[chunkCount][bandCount];
+        final IntList[] clipped = new IntList[chunkCount];
+        IntStream.range(0, chunkCount).parallel().forEach(chunk -> {
+            final IntList[] chunkBins = bins[chunk];
+            for (int b = 0; b < bandCount; b++) {
+                chunkBins[b] = new IntList();
+            }
+            clipped[chunk] = new IntList();
+            final int from = (int) ((long) triangles * chunk / chunkCount), to = (int) ((long) triangles * (chunk + 1) / chunkCount);
+            for (int t = from; t < to; t++) {
+                final int a = mesh.triangles[t * 3], b = mesh.triangles[t * 3 + 1], c = mesh.triangles[t * 3 + 2];
+                if (! orthographic) {
+                    final boolean inA = cz[a] > NEAR, inB = cz[b] > NEAR, inC = cz[c] > NEAR;
+                    if (! (inA || inB || inC)) {
+                        continue;
+                    } else if (! (inA && inB && inC)) {
+                        clipped[chunk].add(t);
+                        continue;
+                    }
+                }
+                final float minX = Math.min(sx[a], Math.min(sx[b], sx[c])), maxX = Math.max(sx[a], Math.max(sx[b], sx[c]));
+                final float minY = Math.min(sy[a], Math.min(sy[b], sy[c])), maxY = Math.max(sy[a], Math.max(sy[b], sy[c]));
+                if ((maxX < 0) || (minX > w) || (maxY < 0) || (minY > h)) {
+                    continue;
+                }
+                final int firstBand = Math.max(0, (int) minY / bandHeight), lastBand = Math.min(bandCount - 1, (int) maxY / bandHeight);
+                for (int band = firstBand; band <= lastBand; band++) {
+                    chunkBins[band].add(t);
+                }
+            }
+        });
+        final int wallStart = mesh.wallTriangleStart;
+        IntStream.range(0, bandCount).parallel().forEach(band -> {
+            final int y0 = band * bandHeight, y1 = Math.min(h, y0 + bandHeight);
+            final Rasteriser rasteriser = new Rasteriser(pixels, w, y0, y1);
+            for (int chunk = 0; chunk < chunkCount; chunk++) {
+                final IntList list = bins[chunk][band];
+                for (int i = 0; i < list.size; i++) {
+                    final int t = list.values[i];
+                    final int a = mesh.triangles[t * 3], b = mesh.triangles[t * 3 + 1], c = mesh.triangles[t * 3 + 2];
+                    final boolean wall = t >= wallStart;
+                    rasteriser.triangle(sx[a], sy[a], depth[a], q[a], colour[a], wall ? Float.NaN : mesh.h[a],
+                            sx[b], sy[b], depth[b], q[b], colour[b], wall ? Float.NaN : mesh.h[b],
+                            sx[c], sy[c], depth[c], q[c], colour[c], wall ? Float.NaN : mesh.h[c]);
+                }
+                // Triangles crossing the near plane: clip them, then draw the resulting polygon
+                final IntList list2 = clipped[chunk];
+                for (int i = 0; i < list2.size; i++) {
+                    final int t = list2.values[i];
+                    rasteriser.clippedTriangle(mesh, t, t >= wallStart, cx, cy, cz, colour, camera);
+                }
+            }
+        });
+
+        if (showContours) {
+            drawContours(pixels, w, h);
+        }
     }
 
     /**
-     * Render the height field into a pixel buffer, front to back, one screen column at a time.
+     * Darken the pixels where the height crosses a multiple of the contour interval.
      */
-    private void render(int[] pixels, int w, int h) {
-        final boolean dark = ThemeUtils.isDarkTheme();
-        final int skyTop = dark ? 0x0b1220 : 0xdbeafe, skyBottom = dark ? 0x18181b : 0xf8fafc;
-        final int fogColour = skyBottom;
-        for (int y = 0; y < h; y++) {
-            final int c = blend(skyTop, skyBottom, (float) y / h);
-            java.util.Arrays.fill(pixels, y * w, (y + 1) * w, c);
-        }
-        java.util.Arrays.fill(pick, 0);
-        final int[] yBuffer = new int[w];
-        java.util.Arrays.fill(yBuffer, h);
-
-        final TerrainModel model = this.model;
-        final int[] colours = sampleColours;
-        final double focal = focal() * w / Math.max(getWidth(), 1);
-        final double fx = Math.sin(yaw), fy = -Math.cos(yaw); // Forward
-        final double rx = Math.cos(yaw), ry = Math.sin(yaw); // Right
-        final double cosPitch = Math.cos(pitch), sinPitch = Math.sin(pitch);
-        final float vertical = exaggeration / model.step;
-        final double targetHeight = (sampleHeight(model, (int) targetX, (int) targetY) - model.lowestHeight) * vertical;
-        final double camX = targetX - fx * distance * cosPitch, camY = targetY - fy * distance * cosPitch;
-        final double camH = targetHeight + distance * sinPitch;
-        // The base of the model, a little below the lowest point, relative to the camera
-        final double floorH = -BASE_THICKNESS * vertical - camH;
-        final double halfWidth = w / 2.0 / focal;
-        final double zFar = distance * 2.5 + Math.max(model.width, model.height) * 1.5;
-        final double fogStart = distance * 0.9, fogEnd = zFar;
-        double z = 0.5;
-        double dz = 0.25;
-        final double centreY = h / 2.0;
-        while (z < zFar) {
-            // The row of samples at depth z, from the left to the right edge of the view
-            final double leftX = camX + (fx - halfWidth * rx) * z, leftY = camY + (fy - halfWidth * ry) * z;
-            final double stepX = (2 * halfWidth * rx * z) / w, stepY = (2 * halfWidth * ry * z) / w;
-            final float fog = (float) Math.max(0, Math.min(0.85, (z - fogStart) / (fogEnd - fogStart)));
-            double px = leftX, py = leftY;
-            for (int column = 0; column < w; column++, px += stepX, py += stepY) {
-                final int sx = (int) Math.floor(px), sy = (int) Math.floor(py);
-                if ((sx < 0) || (sy < 0) || (sx >= model.width) || (sy >= model.height)) {
+    private void drawContours(int[] pixels, int w, int h) {
+        final float[] heights = heightBuffer;
+        final float offset = model.lowestHeight;
+        IntStream.range(0, h - 1).parallel().forEach(y -> {
+            for (int x = 0; x < w - 1; x++) {
+                final int i = y * w + x;
+                final float here = heights[i];
+                if (Float.isNaN(here)) {
                     continue;
                 }
-                final int sample = sy * model.width + sx;
-                if (! model.present[sample]) {
-                    continue;
-                }
-                float surface = model.heights[sample];
-                if (showWater && (model.waterLevels[sample] > surface) && (mode != Mode.SLOPE)) {
-                    surface = model.waterLevels[sample];
-                }
-                final double dh = (surface - model.lowestHeight) * vertical - camH;
-                final double depth = z * cosPitch - dh * sinPitch;
-                if (depth <= 0.1) {
-                    continue;
-                }
-                final int screenY = (int) (centreY - focal * (z * sinPitch + dh * cosPitch) / depth);
-                if (screenY < yBuffer[column]) {
-                    int colour = colours[sample];
-                    if (fog > 0) {
-                        colour = blend(colour, fogColour, fog);
-                    }
-                    final int top = Math.max(0, screenY);
-                    // Fill down to the base of the model (like a diorama) rather than to the bottom of the screen
-                    final int bottom;
-                    final double floorDepth = z * cosPitch - floorH * sinPitch;
-                    if (floorDepth > 0.1) {
-                        bottom = Math.min(yBuffer[column], (int) (centreY - focal * (z * sinPitch + floorH * cosPitch) / floorDepth) + 1);
-                    } else {
-                        bottom = yBuffer[column];
-                    }
-                    if (yBuffer[column] == h) {
-                        // The front face of the model: the surface colour on top, darker earth below
-                        final int side = shade(colour, 0.55f);
-                        for (int y = top; y < bottom; y++) {
-                            pixels[y * w + column] = (y <= top + 1) ? colour : side;
-                            pick[y * w + column] = sample + 1;
-                        }
-                    } else {
-                        for (int y = top; y < bottom; y++) {
-                            pixels[y * w + column] = colour;
-                            pick[y * w + column] = sample + 1;
-                        }
-                    }
-                    yBuffer[column] = Math.min(yBuffer[column], top);
+                final int band = (int) Math.floor((here + offset) / CONTOUR_INTERVAL);
+                final float right = heights[i + 1], below = heights[i + w];
+                if ((! Float.isNaN(right) && ((int) Math.floor((right + offset) / CONTOUR_INTERVAL) != band))
+                        || (! Float.isNaN(below) && ((int) Math.floor((below + offset) / CONTOUR_INTERVAL) != band))) {
+                    pixels[i] = shade(pixels[i], 0.6f);
                 }
             }
-            z += dz;
-            dz *= 1.012;
-        }
+        });
     }
 
-    private static float sampleHeight(TerrainModel model, int sx, int sy) {
-        sx = Math.max(0, Math.min(model.width - 1, sx));
-        sy = Math.max(0, Math.min(model.height - 1, sy));
-        final int i = sy * model.width + sx;
-        return model.present[i] ? model.heights[i] : model.lowestHeight;
+    // Picking
+
+    /**
+     * The point of the model (x and y in samples, height in exaggerated samples) shown at a location in the component,
+     * or {@code null}.
+     */
+    private double[] worldPointAt(int x, int y) {
+        final Camera camera = this.camera;
+        if ((image == null) || (camera == null) || (getWidth() <= 0) || (getHeight() <= 0)) {
+            return null;
+        }
+        final int px = x * image.getWidth() / getWidth(), py = y * image.getHeight() / getHeight();
+        if ((px < 0) || (py < 0) || (px >= image.getWidth()) || (py >= image.getHeight())) {
+            return null;
+        }
+        final float d = depthBuffer[py * image.getWidth() + px];
+        if (d <= 0) {
+            return null;
+        }
+        final double xc, yc, zc;
+        if (camera.orthographic) {
+            zc = ORTHO_DEPTH - d;
+            xc = (px + 0.5 - camera.centreX) / camera.scale;
+            yc = (camera.centreY - (py + 0.5)) / camera.scale;
+        } else {
+            zc = 1 / d;
+            xc = (px + 0.5 - camera.centreX) * zc / camera.focal;
+            yc = (camera.centreY - (py + 0.5)) * zc / camera.focal;
+        }
+        return new double[] {
+                camera.x + camera.rx * xc + camera.ux * yc + camera.fx * zc,
+                camera.y + camera.ry * xc + camera.uy * yc + camera.fy * zc,
+                camera.h + camera.uh * yc + camera.fh * zc};
     }
 
     /**
      * The sample shown at a location in the component, or -1.
      */
     int sampleAt(int x, int y) {
-        if ((image == null) || (pick == null) || (getWidth() <= 0)) {
+        final double[] point = worldPointAt(x, y);
+        if ((point == null) || (model == null)) {
             return -1;
         }
-        final int px = x * image.getWidth() / getWidth(), py = y * image.getHeight() / getHeight();
-        if ((px < 0) || (py < 0) || (px >= image.getWidth()) || (py >= image.getHeight())) {
-            return -1;
-        }
-        return pick[py * image.getWidth() + px] - 1;
+        final int sx = Math.max(0, Math.min(model.width - 1, (int) Math.floor(point[0])));
+        final int sy = Math.max(0, Math.min(model.height - 1, (int) Math.floor(point[1])));
+        final int sample = sy * model.width + sx;
+        return model.present[sample] ? sample : -1;
     }
 
     private void updateHover(int x, int y) {
@@ -368,6 +625,8 @@ class Terrain3DView extends JComponent {
             hoverListener.accept(sampleAt(x, y));
         }
     }
+
+    // Utilities
 
     static int ramp(int[] stops, float t) {
         t = Math.max(0, Math.min(1, t));
@@ -391,18 +650,23 @@ class Terrain3DView extends JComponent {
     }
 
     private TerrainModel model;
-    private int[] sampleColours, pick;
+    private Mesh mesh, coarseMesh;
+    private volatile Camera camera;
+    private float[] depthBuffer, heightBuffer;
     private BufferedImage image;
     private Mode mode = Mode.TERRAIN;
-    private boolean showWater = true, showContours, interacting;
+    private boolean showWater = true, showContours, interacting, orthographic;
     private float exaggeration = 1.0f;
-    private double targetX, targetY, yaw, pitch, distance = 200, maxDistance = 1000;
+    private double targetX, targetY, targetH, yaw, pitch, distance = 200, maxDistance = 1000;
     private IntConsumer hoverListener;
 
     static final int[] HEIGHT_RAMP = {0x2e6b3f, 0x5f9e4a, 0xa9c56b, 0xe6d79a, 0xc39a68, 0x8b6a52, 0xf5f5f4};
     static final int[] SLOPE_RAMP = {0x3b82f6, 0x22c55e, 0xeab308, 0xf97316, 0xdc2626};
     static final int CONTOUR_INTERVAL = 8;
-    private static final float BASE_THICKNESS = 12;
+    private static final int EARTH = 0x6b5442;
+    private static final int CELL_BUDGET = 600_000, COARSE_CELL_BUDGET = 150_000;
+    private static final double MIN_PITCH = Math.toRadians(5), MAX_PITCH = Math.toRadians(89.5), MIN_DISTANCE = 4;
+    private static final float NEAR = 0.5f, ORTHO_DEPTH = 1.0e6f;
     private static final long serialVersionUID = 1L;
 
     enum Mode {
@@ -418,5 +682,179 @@ class Terrain3DView extends JComponent {
         }
 
         final String displayName, description;
+    }
+
+    /**
+     * The camera for one frame: its position and orientation in model coordinates (x and y in samples, height in
+     * exaggerated samples above the lowest point) and its projection onto the image.
+     */
+    private final class Camera {
+        Camera(int w, int h) {
+            orthographic = Terrain3DView.this.orthographic;
+            centreX = w / 2.0;
+            centreY = h / 2.0;
+            focal = focal(w);
+            scale = focal / distance;
+            final double sinYaw = Math.sin(yaw), cosYaw = Math.cos(yaw), sinPitch = Math.sin(pitch), cosPitch = Math.cos(pitch);
+            // Right, forward and up vectors
+            rx = cosYaw;
+            ry = sinYaw;
+            fx = cosPitch * sinYaw;
+            fy = -cosPitch * cosYaw;
+            fh = -sinPitch;
+            ux = sinPitch * sinYaw;
+            uy = -sinPitch * cosYaw;
+            uh = cosPitch;
+            final double th = targetH * exaggeration;
+            x = targetX - fx * distance;
+            y = targetY - fy * distance;
+            this.h = th - fh * distance;
+        }
+
+        final boolean orthographic;
+        final double centreX, centreY, focal, scale, rx, ry, fx, fy, fh, ux, uy, uh, x, y, h;
+    }
+
+    /**
+     * A triangle mesh. Vertex heights are in blocks above the lowest point of the model, or NaN for vertices on the
+     * base of the model.
+     */
+    private static final class Mesh {
+        Mesh(int vertexCount, int triangleCount) {
+            this.vertexCount = vertexCount;
+            this.triangleCount = triangleCount;
+            x = new float[vertexCount];
+            y = new float[vertexCount];
+            h = new float[vertexCount];
+            colour = new int[vertexCount];
+            triangles = new int[triangleCount * 3];
+        }
+
+        void setTriangle(int t, int a, int b, int c) {
+            triangles[t * 3] = a;
+            triangles[t * 3 + 1] = b;
+            triangles[t * 3 + 2] = c;
+        }
+
+        final int vertexCount, triangleCount;
+        final float[] x, y, h;
+        final int[] colour, triangles;
+        int wallTriangleStart;
+        float floor;
+    }
+
+    /**
+     * Rasterises triangles into one horizontal band of the image, with a depth test. Colours are interpolated linearly
+     * on the screen; heights (for the contour lines) with perspective correction.
+     */
+    private final class Rasteriser {
+        Rasteriser(int[] pixels, int width, int y0, int y1) {
+            this.pixels = pixels;
+            this.width = width;
+            this.y0 = y0;
+            this.y1 = y1;
+        }
+
+        void triangle(float x0, float y0, float d0, float q0, int c0, float h0,
+                      float x1, float y1, float d1, float q1, int c1, float h1,
+                      float x2, float y2, float d2, float q2, int c2, float h2) {
+            final float area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
+            if (Math.abs(area) < 1e-6f) {
+                return;
+            }
+            final int minX = Math.max(0, (int) Math.floor(Math.min(x0, Math.min(x1, x2)))), maxX = Math.min(width - 1, (int) Math.ceil(Math.max(x0, Math.max(x1, x2))));
+            final int minY = Math.max(this.y0, (int) Math.floor(Math.min(y0, Math.min(y1, y2)))), maxY = Math.min(this.y1 - 1, (int) Math.ceil(Math.max(y0, Math.max(y1, y2))));
+            if ((minX > maxX) || (minY > maxY)) {
+                return;
+            }
+            final float inverseArea = 1 / area;
+            // Edge functions (barycentric weights times the area) and their steps per pixel
+            final float e0dx = (y1 - y2) * inverseArea, e1dx = (y2 - y0) * inverseArea;
+            final float r0 = (c0 >> 16) & 0xff, g0 = (c0 >> 8) & 0xff, b0 = c0 & 0xff;
+            final float r1 = (c1 >> 16) & 0xff, g1 = (c1 >> 8) & 0xff, b1 = c1 & 0xff;
+            final float r2 = (c2 >> 16) & 0xff, g2 = (c2 >> 8) & 0xff, b2 = c2 & 0xff;
+            final boolean heights = ! Float.isNaN(h0);
+            final float hq0 = h0 * q0, hq1 = h1 * q1, hq2 = h2 * q2;
+            final float epsilon = -1e-5f;
+            for (int y = minY; y <= maxY; y++) {
+                final float py = y + 0.5f, px0 = minX + 0.5f;
+                // Barycentric weights at the first pixel of the row
+                float l0 = ((x1 - px0) * (y2 - py) - (x2 - px0) * (y1 - py)) * inverseArea;
+                float l1 = ((x2 - px0) * (y0 - py) - (x0 - px0) * (y2 - py)) * inverseArea;
+                int i = y * width + minX;
+                for (int x = minX; x <= maxX; x++, i++, l0 += e0dx, l1 += e1dx) {
+                    final float l2 = 1 - l0 - l1;
+                    if ((l0 < epsilon) || (l1 < epsilon) || (l2 < epsilon)) {
+                        continue;
+                    }
+                    final float d = l0 * d0 + l1 * d1 + l2 * d2;
+                    if (d <= depthBuffer[i]) {
+                        continue;
+                    }
+                    depthBuffer[i] = d;
+                    pixels[i] = (((int) (l0 * r0 + l1 * r1 + l2 * r2)) << 16) | (((int) (l0 * g0 + l1 * g1 + l2 * g2)) << 8) | ((int) (l0 * b0 + l1 * b1 + l2 * b2));
+                    heightBuffer[i] = heights ? (l0 * hq0 + l1 * hq1 + l2 * hq2) / (l0 * q0 + l1 * q1 + l2 * q2) : Float.NaN;
+                }
+            }
+        }
+
+        /**
+         * Draw a triangle which crosses the near plane of the camera, by clipping it against that plane.
+         */
+        void clippedTriangle(Mesh mesh, int t, boolean wall, float[] cx, float[] cy, float[] cz, int[] colour, Camera camera) {
+            final float[] px = new float[4], py = new float[4], pz = new float[4], ph = new float[4];
+            final int[] pc = new int[4];
+            int count = 0;
+            for (int k = 0; k < 3; k++) {
+                final int a = mesh.triangles[t * 3 + k], b = mesh.triangles[t * 3 + (k + 1) % 3];
+                final boolean inA = cz[a] > NEAR, inB = cz[b] > NEAR;
+                final float ha = wall ? Float.NaN : mesh.h[a], hb = wall ? Float.NaN : mesh.h[b];
+                if (inA) {
+                    px[count] = cx[a];
+                    py[count] = cy[a];
+                    pz[count] = cz[a];
+                    ph[count] = ha;
+                    pc[count++] = colour[a];
+                }
+                if (inA != inB) {
+                    final float f = (NEAR - cz[a]) / (cz[b] - cz[a]);
+                    px[count] = cx[a] + (cx[b] - cx[a]) * f;
+                    py[count] = cy[a] + (cy[b] - cy[a]) * f;
+                    pz[count] = NEAR;
+                    ph[count] = ha + (hb - ha) * f;
+                    pc[count++] = blend(colour[a], colour[b], f);
+                }
+            }
+            if (count < 3) {
+                return;
+            }
+            final float[] sx = new float[count], sy = new float[count], d = new float[count];
+            for (int k = 0; k < count; k++) {
+                sx[k] = (float) (camera.centreX + camera.focal * px[k] / pz[k]);
+                sy[k] = (float) (camera.centreY - camera.focal * py[k] / pz[k]);
+                d[k] = 1 / pz[k];
+            }
+            for (int k = 1; k < count - 1; k++) {
+                triangle(sx[0], sy[0], d[0], d[0], pc[0], ph[0], sx[k], sy[k], d[k], d[k], pc[k], ph[k], sx[k + 1], sy[k + 1], d[k + 1], d[k + 1], pc[k + 1], ph[k + 1]);
+            }
+        }
+
+        private final int[] pixels;
+        private final int width, y0, y1;
+    }
+
+    /**
+     * A growable list of ints.
+     */
+    private static final class IntList {
+        void add(int value) {
+            if (size == values.length) {
+                values = Arrays.copyOf(values, size * 2);
+            }
+            values[size++] = value;
+        }
+
+        int[] values = new int[64];
+        int size;
     }
 }

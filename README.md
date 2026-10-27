@@ -59,8 +59,9 @@ Les boutons **Map / 3D** en haut à droite basculent l'espace de travail entre l
 - **Fiche du bloc survolé** : position X / Z, hauteur Y, pente, terrain, biome (peint ou automatique), profondeur d'eau et calques présents.
 - **5 modes d'affichage** : *Terrain* (couleurs des blocs), *Height* (dégradé d'altitude), *Slope* (du bleu pour le plat au rouge pour les pentes de 60° et plus), *Biome* et *Relief* (ombrage et courbes de niveau), avec leur légende.
 - **Eau** et **courbes de niveau** activables, **exagération du relief** réglable.
-- Navigation : glisser pour tourner, <kbd>⇧</kbd> + glisser pour se déplacer, molette pour zoomer, double-clic pour centrer sur un point ; boutons de rotation, d'angle de vue et de recadrage.
-- La carte est affichée comme une maquette posée sur un socle ; les très grandes cartes sont échantillonnées pour rester fluides.
+- Vraie **perspective** ou projection **orthographique** (sans déformation, les distances restent comparables), vue rasante, plongeante ou **vue de dessus** orientée au nord.
+- Navigation : glisser pour tourner, <kbd>⇧</kbd> + glisser pour se déplacer, molette pour zoomer, double-clic pour centrer sur un point ; boutons de rotation et de recadrage.
+- La carte est affichée comme une maquette posée sur un socle, rendue en maillage 3D sur tous les cœurs (environ 10 ms par image) ; les très grandes cartes sont simplifiées pour rester fluides.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/view3d-dark.png">

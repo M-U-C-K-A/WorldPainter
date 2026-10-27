@@ -24,9 +24,9 @@ import static org.pepsoft.worldpainter.Constants.TILE_SIZE_BITS;
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE_MASK;
 
 /**
- * The 3D view of the map, integrated in the main window: a perspective view of the terrain with several colour modes
- * (terrain, height, slope, biome, relief), water and contour line overlays, adjustable vertical exaggeration and preset
- * view directions, and a card showing everything that is known about the block under the mouse.
+ * The 3D view of the map, integrated in the main window: a perspective or orthographic view of the terrain with several
+ * colour modes (terrain, height, slope, biome, relief), water and contour line overlays, adjustable vertical
+ * exaggeration and preset view directions, and a card showing everything that is known about the block under the mouse.
  */
 public class Terrain3DPanel extends JPanel {
     public Terrain3DPanel() {
@@ -89,6 +89,17 @@ public class Terrain3DPanel extends JPanel {
         highButton.setToolTipText(App.richToolTip("High angle", "Look down on the land from above", null));
         highButton.addActionListener(e -> view.setPitchDegrees(62));
         toolBar.add(highButton);
+        final JButton topButton = new JButton(Icons.get("grid-3x3", 18));
+        topButton.setToolTipText(App.richToolTip("Top view", "Look straight down on the land, like the map", null));
+        topButton.addActionListener(e -> {
+            view.setYawDegrees(0);
+            view.setPitchDegrees(90);
+        });
+        toolBar.add(topButton);
+        final JToggleButton orthographicButton = new JToggleButton(Icons.get("box", 18));
+        orthographicButton.setToolTipText(App.richToolTip("Orthographic", "Show the land without perspective: parallel lines stay parallel and sizes do not shrink with distance", null));
+        orthographicButton.addActionListener(e -> view.setOrthographic(orthographicButton.isSelected()));
+        toolBar.add(orthographicButton);
         final JButton resetButton = new JButton(Icons.get("scan-search", 18));
         resetButton.setToolTipText(App.richToolTip("Reset view", "Show the whole map again", null));
         resetButton.addActionListener(e -> view.resetView());
