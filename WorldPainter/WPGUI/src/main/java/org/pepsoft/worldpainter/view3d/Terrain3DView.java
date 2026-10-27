@@ -251,7 +251,8 @@ class Terrain3DView extends JComponent {
                 continue;
             }
             final float h = model.heights[i];
-            final float shade = flat ? 1.0f : model.normalShades[i];
+            // Blocks get the same light as the smooth surface around them, in steps so that equal faces still merge
+            final float shade = flat ? (Math.round(model.normalShades[i] * 12) / 12f) : model.normalShades[i];
             int colour;
             switch (mode) {
                 case HEIGHT:
@@ -267,7 +268,7 @@ class Terrain3DView extends JComponent {
                     colour = shade(0xd6d3d1, 0.2f + 0.85f * shade);
                     break;
                 default:
-                    colour = flat ? model.colours[i] : shade(model.colours[i], 0.45f + 0.6f * shade);
+                    colour = shade(model.colours[i], 0.45f + 0.6f * shade);
                     break;
             }
             if (isWater(model, i)) {
@@ -395,7 +396,7 @@ class Terrain3DView extends JComponent {
                 while (k < length) {
                     final int gx = alongX ? k : line, gy = alongX ? line : k;
                     final float top = tops[gy * nx + gx];
-                    final float bottom = (Float.isNaN(top)) ? Float.NaN : sideBottom(tops, nx, ny, gx + dxs[d], gy + dys[d], top);
+                    final float bottom = (Float.isNaN(top)) ? Float.NaN : sideBottom(tops, nx, ny, gx + dxs[d], gy + dys[d], top, model, overview, base);
                     if (Float.isNaN(top) || (bottom == top)) {
                         k++;
                         continue;
@@ -408,7 +409,7 @@ class Terrain3DView extends JComponent {
                         if ((tops[j] != top) || (colours[j] != colour)) {
                             break;
                         }
-                        final float nb = sideBottom(tops, nx, ny, ngx + dxs[d], ngy + dys[d], top);
+                        final float nb = sideBottom(tops, nx, ny, ngx + dxs[d], ngy + dys[d], top, model, overview, base);
                         if (! ((nb == bottom) || (Float.isNaN(nb) && Float.isNaN(bottom)))) {
                             break;
                         }
@@ -440,8 +441,14 @@ class Terrain3DView extends JComponent {
      * How far down the side of a column goes towards a neighbour: to the top of the neighbour when it is lower, to the
      * base of the model (NaN) when there is no land there, or not at all (the top itself).
      */
-    private static float sideBottom(float[] tops, int nx, int ny, int gx, int gy, float top) {
+    private float sideBottom(float[] tops, int nx, int ny, int gx, int gy, float top, TerrainModel model, TerrainModel overview, float base) {
         if ((gx < 0) || (gy < 0) || (gx >= nx) || (gy >= ny)) {
+            // Outside the block area: if that is still on the map, go down to the smooth surface there
+            final int ox = (model.x0 + gx * model.step - overview.x0) / overview.step, oy = (model.y0 + gy * model.step - overview.y0) / overview.step;
+            if ((ox >= 0) && (oy >= 0) && (ox < overview.width) && (oy < overview.height) && overview.present[oy * overview.width + ox]) {
+                final float neighbour = (float) Math.floor(surfaceHeight(overview, oy * overview.width + ox)) + 1 - base;
+                return Math.min(neighbour, top);
+            }
             return Float.NaN;
         }
         final float neighbour = tops[gy * nx + gx];
@@ -794,7 +801,7 @@ class Terrain3DView extends JComponent {
                     continue;
                 }
                 final double pixelsPerBlock = camera.orthographic ? (camera.scale * unit) : (camera.focal * depths[i] * unit);
-                if (pixelsPerBlock < 4) {
+                if (pixelsPerBlock < 7) {
                     continue;
                 }
                 // An edge between faces, or a block boundary within a face: along x and y on tops, and along the
@@ -808,7 +815,7 @@ class Terrain3DView extends JComponent {
                             || ((kind != KIND_TOP) && crosses(heights[i], heights[i + 1], heights[i + w]));
                 }
                 if (edge) {
-                    pixels[i] = shade(pixels[i], 1 - 0.3f * (float) Math.min(1, (pixelsPerBlock - 4) / 8));
+                    pixels[i] = shade(pixels[i], 1 - 0.22f * (float) Math.min(1, (pixelsPerBlock - 7) / 10));
                 }
             }
         });
