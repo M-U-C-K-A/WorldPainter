@@ -20,7 +20,7 @@ public class RiverNode extends WaterNode {
 
     @Override
     public List<Parameter<?>> getParameters() {
-        return List.of(SPACING, WIDTH, DEPTH, BANKS, MEANDER, MAX_HEIGHT, BED, BIOME, VARIANT);
+        return List.of(SPACING, WIDTH, DEPTH, BANKS, MEANDER, MAX_HEIGHT, MIN_HEIGHT, BED, BIOME, VARIANT);
     }
 
     @Override
@@ -47,6 +47,7 @@ public class RiverNode extends WaterNode {
         depth = getDouble(DEPTH);
         bankSlope = getDouble(BANKS);
         maxHeight = getDouble(MAX_HEIGHT);
+        lowestHeight = getDouble(MIN_HEIGHT);
         noise = new FractalNoise(seed(context, getInt(VARIANT)), NoiseLayer.Type.FBM, spacing, 3, 0.45, getDouble(MEANDER) * spacing * 0.4, 0);
         // The water follows the terrain smoothed over a few river widths, so that it is level across the river
         final BlurNode blur = new BlurNode();
@@ -72,7 +73,8 @@ public class RiverNode extends WaterNode {
                 final int index = i + j * width;
                 final double x = region.x(i);
                 final double level = Math.floor(minHeight + valleyFloor[index] * verticalScale - BANK_DROP + 0.001);
-                final double strength = 1 - HeightMaskNode.rise(level, maxHeight - FADE_DISTANCE, maxHeight);
+                // Peter out towards the top, and below the bottom (out at sea, where a river would only cut a channel)
+                final double strength = (1 - HeightMaskNode.rise(level, maxHeight - FADE_DISTANCE, maxHeight)) * HeightMaskNode.rise(level, lowestHeight - 8, lowestHeight);
                 if (strength <= 0) {
                     continue;
                 }
@@ -108,6 +110,7 @@ public class RiverNode extends WaterNode {
     public static final NumberParameter DEPTH = new NumberParameter("depth", "Depth", "The depth of the water in the middle", 4, 1, 32, 1, false, "blocks");
     public static final NumberParameter BANKS = new NumberParameter("banks", "Bank slope", "How steeply the banks rise from the water (blocks up per block across)", 0.6, 0.1, 3, 0.05, true, null);
     public static final NumberParameter MEANDER = new NumberParameter("meander", "Meander", "How much the rivers wind", 0.5, 0, 1, 0.01, false, null);
+    public static final NumberParameter MIN_HEIGHT = new NumberParameter("minHeight", "Down to height", "The rivers end below this height, e.g. a little under the sea level so that they do not cut channels across the sea bed", -2048, -2048, 4096, 1, false, "blocks");
     public static final NumberParameter MAX_HEIGHT = new NumberParameter("maxHeight", "Up to height", "The rivers peter out towards this height", 160, -2048, 4096, 1, false, "blocks");
     public static final ChoiceParameter<Terrain> BED = new ChoiceParameter<>("bed", "Bed", "The terrain type under the water", Terrain.GRAVEL, getBedChoices());
     public static final ChoiceParameter<RiverBiome> BIOME = new ChoiceParameter<>("biome", "Biome", "The biome to paint on the river", RiverBiome.RIVER, RiverBiome.values());
@@ -120,7 +123,7 @@ public class RiverNode extends WaterNode {
 
     private transient FractalNoise noise;
     private transient CompiledNode valley;
-    private transient double spacing, halfWidth, depth, bankSlope, maxHeight, minHeight, verticalScale;
+    private transient double spacing, halfWidth, depth, bankSlope, maxHeight, lowestHeight, minHeight, verticalScale;
 
     private static final long serialVersionUID = 1L;
 

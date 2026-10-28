@@ -374,6 +374,182 @@ public final class ExampleGraphs {
                 b.biome(MinecraftBiome.MEADOW, 0.55, 5, 5);
                 break;
             }
+            case CONTINENT: {
+                // The shape of the land: a large continent filling most of the map (noise faded out towards the
+                // edges of the map, so that it is surrounded by sea), with an archipelago of smaller islands around it
+                final NoiseNode base = b.noise(NoiseNode.Kind.PERLIN, 1900, 6, 61, 160, 0);
+                final GradientNode falloff = b.add(new GradientNode(), 0, 1);
+                falloff.set(GradientNode.SHAPE, GradientNode.Shape.SQUARE);
+                final CurveNode edges = b.add(new CurveNode(0, 0, 0.12f, 0.3f, 0.3f, 0.92f, 1, 1), 1, 1);
+                b.wire(falloff, edges);
+                // A radial gradient rounds off the corners and pulls the land towards the middle of the map
+                final GradientNode centre = b.add(new GradientNode(), 0, 2);
+                final CombineNode centred = b.add(new CombineNode(CombineNode.Mode.ADD), 1, 2);
+                centred.set(CombineNode.STRENGTH, 0.5);
+                b.wire(base, centred, 0);
+                b.wire(centre, centred, 1);
+                final CombineNode shaped = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 1, 0);
+                b.wire(centred, shaped, 0);
+                b.wire(edges, shaped, 1);
+                // Sea level is at a value of 40 / 240 = 0.17: a continental shelf, coasts, rolling lowlands
+                final CurveNode continent = b.add(new CurveNode(0, 0, 0.42f, 0.1f, 0.56f, 0.165f, 0.64f, 0.2f, 0.95f, 0.3f, 1.3f, 0.38f, 2, 0.4f), 2, 0);
+                b.wire(shaped, continent);
+                final NoiseNode islandNoise = b.noise(NoiseNode.Kind.PERLIN, 230, 5, 62, 25, 3);
+                final CurveNode islandShapes = b.add(new CurveNode(0, 0, 0.6f, 0.06f, 0.7f, 0.19f, 1, 0.28f), 1, 3);
+                b.wire(islandNoise, islandShapes);
+                final CurveNode islandZone = b.add(new CurveNode(0, 0, 0.04f, 0.3f, 0.12f, 1, 0.38f, 1, 0.5f, 0, 1, 0), 2, 3);
+                b.wire(centre, islandZone);
+                final CombineNode islands = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 3, 2);
+                b.wire(islandShapes, islands, 0);
+                b.wire(islandZone, islands, 1);
+                final CombineNode land = b.add(new CombineNode(CombineNode.Mode.MAX), 3, 0);
+                b.wire(continent, land, 0);
+                b.wire(islands, land, 1);
+                // A large mountain range, mostly towards the north east, carved by erosion
+                final NoiseNode rangeNoise = b.noise(NoiseNode.Kind.PERLIN, 2400, 3, 64, 300, 5);
+                final GradientNode northEast = b.add(new GradientNode(), 0, 6);
+                northEast.set(GradientNode.SHAPE, GradientNode.Shape.LINEAR);
+                northEast.set(GradientNode.ANGLE, 315);
+                final CombineNode climate = b.add(new CombineNode(CombineNode.Mode.ADD), 1, 5);
+                climate.set(CombineNode.STRENGTH, 1.1);
+                b.wire(rangeNoise, climate, 0);
+                b.wire(northEast, climate, 1);
+                final CurveNode rangeZone = b.add(new CurveNode(0, 0, 0.95f, 0, 1.25f, 1, 2.5f, 1), 2, 5);
+                b.wire(climate, rangeZone);
+                final CurveNode onLand = b.add(new CurveNode(0, 0, 0.58f, 0, 0.72f, 1, 2, 1), 2, 4);
+                b.wire(shaped, onLand);
+                final CombineNode zone = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 3, 5);
+                b.wire(rangeZone, zone, 0);
+                b.wire(onLand, zone, 1);
+                final NoiseNode peaks = b.noise(NoiseNode.Kind.RIDGED, 600, 7, 63, 30, 4);
+                final CombineNode mountains = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 3, 4);
+                b.wire(peaks, mountains, 0);
+                b.wire(zone, mountains, 1);
+                final GullyErosionNode erosion = b.add(new GullyErosionNode(), 4, 4);
+                erosion.set(GullyErosionNode.DEPTH, 30);
+                erosion.set(Node.VARIANT, 66);
+                b.wire(mountains, erosion);
+                final CombineNode relief = b.add(new CombineNode(CombineNode.Mode.ADD), 4, 0);
+                relief.set(CombineNode.STRENGTH, 1.05);
+                b.wire(land, relief, 0);
+                b.wire(erosion, relief, 1);
+                // A volcanic island in the south west
+                final VolcanoNode volcano = b.add(new VolcanoNode(), 3, 6);
+                volcano.set(VolcanoNode.POSITION_X, 0.13);
+                volcano.set(VolcanoNode.POSITION_Y, 0.76);
+                volcano.set(VolcanoNode.RADIUS, 380);
+                volcano.set(Node.VARIANT, 65);
+                final CurveNode volcanoHeight = b.add(new CurveNode(0, 0, 0.01f, 0.18f, 1, 0.82f), 4, 6);
+                b.wire(volcano, volcanoHeight);
+                final CombineNode withVolcano = b.add(new CombineNode(CombineNode.Mode.MAX), 5, 0);
+                b.wire(relief, withVolcano, 0);
+                b.wire(volcanoHeight, withVolcano, 1);
+                final ClampNode clamp = b.add(new ClampNode(), 6, 0);
+                b.wire(withVolcano, clamp);
+                final LakeNode lakes = b.add(new LakeNode(), 7, 0);
+                lakes.set(LakeNode.MAX_HEIGHT, w + 45);
+                lakes.set(Node.VARIANT, 67);
+                b.wire(clamp, lakes);
+                final RiverNode rivers = b.add(new RiverNode(), 8, 0);
+                rivers.set(RiverNode.SPACING, 1500);
+                rivers.set(RiverNode.WIDTH, 10);
+                rivers.set(RiverNode.MAX_HEIGHT, w + 90);
+                rivers.set(RiverNode.MIN_HEIGHT, w - 4);
+                rivers.set(Node.VARIANT, 68);
+                b.wire(lakes, rivers);
+                b.output(rivers, 9, 0, w - 40, w + 200, minHeight, maxHeight);
+
+                // The surface. Snow on the high mountains, rock on cliffs, scree below them
+                final HeightMaskNode snowline = b.height(w + 120, 4096, 20, 0, 8);
+                b.wire(snowline, b.material(MaterialGroup.SNOWY_ROCK, 1.3, 1, 8));
+                b.wire(snowline, b.flora(Vegetation.SNOW, 1, 2, 8));
+                b.wire(snowline, b.biome(MinecraftBiome.FROZEN_PEAKS, 1.3, 3, 8));
+                final SlopeMaskNode cliffs = b.slope(42, 90, 6, 0, 9);
+                b.wire(cliffs, b.material(MaterialGroup.GREY_CLIFFS, 1.2, 1, 9));
+                final SlopeMaskNode steep = b.slope(30, 42, 4, 0, 10);
+                b.wire(steep, b.material(MaterialGroup.SCREE, 1.05, 1, 10));
+                // Beaches, and coral reefs in patches of the shallow sea
+                final HeightMaskNode coast = b.height(w - 3, w + 3, 1, 0, 11);
+                b.wire(coast, b.material(MaterialGroup.BEACH, 1.25, 1, 11));
+                b.wire(coast, b.biome(MinecraftBiome.BEACH, 1.25, 2, 11));
+                final HeightMaskNode shallows = b.height(w - 12, w - 2, 3, 0, 12);
+                final NoiseNode reefNoise = b.noise(NoiseNode.Kind.PERLIN, 90, 3, 69, 0, 13);
+                final CurveNode reefPatches = b.add(new CurveNode(0, 0, 0.5f, 0, 0.62f, 1, 1, 1), 1, 13);
+                b.wire(reefNoise, reefPatches);
+                final CombineNode reefs = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 1, 12);
+                b.wire(shallows, reefs, 0);
+                b.wire(reefPatches, reefs, 1);
+                b.wire(reefs, b.material(MaterialGroup.CORAL_REEF, 1.2, 2, 12));
+                b.wire(shallows, b.biome(MinecraftBiome.WARM_OCEAN, 1, 3, 12));
+                b.biome(MinecraftBiome.OCEAN, 0.4, 3, 13);
+                // The volcano: dark volcanic rock
+                final CurveNode volcanoMask = b.add(new CurveNode(0, 0, 0.01f, 0, 0.04f, 1, 1, 1), 5, 6);
+                b.wire(volcano, volcanoMask);
+                b.wire(volcanoMask, b.material(MaterialGroup.VOLCANIC, 1.6, 6, 6));
+                // Forests everywhere on the lowlands, firs and spruces higher up
+                final HeightMaskNode lowlands = b.height(w + 2, w + 110, 15, 4, 8);
+                final HeightMaskNode highlands = b.height(w + 85, w + 130, 15, 4, 13);
+                final SlopeMaskNode gentle = b.slope(0, 34, 6, 4, 9);
+                final CombineNode plantable = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 5, 8);
+                b.wire(lowlands, plantable, 0);
+                b.wire(gentle, plantable, 1);
+                // Meadows everywhere, with patches of forest
+                b.wire(plantable, b.material(MaterialGroup.MEADOW, 0.8, 6, 7));
+                b.wire(plantable, b.flora(Vegetation.GRASS_AND_FLOWERS, 0.35, 7, 7));
+                b.wire(plantable, b.biome(MinecraftBiome.PLAINS, 0.75, 8, 7));
+                final NoiseNode woodNoise = b.noise(NoiseNode.Kind.PERLIN, 420, 4, 72, 60, 14);
+                final CurveNode woodPatches = b.add(new CurveNode(0, 0, 0.47f, 0, 0.56f, 1, 1, 1), 5, 14);
+                b.wire(woodNoise, woodPatches);
+                final CombineNode woods = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 6, 14);
+                b.wire(woodPatches, woods, 0);
+                b.wire(plantable, woods, 1);
+                b.wire(woods, b.material(MaterialGroup.FOREST_FLOOR, 0.9, 7, 14));
+                b.wire(woods, b.flora(Vegetation.BIG_OAKS, 0.5, 8, 14));
+                b.wire(woods, b.flora(Vegetation.BIRCHES, 0.3, 9, 14));
+                b.wire(woods, b.biome(MinecraftBiome.FOREST, 0.9, 10, 14));
+                final CombineNode alpine = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 5, 13);
+                b.wire(highlands, alpine, 0);
+                b.wire(gentle, alpine, 1);
+                b.wire(alpine, b.flora(Vegetation.FIRS, 0.5, 6, 13));
+                b.wire(alpine, b.flora(Vegetation.TALL_SPRUCES, 0.25, 7, 13));
+                b.wire(alpine, b.biome(MinecraftBiome.OLD_GROWTH_SPRUCE_TAIGA, 1.1, 8, 13));
+                // Cherry groves in some regions
+                final CombineNode cherry = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 6, 9);
+                final RegionsNode cherryRegions = b.regions(6, 0, 70, 5, 9);
+                cherryRegions.set(RegionsNode.SIZE, 700);
+                b.wire(cherryRegions, cherry, 0);
+                b.wire(plantable, cherry, 1);
+                b.wire(cherry, b.material(MaterialGroup.MEADOW, 1.1, 7, 9));
+                b.wire(cherry, b.flora(Vegetation.CHERRY_TREES, 0.55, 8, 9));
+                b.wire(cherry, b.flora(Vegetation.FLOWERS, 0.35, 9, 9));
+                b.wire(cherry, b.biome(MinecraftBiome.CHERRY_GROVE, 1.1, 10, 9));
+                // Badlands and savanna in the south
+                final GradientNode south = b.add(new GradientNode(), 4, 10);
+                south.set(GradientNode.SHAPE, GradientNode.Shape.LINEAR);
+                south.set(GradientNode.ANGLE, 90);
+                final NoiseNode dryNoise = b.noise(NoiseNode.Kind.PERLIN, 1200, 4, 71, 200, 11);
+                final CombineNode dryness = b.add(new CombineNode(CombineNode.Mode.ADD), 5, 11);
+                dryness.set(CombineNode.STRENGTH, 0.8);
+                b.wire(dryNoise, dryness, 0);
+                b.wire(south, dryness, 1);
+                final CurveNode badlandZone = b.add(new CurveNode(0, 0, 1.2f, 0, 1.28f, 1, 2, 1), 6, 11);
+                b.wire(dryness, badlandZone);
+                final CombineNode badlands = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 7, 11);
+                b.wire(badlandZone, badlands, 0);
+                b.wire(lowlands, badlands, 1);
+                b.wire(badlands, b.material(MaterialGroup.RED_CLIFFS, 1.15, 8, 11));
+                b.wire(badlands, b.flora(Vegetation.DEAD_TREES, 0.04, 9, 11));
+                b.wire(badlands, b.biome(MinecraftBiome.BADLANDS, 1.15, 10, 11));
+                final CurveNode savannaZone = b.add(new CurveNode(0, 0, 1.08f, 0, 1.13f, 1, 1.18f, 1, 1.24f, 0, 2, 0), 6, 10);
+                b.wire(dryness, savannaZone);
+                final CombineNode savanna = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 7, 10);
+                b.wire(savannaZone, savanna, 0);
+                b.wire(plantable, savanna, 1);
+                b.wire(savanna, b.material(MaterialGroup.MIXED_DIRT, 1.05, 8, 10));
+                b.wire(savanna, b.flora(Vegetation.TALL_GRASS, 0.5, 9, 10));
+                b.wire(savanna, b.biome(MinecraftBiome.SAVANNA, 1.05, 10, 10));
+                break;
+            }
             case ERODE_CURRENT_MAP: {
                 final CurrentMapNode current = b.add(new CurrentMapNode(), 0, 0);
                 final GullyErosionNode erosion = b.add(new GullyErosionNode(), 1, 0);
@@ -403,6 +579,7 @@ public final class ExampleGraphs {
         TOWER_KARST("Tower karst jungle"),
         RED_CLIFFS("Red cliffs and spruces"),
         ALPINE_VALLEY("Alpine valley"),
+        CONTINENT("Continent and islands (5000 x 5000)"),
         ERODE_CURRENT_MAP("Erode the current map");
 
         Example(String displayName) {
@@ -473,6 +650,14 @@ public final class ExampleGraphs {
         MaterialPainterNode material(MaterialGroup group, double strength, int column, int row) {
             final MaterialPainterNode node = add(new MaterialPainterNode(group), column, row);
             node.set(MaterialPainterNode.STRENGTH, strength);
+            return node;
+        }
+
+        RegionsNode regions(int count, int type, int variant, int column, int row) {
+            final RegionsNode node = add(new RegionsNode(), column, row);
+            node.set(RegionsNode.COUNT, count);
+            node.set(RegionsNode.TYPE, type);
+            node.set(Node.VARIANT, variant);
             return node;
         }
 

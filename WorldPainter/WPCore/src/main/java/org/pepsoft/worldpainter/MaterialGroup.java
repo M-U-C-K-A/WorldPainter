@@ -76,6 +76,21 @@ public enum MaterialGroup {
             return blobs(this, 0.5f, row("mud", 50), row("packed_mud", 15), row("muddy_mangrove_roots", 15), row("coarse_dirt", 20));
         }
     },
+    CORAL_REEF("Coral reef", 0xe07a8f) {
+        @Override MixedMaterial createMaterial() {
+            return blobs(this, 0.35f, row("sand", 35), row("tube_coral_block", 13), row("brain_coral_block", 13), row("bubble_coral_block", 13), row("fire_coral_block", 13), row("horn_coral_block", 13));
+        }
+    },
+    VOLCANIC("Volcanic rock", 0x3d3a3a) {
+        @Override MixedMaterial createMaterial() {
+            return blobs(this, 0.5f, row("basalt", 35), row("blackstone", 25), row("tuff", 20), row("smooth_basalt", 15), row("magma_block", 5));
+        }
+    },
+    GLACIER("Glacier", 0xbcd9f0) {
+        @Override MixedMaterial createMaterial() {
+            return blobs(this, 0.6f, row("packed_ice", 40), row("snow_block", 35), row("blue_ice", 15), row("ice", 10));
+        }
+    },
     DESERT("Desert mix", 0xdcc58e) {
         @Override MixedMaterial createMaterial() {
             return blobs(this, 0.8f, row("sand", 65), row("sandstone", 20), row("red_sand", 15));

@@ -27,6 +27,7 @@ public final class TreePack {
         RAINFOREST("Rainforest giants", 0x3f7f2a, 8, 4),
         BIG_OAK("Big oaks", 0x3a6b2a, 6, 4),
         BIRCH("Birches", 0x6e9b45, 3, 3),
+        CHERRY("Cherry trees", 0xf0a3c8, 6, 4),
         DEAD("Dead trees", 0x6b5a48, 5, 4),
         BUSH("Bushes", 0x4d7a35, 2, 2);
 
@@ -87,6 +88,8 @@ public final class TreePack {
                 return bigOak(variant, random);
             case BIRCH:
                 return birch(variant, random);
+            case CHERRY:
+                return cherry(variant, random);
             case DEAD:
                 return dead(variant, random);
             case BUSH:
@@ -186,6 +189,25 @@ public final class TreePack {
         final Builder b = new Builder("Birch " + (variant + 1), 9, height + 3);
         b.trunk(log("birch"), height, 1);
         b.blob(leaves("birch"), 0.5, 0.5, height - 2, 2.3 + random.nextDouble(), 3.5, 0.9, random);
+        return b.build();
+    }
+
+    /**
+     * A cherry tree: a short trunk which forks into a few spreading branches carrying a broad, flat, pink crown.
+     */
+    private static WPObject cherry(int variant, Random random) {
+        final int height = 5 + random.nextInt(4);
+        final Builder b = new Builder("Cherry tree " + (variant + 1), 15, height + 6);
+        final Material log = log("cherry"), leaves = leaves("cherry");
+        b.trunk(log, height, 1);
+        final int forks = 2 + random.nextInt(3);
+        for (int i = 0; i < forks; i++) {
+            final double angle = random.nextDouble() * Math.PI * 2, reach = 2 + random.nextDouble() * 2.5;
+            final double x = 0.5 + Math.cos(angle) * reach, y = 0.5 + Math.sin(angle) * reach;
+            final int z = height + 1 + random.nextInt(2);
+            b.line(log, 0.5, 0.5, height - 1, x, y, z);
+            b.blob(leaves, x, y, z + 1, 2.6 + random.nextDouble() * 1.4, 1.6, 0.88, random);
+        }
         return b.build();
     }
 

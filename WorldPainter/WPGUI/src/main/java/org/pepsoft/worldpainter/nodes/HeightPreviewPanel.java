@@ -192,7 +192,10 @@ public class HeightPreviewPanel extends JComponent {
                         if (strength <= 0) {
                             continue;
                         }
-                        if (vegetation.isForest()) {
+                        if (vegetation == Vegetation.CHERRY_TREES) {
+                            // Pink blossom, which should stand out
+                            colour = blend(colour, vegetation.getColour(), Math.min(0.85f, SurfaceRules.forestLevel(strength) / 15f));
+                        } else if (vegetation.isForest()) {
                             // Darker, speckled canopy
                             final float cover = SurfaceRules.forestLevel(strength) / 15f * 0.75f;
                             colour = blend(colour, vegetation.getColour(), cover);

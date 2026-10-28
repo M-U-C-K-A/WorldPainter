@@ -18,6 +18,7 @@ public enum Vegetation {
     RAINFOREST(TreePack.Kind.RAINFOREST),
     BIG_OAKS(TreePack.Kind.BIG_OAK),
     BIRCHES(TreePack.Kind.BIRCH),
+    CHERRY_TREES(TreePack.Kind.CHERRY),
     DEAD_TREES(TreePack.Kind.DEAD),
     BUSHES(TreePack.Kind.BUSH),
     SNOW("Snow and ice", Frost.INSTANCE, null, 0xf4f8ff),
