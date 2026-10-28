@@ -279,7 +279,7 @@ public final class App extends JFrame implements BrushControl,
 
             @Override
             public void windowActivated(WindowEvent e) {
-                refreshScreenMenuBar();
+                bringModalDialogsToFront();
             }
         };
         addWindowListener(windowAdapter);
@@ -3108,17 +3108,26 @@ public final class App extends JFrame implements BrushControl,
     }
 
     private JPanel createToolPanel() {
-        JPanel toolPanel = new JPanel();
-        toolPanel.setLayout(new GridLayout(0, 4, 2, 2));
+        // The tools are grouped by what they do: shape the land, paint on it (terrain, layers, biomes), water and lava,
+        // and selection and other tools
+        final JPanel sculptPanel = new JPanel(new GridLayout(0, 4, 2, 2)), paintPanel = new JPanel(new GridLayout(0, 4, 2, 2));
+        final JPanel waterPanel = new JPanel(new GridLayout(0, 4, 2, 2)), otherPanel = new JPanel(new GridLayout(0, 4, 2, 2));
         // TODO: use function keys as accelerators?
-        toolPanel.add(createButtonForOperation(new SprayPaint(view), 'r'));
-        toolPanel.add(createButtonForOperation(new Pencil(view), 'p'));
-        toolPanel.add(createButtonForOperation(new Fill(view), 'l'));
-        toolPanel.add(createButtonForOperation(new Text(view), 'x'));
+        sculptPanel.add(createButtonForOperation(new Height(view), 'h'));
+        sculptPanel.add(createButtonForOperation(new Flatten(view), 'a'));
+        sculptPanel.add(createButtonForOperation(new Smooth(view), 's'));
+        sculptPanel.add(createButtonForOperation(new RaiseMountain(view), 'm'));
+        sculptPanel.add(createButtonForOperation(new RaisePyramid(view)));
+        sculptPanel.add(createButtonForOperation(new RaiseRotatedPyramid(view)));
+        sculptPanel.add(createButtonForOperation(new PathTool(view)));
 
-        toolPanel.add(createButtonForOperation(new Flood(view, false), 'f'));
-        toolPanel.add(createButtonForOperation(new Flood(view, true)));
-        toolPanel.add(createButtonForOperation(new Sponge(view)));
+        paintPanel.add(createButtonForOperation(new Pencil(view), 'p'));
+        paintPanel.add(createButtonForOperation(new SprayPaint(view), 'r'));
+        paintPanel.add(createButtonForOperation(new Fill(view), 'l'));
+
+        waterPanel.add(createButtonForOperation(new Flood(view, false), 'f'));
+        waterPanel.add(createButtonForOperation(new Flood(view, true)));
+        waterPanel.add(createButtonForOperation(new Sponge(view)));
         eyedropperToggleButton = new JToggleButton(Icons.get("pipette", 18));
         eyedropperToggleButton.setMnemonic('y');
         styleToolButton(eyedropperToggleButton);
@@ -3156,28 +3165,21 @@ public final class App extends JFrame implements BrushControl,
         });
         eyedropperToggleButton.setToolTipText(richToolTip("Eyedropper", "Pick a terrain or layer from the map to paint with", "Alt+Y"));
         eyedropperToggleButton.putClientProperty(KEY_HELP_KEY, "Operation/Eyedropper");
-        toolPanel.add(eyedropperToggleButton);
-
-        toolPanel.add(createButtonForOperation(new Height(view), 'h'));
-        toolPanel.add(createButtonForOperation(new Flatten(view), 'a'));
-        toolPanel.add(createButtonForOperation(new Smooth(view), 's'));
-        toolPanel.add(createButtonForOperation(new RaiseMountain(view), 'm'));
+        paintPanel.add(eyedropperToggleButton);
 
 //        toolPanel.add(createButtonForOperation(new Erode(view, this, mapDragControl), 'm'));
-        toolPanel.add(createButtonForOperation(new SetSpawnPoint(view)));
         final JButton button = new JButton(Icons.get("globe", 18));
         styleToolButton(button);
         button.addActionListener(e -> showGlobalOperations());
         button.setToolTipText(richToolTip("Global operations", "Fill or clear the whole world (or the selection) with a terrain, biome or layer", null));
         button.putClientProperty(KEY_HELP_KEY, "Operation/GlobalOperations");
-        toolPanel.add(button);
-        toolPanel.add(createButtonForOperation(new RaiseRotatedPyramid(view)));
-        toolPanel.add(createButtonForOperation(new RaisePyramid(view)));
+        paintPanel.add(button);
+        paintPanel.add(createButtonForOperation(new Text(view), 'x'));
 
         final AbstractButton copySelectionButton = createButtonForOperation(new CopySelectionOperation(view));
         copySelectionButton.setEnabled(selectionState.getValue());
-        toolPanel.add(createButtonForOperation(new EditSelectionOperation(view, selectionState)));
-        toolPanel.add(copySelectionButton);
+        otherPanel.add(createButtonForOperation(new EditSelectionOperation(view, selectionState)));
+        otherPanel.add(copySelectionButton);
         final JButton clearSelectionButton = new JButton(Icons.get("square-x", 18));
         clearSelectionButton.setEnabled(selectionState.getValue());
         styleToolButton(clearSelectionButton);
@@ -3209,17 +3211,40 @@ public final class App extends JFrame implements BrushControl,
             clearSelectionButton.setEnabled((boolean) selectionMayBePresent);
         });
         clearSelectionButton.putClientProperty(KEY_HELP_KEY, "Operation/ClearSelection");
-        toolPanel.add(clearSelectionButton);
-
-        while ((toolPanel.getComponentCount() % 4) != 0) {
-            toolPanel.add(Box.createGlue());
-        }
+        otherPanel.add(clearSelectionButton);
+        otherPanel.add(createButtonForOperation(new SetSpawnPoint(view)));
         for (Operation operation: operations) {
             operation.setView(view);
-            toolPanel.add(createButtonForOperation(operation));
+            otherPanel.add(createButtonForOperation(operation));
         }
 
+        final JPanel toolPanel = new JPanel(new GridBagLayout());
+        final GridBagConstraints constraints = new GridBagConstraints();
+        constraints.gridwidth = GridBagConstraints.REMAINDER;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        constraints.anchor = GridBagConstraints.FIRST_LINE_START;
+        constraints.weightx = 1.0;
+        addToolSection(toolPanel, constraints, "Sculpt terrain", "mountain", "Change the shape of the land: raise, lower, flatten, smooth", sculptPanel, true);
+        addToolSection(toolPanel, constraints, "Paint", "brush", "Paint the selected terrain, layer or biome onto the land, without changing its shape", paintPanel, false);
+        addToolSection(toolPanel, constraints, "Water", "waves", "Flood areas with water or lava, or dry them out", waterPanel, false);
+        addToolSection(toolPanel, constraints, "Selection & more", "square-dashed-mouse-pointer", "Select, copy and clear areas, and other tools", otherPanel, false);
+        constraints.weighty = 1.0;
+        toolPanel.add(Box.createGlue(), constraints);
         return toolPanel;
+    }
+
+    /**
+     * Add a titled group of tools to the tool panel, with an icon and an explanation in its tool tip.
+     */
+    private static void addToolSection(JPanel toolPanel, GridBagConstraints constraints, String title, String icon, String description, JPanel tools, boolean first) {
+        final JLabel label = createSectionLabel(title);
+        label.setIcon(Icons.muted(icon, 12));
+        label.setIconTextGap(5);
+        label.setToolTipText(richToolTip(title, description, null));
+        constraints.insets = new Insets(first ? 2 : 8, 4, 3, 4);
+        toolPanel.add(label, constraints);
+        constraints.insets = new Insets(0, 0, 0, 0);
+        toolPanel.add(tools, constraints);
     }
 
     private JPanel createToolSettingsPanel() {
@@ -4528,6 +4553,37 @@ public final class App extends JFrame implements BrushControl,
         }
     }
 
+    /**
+     * A number for naming the layers generated by tools (bridges, tunnels), higher than that of any such layer so far.
+     */
+    public int nextGeneratedLayerNumber() {
+        int highest = 0;
+        for (Collection<CustomLayer> layers: getCustomLayersByPalette().values()) {
+            for (CustomLayer layer: layers) {
+                final String name = layer.getName();
+                final int space = name.lastIndexOf(' ');
+                if ((space > 0) && (name.startsWith("Bridge ") || name.startsWith("Tunnel "))) {
+                    try {
+                        highest = Math.max(highest, Integer.parseInt(name.substring(space + 1)));
+                    } catch (NumberFormatException e) {
+                        // Not one of ours
+                    }
+                }
+            }
+        }
+        return highest + 1;
+    }
+
+    /**
+     * Show layers which a tool created (such as the bridges and tunnels of a path) in the layer panels, so that the
+     * user can edit and paint with them.
+     */
+    public void registerGeneratedLayers(List<CustomLayer> layers) {
+        for (CustomLayer layer: layers) {
+            customLayerController.registerCustomLayer(layer, false);
+        }
+    }
+
     private void showNodeGraph() {
         if ((world == null) || (dimension == null)) {
             DesktopUtils.beep();
@@ -5020,32 +5076,16 @@ public final class App extends JFrame implements BrushControl,
      * Switch the workspace between the map and the integrated 3D view.
      */
     /**
-     * On macOS the menu bar at the top of the screen sometimes keeps showing menu items as disabled after the focus
-     * has been in another window (a dialog, a pop-up). Setting the enabled state of every item again, when the window
-     * is activated, brings it back in line.
+     * While a modal dialog is open all the menus are disabled (on macOS they show greyed out in the menu bar at the top
+     * of the screen). Such a dialog can end up hidden behind the main window, for instance after switching to another
+     * application, which leaves the menus unusable for no visible reason. So bring it back to the front whenever the
+     * main window is activated.
      */
-    private void refreshScreenMenuBar() {
-        final JMenuBar menuBar = getJMenuBar();
-        if ((menuBar == null) || (! SystemUtils.isMac())) {
-            return;
-        }
-        for (int i = 0; i < menuBar.getMenuCount(); i++) {
-            refreshMenuItems(menuBar.getMenu(i));
-        }
-    }
-
-    private static void refreshMenuItems(JMenu menu) {
-        if (menu == null) {
-            return;
-        }
-        for (Component component: menu.getMenuComponents()) {
-            if (component instanceof JMenu) {
-                refreshMenuItems((JMenu) component);
-            } else if (component instanceof JMenuItem) {
-                final JMenuItem item = (JMenuItem) component;
-                final boolean enabled = item.isEnabled();
-                item.setEnabled(! enabled);
-                item.setEnabled(enabled);
+    private void bringModalDialogsToFront() {
+        for (Window window: getOwnedWindows()) {
+            if ((window instanceof Dialog) && ((Dialog) window).isModal() && window.isShowing()) {
+                window.toFront();
+                window.requestFocus();
             }
         }
     }
@@ -5346,6 +5386,7 @@ public final class App extends JFrame implements BrushControl,
             case "CopySelectionOperation": return "copy";
             case "EditSelectionOperation": return "square-dashed-mouse-pointer";
             case "Erode": return "wind";
+            case "PathTool": return "route";
             default: return null;
         }
     }
