@@ -814,9 +814,7 @@ class Terrain3DView extends JComponent {
             // Only the water moves: start again from the last rendered frame
             System.arraycopy(basePixels, 0, pixels, 0, pixels.length);
         }
-        if (shaders) {
-            drawWater(pixels, w, h, camera, (System.nanoTime() - startTime) / 1e9);
-        }
+        drawWater(pixels, w, h, camera, (System.nanoTime() - startTime) / 1e9, shaders);
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g2.drawImage(image, 0, 0, width, height, null);
     }
@@ -891,10 +889,15 @@ class Terrain3DView extends JComponent {
     }
 
     /**
-     * Make the water ripple and reflect the sky and the sun, using the block coordinates of every water pixel and the
-     * time for the movement of the waves.
+     * Colour the water per pixel: a smooth gradient of blue by depth (rather than one colour per block or triangle,
+     * which shows as squares), and with shaders, ripples which reflect the sky and the sun, moving with the time.
      */
-    private void drawWater(int[] pixels, int w, int h, Camera camera, double time) {
+    private void drawWater(int[] pixels, int w, int h, Camera camera, double time, boolean waves) {
+        final boolean recolour = mode == Mode.TERRAIN;
+        final TerrainModel detail = blocks ? this.detail : null;
+        final double size = Math.max(model.width, model.height);
+        final double fogStart = Math.max(distance * 0.85, size * 0.6), fogEnd = fogStart + Math.max(distance * 1.75, size);
+        final int fogColour = blend(skyColour, ThemeUtils.isDarkTheme() ? 0x18181b : 0xf8fafc, 0.5f);
         final byte[] kinds = kindBuffer;
         final float[] xs = blockXBuffer, ys = blockYBuffer;
         final double[] sun = sunVector();
@@ -907,6 +910,19 @@ class Terrain3DView extends JComponent {
                     continue;
                 }
                 final float bx = xs[i], by = ys[i];
+                if (recolour) {
+                    final double depth = waterDepthAt(detail, bx, by);
+                    int base = blend(0x4a8fe7, 0x1d3f8f, (float) Math.min(1, depth / 24));
+                    final double zc = camera.orthographic ? (ORTHO_DEPTH - depthBuffer[i]) : (1 / depthBuffer[i]);
+                    final float fog = (float) Math.max(0, Math.min(0.6, (zc - fogStart) / (fogEnd - fogStart)));
+                    if (fog > 0) {
+                        base = blend(base, fogColour, fog);
+                    }
+                    pixels[i] = base;
+                }
+                if (! waves) {
+                    continue;
+                }
                 // Waves which would be smaller than a few pixels on the screen only make noise, so fade them out
                 final double pixelsPerBlock = camera.orthographic ? (camera.scale / model.step) : (camera.focal * depthBuffer[i] / model.step);
                 final double big = Math.min(1, Math.max(0, (pixelsPerBlock - 0.6) / 2)), medium = Math.min(1, Math.max(0, (pixelsPerBlock - 1.5) / 3)), small = Math.min(1, Math.max(0, (pixelsPerBlock - 3) / 5));
@@ -943,6 +959,37 @@ class Terrain3DView extends JComponent {
                 pixels[i] = colour;
             }
         });
+    }
+
+    /**
+     * The depth of the water at a location in blocks from the corner of the overview model, interpolated between the
+     * samples. The full resolution detail model is used where there is one.
+     */
+    private double waterDepthAt(TerrainModel detail, double bx, double by) {
+        TerrainModel m = model;
+        double x = bx / model.step, y = by / model.step;
+        if (detail != null) {
+            final double dx = bx - (detail.x0 - model.x0), dy = by - (detail.y0 - model.y0);
+            if ((dx >= 0) && (dy >= 0) && (dx < detail.width) && (dy < detail.height)) {
+                m = detail;
+                x = dx;
+                y = dy;
+            }
+        }
+        // Bilinear interpolation between the centres of the samples
+        x -= 0.5;
+        y -= 0.5;
+        final int x0 = (int) Math.floor(x), y0 = (int) Math.floor(y);
+        final double fx = x - x0, fy = y - y0;
+        return (sampleDepth(m, x0, y0) * (1 - fx) + sampleDepth(m, x0 + 1, y0) * fx) * (1 - fy)
+                + (sampleDepth(m, x0, y0 + 1) * (1 - fx) + sampleDepth(m, x0 + 1, y0 + 1) * fx) * fy;
+    }
+
+    private static double sampleDepth(TerrainModel m, int sx, int sy) {
+        sx = Math.max(0, Math.min(m.width - 1, sx));
+        sy = Math.max(0, Math.min(m.height - 1, sy));
+        final int i = sy * m.width + sx;
+        return m.present[i] ? Math.max(0, m.waterLevels[i] - m.heights[i]) : 0;
     }
 
     /**

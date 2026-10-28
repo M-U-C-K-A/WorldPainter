@@ -276,6 +276,11 @@ public final class App extends JFrame implements BrushControl,
                 }
                 exit();
             }
+
+            @Override
+            public void windowActivated(WindowEvent e) {
+                refreshScreenMenuBar();
+            }
         };
         addWindowListener(windowAdapter);
 
@@ -5006,6 +5011,37 @@ public final class App extends JFrame implements BrushControl,
     /**
      * Switch the workspace between the map and the integrated 3D view.
      */
+    /**
+     * On macOS the menu bar at the top of the screen sometimes keeps showing menu items as disabled after the focus
+     * has been in another window (a dialog, a pop-up). Setting the enabled state of every item again, when the window
+     * is activated, brings it back in line.
+     */
+    private void refreshScreenMenuBar() {
+        final JMenuBar menuBar = getJMenuBar();
+        if ((menuBar == null) || (! SystemUtils.isMac())) {
+            return;
+        }
+        for (int i = 0; i < menuBar.getMenuCount(); i++) {
+            refreshMenuItems(menuBar.getMenu(i));
+        }
+    }
+
+    private static void refreshMenuItems(JMenu menu) {
+        if (menu == null) {
+            return;
+        }
+        for (Component component: menu.getMenuComponents()) {
+            if (component instanceof JMenu) {
+                refreshMenuItems((JMenu) component);
+            } else if (component instanceof JMenuItem) {
+                final JMenuItem item = (JMenuItem) component;
+                final boolean enabled = item.isEnabled();
+                item.setEnabled(! enabled);
+                item.setEnabled(enabled);
+            }
+        }
+    }
+
     private void showWorkspace(boolean threeDee) {
         showing3D = threeDee;
         ((CardLayout) workspaceCards.getLayout()).show(workspaceCards, threeDee ? WORKSPACE_3D : WORKSPACE_MAP);

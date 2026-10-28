@@ -152,7 +152,7 @@ public class ProceduralTerrainSettings implements Serializable, Cloneable {
             case ALPINE:
                 settings.baseHeight = 56;
                 layers.add(layer("Lowlands", FBM, ADD, 900, 36, 4, 0.5f, 1.0f, 80, 1.0f));
-                layers.add(layer("Mountain ranges", RIDGED, ADD, 520, 170, 6, 0.5f, 1.7f, 70, 0.55f));
+                layers.add(layer("Mountain ranges", RIDGED, ADD, 620, 115, 5, 0.45f, 1.15f, 90, 0.55f));
                 layers.add(layer("Detail", FBM, ADD, 50, 5, 3, 0.5f, 1.0f, 0, 1.0f));
                 rules.add(rule(Terrain.DEEP_SNOW, 200, Integer.MAX_VALUE, 0, 90, 8));
                 rules.add(rule(Terrain.SNOW, 175, Integer.MAX_VALUE, 0, 50, 8));
@@ -164,7 +164,7 @@ public class ProceduralTerrainSettings implements Serializable, Cloneable {
             case ARCHIPELAGO:
                 settings.baseHeight = 24;
                 layers.add(layer("Islands", FBM, ADD, 340, 78, 5, 0.5f, 1.35f, 60, 1.0f));
-                layers.add(layer("Peaks", RIDGED, ADD, 160, 30, 4, 0.5f, 2.0f, 20, 0.4f));
+                layers.add(layer("Peaks", RIDGED, ADD, 220, 22, 4, 0.45f, 1.2f, 30, 0.4f));
                 rules.add(rule(Terrain.ROCK, Integer.MIN_VALUE, Integer.MAX_VALUE, 45, 90, 0));
                 rules.add(rule(Terrain.SAND, Integer.MIN_VALUE, settings.waterLevel + 3, 0, 90, 1));
                 rules.add(rule(Terrain.STONE, 120, Integer.MAX_VALUE, 0, 90, 6));

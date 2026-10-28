@@ -25,8 +25,9 @@ import static org.pepsoft.worldpainter.Constants.TILE_SIZE_MASK;
 
 /**
  * The 3D view of the map, integrated in the main window: a perspective or orthographic view of the terrain with several
- * colour modes (terrain, height, slope, biome, relief), water and contour line overlays, adjustable vertical
- * exaggeration and preset view directions, and a card showing everything that is known about the block under the mouse.
+ * colour modes (terrain, height, slope, biome, relief), water and contour line overlays, a block by block preview
+ * around the camera, optional sun lighting with shadows and moving water, preset view directions, and a card showing
+ * everything that is known about the block under the mouse.
  */
 public class Terrain3DPanel extends JPanel {
     public Terrain3DPanel() {
@@ -69,17 +70,6 @@ public class Terrain3DPanel extends JPanel {
         contoursButton.addActionListener(e -> view.setShowContours(contoursButton.isSelected()));
         toolBar.add(contoursButton);
         toolBar.addSeparator();
-        toolBar.add(new JLabel("Height ×"));
-        exaggerationSlider = new JSlider(5, 40, 10);
-        exaggerationSlider.setToolTipText(App.richToolTip("Vertical exaggeration", "Stretch the heights to make the relief easier to read", null));
-        exaggerationSlider.setPreferredSize(new java.awt.Dimension(110, exaggerationSlider.getPreferredSize().height));
-        final JLabel exaggerationLabel = new JLabel("1.0");
-        exaggerationSlider.addChangeListener(e -> {
-            view.setExaggeration(exaggerationSlider.getValue() / 10f);
-            exaggerationLabel.setText(String.format("%.1f", exaggerationSlider.getValue() / 10f));
-        });
-        toolBar.add(exaggerationSlider);
-        toolBar.add(exaggerationLabel);
         toolBar.add(Box.createHorizontalGlue());
         final JButton rotateLeftButton = new JButton(Icons.get("rotate-ccw", 18));
         rotateLeftButton.setToolTipText(App.richToolTip("Rotate left", "Turn the view a quarter turn", null));
@@ -108,10 +98,27 @@ public class Terrain3DPanel extends JPanel {
         blocksButton.setToolTipText(App.richToolTip("Blocks", "Preview the land as Minecraft will show it: every block a one metre cube at its exact height, around the centre of the view", null));
         blocksButton.addActionListener(e -> {
             view.setBlocks(blocksButton.isSelected());
-            exaggerationSlider.setEnabled(! blocksButton.isSelected());
+            detailSizeComboBox.setEnabled(blocksButton.isSelected());
             requestDetail();
         });
         toolBar.add(blocksButton);
+        detailSizeComboBox = new JComboBox<>(new Integer[] {256, 512, 768, 1024, 1536});
+        detailSizeComboBox.setSelectedItem(detailSize);
+        detailSizeComboBox.setEnabled(false);
+        detailSizeComboBox.setToolTipText(App.richToolTip("Block area", "How far around the camera, in blocks, the land is shown block by block. Larger areas take longer to build and draw", null));
+        detailSizeComboBox.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                return super.getListCellRendererComponent(list, (value != null) ? (value + " blocks") : null, index, isSelected, cellHasFocus);
+            }
+        });
+        detailSizeComboBox.setMaximumSize(detailSizeComboBox.getPreferredSize());
+        detailSizeComboBox.addActionListener(e -> {
+            detailSize = (Integer) detailSizeComboBox.getSelectedItem();
+            detailArea = null;
+            requestDetail();
+        });
+        toolBar.add(detailSizeComboBox);
         final JToggleButton orthographicButton = new JToggleButton(Icons.get("box", 18));
         orthographicButton.setToolTipText(App.richToolTip("Orthographic", "Show the land without perspective: parallel lines stay parallel and sizes do not shrink with distance", null));
         orthographicButton.addActionListener(e -> view.setOrthographic(orthographicButton.isSelected()));
@@ -220,7 +227,7 @@ public class Terrain3DPanel extends JPanel {
         if ((! blocksButton.isSelected()) || (dimension == null) || (model == null)) {
             return;
         }
-        final Point target = view.getDetailCentre(DETAIL_SIZE);
+        final Point target = view.getDetailCentre(detailSize);
         final Rectangle extent = TerrainModel.getBlockExtent(dimension);
         if ((detailArea != null) && covers(detailArea, extent, target)) {
             return;
@@ -229,7 +236,7 @@ public class Terrain3DPanel extends JPanel {
             detailPending = true;
             return;
         }
-        final Rectangle area = new Rectangle(target.x - DETAIL_SIZE / 2, target.y - DETAIL_SIZE / 2, DETAIL_SIZE, DETAIL_SIZE).intersection(extent);
+        final Rectangle area = new Rectangle(target.x - detailSize / 2, target.y - detailSize / 2, detailSize, detailSize).intersection(extent);
         if (area.isEmpty()) {
             return;
         }
@@ -266,8 +273,8 @@ public class Terrain3DPanel extends JPanel {
      * Whether a loaded area still covers a target well: it is at least a quarter of the area away from every edge which
      * is not also an edge of the map.
      */
-    private static boolean covers(Rectangle area, Rectangle extent, Point target) {
-        final int margin = DETAIL_SIZE / 4;
+    private boolean covers(Rectangle area, Rectangle extent, Point target) {
+        final int margin = detailSize / 4;
         return ((target.x - area.x >= margin) || (area.x <= extent.x))
                 && ((area.x + area.width - target.x >= margin) || (area.x + area.width >= extent.x + extent.width))
                 && ((target.y - area.y >= margin) || (area.y <= extent.y))
@@ -326,7 +333,7 @@ public class Terrain3DPanel extends JPanel {
     private final Terrain3DView view;
     private SunControl sunControl;
     private final JToggleButton blocksButton;
-    private final JSlider exaggerationSlider;
+    private JComboBox<Integer> detailSizeComboBox;
     private Rectangle detailArea;
     private boolean detailLoading, detailPending;
     private final InfoCard infoCard;
@@ -340,7 +347,7 @@ public class Terrain3DPanel extends JPanel {
     /**
      * The size of the area around the centre of the view which is shown block by block, in blocks.
      */
-    private static final int DETAIL_SIZE = 768;
+    private int detailSize = 768;
     private static final long serialVersionUID = 1L;
 
     /**

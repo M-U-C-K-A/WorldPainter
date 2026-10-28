@@ -54,7 +54,7 @@ public class ProceduralTerrainDialog extends WorldPainterDialog {
         } else if (lastSettings != null) {
             settings = lastSettings.clone();
         } else {
-            settings = ProceduralTerrainSettings.create(ProceduralTerrainSettings.Preset.ALPINE, new Random().nextLong());
+            settings = ProceduralTerrainSettings.create(ProceduralTerrainSettings.Preset.MINECRAFT_LIKE, new Random().nextLong());
         }
         setTitle(editOnly ? "Edit Procedural Terrain" : "Procedural Terrain");
 
