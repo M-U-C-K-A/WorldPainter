@@ -62,6 +62,8 @@ public final class NodeType {
             new NodeType("Billow noise", "Rounded, puffy hills", NodeCategory.GENERATOR, () -> new NoiseNode(NoiseNode.Kind.BILLOW)),
             new NodeType("Cells (Voronoi)", "Cellular noise: mounds, pits or ridges along cell edges", NodeCategory.GENERATOR, CellsNode::new),
             new NodeType("Dunes", "Parallel wavy ridges, like sand dunes", NodeCategory.GENERATOR, () -> new NoiseNode(NoiseNode.Kind.DUNES)),
+            new NodeType("Rock towers", "Tall rock pillars with steep, fluted walls: tower karst", NodeCategory.GENERATOR, TowersNode::new),
+            new NodeType("Plateaus", "Flat topped table mountains in levels, bounded by cliffs", NodeCategory.GENERATOR, PlateausNode::new),
             new NodeType("Gradient", "A radial, square or linear gradient, for instance to make an island", NodeCategory.GENERATOR, GradientNode::new),
             new NodeType("Constant", "The same value everywhere", NodeCategory.GENERATOR, ConstantNode::new),
             new NodeType("Image", "An imported greyscale height map", NodeCategory.GENERATOR, ImageNode::new),
@@ -74,6 +76,7 @@ public final class NodeType {
             new NodeType("Blend with mask", "A where the mask is black, B where it is white", NodeCategory.COMBINER, BlendNode::new),
             new NodeType("Curve", "Reshape the heights with a curve", NodeCategory.FILTER, CurveNode::new),
             new NodeType("Terrace", "Flat terraces separated by steep steps", NodeCategory.FILTER, TerraceNode::new),
+            new NodeType("Strata", "Ledges and bands of rock of uneven thickness which dip across the map, as in canyon walls", NodeCategory.FILTER, StrataNode::new),
             new NodeType("Clamp", "Limit the values to a range", NodeCategory.FILTER, ClampNode::new),
             new NodeType("Blur", "Smooth the terrain", NodeCategory.FILTER, BlurNode::new),
             new NodeType("Erosion", "Branching gullies and valleys carved down the slopes", NodeCategory.FILTER, GullyErosionNode::new),
@@ -84,6 +87,7 @@ public final class NodeType {
             new NodeType("Slope range", "Select the terrain by steepness, e.g. for rock on cliffs", NodeCategory.MASK, SlopeMaskNode::new),
             new NodeType("Selection", "The area selected on the map", NodeCategory.MASK, SelectionMaskNode::new),
             new NodeType("Paint terrain", "Paint a terrain type where the mask is strong", NodeCategory.SURFACE, TerrainPainterNode::new),
+            new NodeType("Paint material mix", "Paint a ready made mix of blocks (mixed dirt, forest floor, scree, cliff strata...) where the mask is strong", NodeCategory.SURFACE, MaterialPainterNode::new),
             new NodeType("Paint biome", "Paint a Minecraft biome where the mask is strong", NodeCategory.SURFACE, BiomePainterNode::new),
             new NodeType("Paint flora", "Plant forests, grass, flowers or snow, as dense as the mask", NodeCategory.SURFACE, FloraPainterNode::new));
 }

@@ -63,6 +63,27 @@ public final class VanillaBiomeSource {
     }
 
     /**
+     * An estimate of the height of the land Minecraft generates at a location in biome coordinates (one quarter of
+     * block coordinates): where the terrain "depth" from the continentalness, erosion and weirdness spline reaches zero.
+     * It leaves out the small scale noise and the jaggedness of peaks, so it gives the broad shape of the land: low
+     * under oceans, around sea level on coasts and plains, high in mountains.
+     *
+     * @return The estimated height in blocks.
+     */
+    public float getApproximateSurfaceHeight(int x, int z) {
+        double px = x, pz = z;
+        px += shift.sample(x, 0, z) * 4.0;
+        pz += shift.sample(z, x, 0) * 4.0;
+        final float c = (float) continentalness.sample(px, 0, pz);
+        final float e = (float) erosion.sample(px, 0, pz);
+        final float w = (float) weirdness.sample(px, 0, pz);
+        final float[] splineParams = {c, e, -3.0F * (Math.abs(Math.abs(w) - 0.6666667F) - 0.33333334F), w};
+        final double offset = spline.get(splineParams) + 0.015F;
+        // depth = 1 - y / 128 - 83 / 160 + offset is zero at the surface
+        return (float) (128 * (1 - 83.0 / 160 + offset));
+    }
+
+    /**
      * Get the biome at a location in biome coordinates (one quarter of block coordinates), taking the depth below the
      * terrain surface into account, as Minecraft does.
      *

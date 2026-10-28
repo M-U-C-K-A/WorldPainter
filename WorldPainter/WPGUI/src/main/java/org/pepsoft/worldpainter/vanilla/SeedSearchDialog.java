@@ -64,6 +64,9 @@ public class SeedSearchDialog extends WorldPainterDialog {
 
         statusLabel = new JLabel(" ");
         final JPanel bottom = new JPanel(new BorderLayout(12, 0));
+        blendCheckBox = new JCheckBox("Then blend the edges of the map into the land of this seed (100 blocks)", lastBlend);
+        blendCheckBox.setToolTipText("Add 100 blocks around the map which go over smoothly into the height, biomes and surface Minecraft generates for the seed beyond them");
+        bottom.add(blendCheckBox, BorderLayout.NORTH);
         bottom.add(statusLabel, BorderLayout.CENTER);
         final JPanel buttons = new JPanel(new FlowLayout(FlowLayout.TRAILING, 6, 0));
         stopButton = new JButton("Stop");
@@ -76,6 +79,7 @@ public class SeedSearchDialog extends WorldPainterDialog {
             final Result result = resultList.getSelectedValue();
             if (result != null) {
                 selectedSeed = result.seed;
+                lastBlend = blendCheckBox.isSelected();
                 stopSearch();
                 ok();
             }
@@ -102,6 +106,13 @@ public class SeedSearchDialog extends WorldPainterDialog {
     /**
      * The seed chosen by the user, if the dialog was not cancelled.
      */
+    /**
+     * Whether the user wants the edges of the map blended into the land of the chosen seed.
+     */
+    public boolean isBlendEdges() {
+        return blendCheckBox.isSelected();
+    }
+
     public long getSelectedSeed() {
         return selectedSeed;
     }
@@ -252,6 +263,8 @@ public class SeedSearchDialog extends WorldPainterDialog {
     private final JList<Result> resultList;
     private final JLabel preview, statusLabel;
     private final JButton stopButton, useButton;
+    private final JCheckBox blendCheckBox;
+    private static boolean lastBlend;
     private final Timer timer;
     private final List<Result> best = new ArrayList<>(), candidates = new ArrayList<>();
     private final AtomicBoolean stopped = new AtomicBoolean();

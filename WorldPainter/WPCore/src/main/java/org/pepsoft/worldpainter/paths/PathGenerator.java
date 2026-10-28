@@ -43,7 +43,22 @@ public final class PathGenerator {
      * Work out a path between two points, without changing the dimension.
      */
     public static PathPlan plan(Dimension dimension, Point a, Point b, PathSettings settings) {
-        final List<double[]> route = route(dimension, a, b, settings);
+        return plan(dimension, List.of(a, b), settings);
+    }
+
+    /**
+     * Work out a path through a series of points (at least two), without changing the dimension.
+     */
+    public static PathPlan plan(Dimension dimension, List<Point> waypoints, PathSettings settings) {
+        if (waypoints.size() < 2) {
+            throw new IllegalArgumentException("A path needs at least two points");
+        }
+        final List<double[]> route = new ArrayList<>();
+        for (int i = 0; i < waypoints.size() - 1; i++) {
+            final List<double[]> leg = route(dimension, waypoints.get(i), waypoints.get(i + 1), settings);
+            // The legs share their end and start points
+            route.addAll((i == 0) ? leg : leg.subList(1, leg.size()));
+        }
         final List<double[]> points = resample(smooth(route, 3), 1.0);
         final int n = points.size();
         final float[] terrain = new float[n], water = new float[n];

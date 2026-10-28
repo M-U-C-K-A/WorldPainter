@@ -1,5 +1,6 @@
 package org.pepsoft.worldpainter.nodes;
 
+import org.pepsoft.worldpainter.MaterialGroup;
 import org.pepsoft.worldpainter.Terrain;
 
 /**
@@ -247,6 +248,132 @@ public final class ExampleGraphs {
                 b.wire(highlands, b.biome(MinecraftBiome.TAIGA, 1.2, 2, 3));
                 break;
             }
+            case TOWER_KARST: {
+                // Low, gently rolling jungle floor with tall, fluted rock towers rising out of it
+                final NoiseNode ground = b.noise(NoiseNode.Kind.PERLIN, 500, 4, 31, 0, 0);
+                final CurveNode floor = b.add(new CurveNode(0, 0.02f, 1, 0.12f), 1, 0);
+                b.wire(ground, floor);
+                final TowersNode towers = b.add(new TowersNode(), 0, 1);
+                towers.set(TowersNode.SPACING, 90);
+                towers.set(TowersNode.WIDTH, 0.3);
+                towers.set(TowersNode.DENSITY, 0.8);
+                towers.set(TowersNode.HEIGHT_VARIATION, 0.55);
+                towers.set(Node.VARIANT, 32);
+                final StrataNode ledges = b.add(new StrataNode(), 1, 1);
+                ledges.set(StrataNode.LAYERS, 20);
+                ledges.set(StrataNode.STRENGTH, 0.35);
+                ledges.set(Node.VARIANT, 33);
+                b.wire(towers, ledges);
+                final CombineNode land = b.add(new CombineNode(CombineNode.Mode.MAX), 2, 0);
+                b.wire(floor, land, 0);
+                b.wire(ledges, land, 1);
+                b.output(land, 3, 0, w + 2, w + 150, minHeight, maxHeight);
+                // Mossy rock walls, green tops, and a dense rainforest on the ground
+                final SlopeMaskNode walls = b.slope(45, 90, 6, 0, 2);
+                b.wire(walls, b.material(MaterialGroup.MOSSY_ROCK, 1.3, 1, 2));
+                final SlopeMaskNode gentle = b.slope(0, 35, 6, 0, 3);
+                b.wire(gentle, b.material(MaterialGroup.FOREST_FLOOR, 1, 1, 3));
+                final HeightMaskNode lowland = b.height(w, w + 20, 6, 0, 4);
+                final CombineNode jungleFloor = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 1, 4);
+                b.wire(lowland, jungleFloor, 0);
+                b.wire(gentle, jungleFloor, 1);
+                b.wire(jungleFloor, b.flora(Vegetation.RAINFOREST, 0.75, 2, 4));
+                b.wire(jungleFloor, b.flora(Vegetation.BUSHES, 0.5, 2, 5));
+                final HeightMaskNode summits = b.height(w + 40, 4096, 10, 0, 5);
+                final CombineNode tops = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 1, 5);
+                b.wire(summits, tops, 0);
+                b.wire(gentle, tops, 1);
+                b.wire(tops, b.flora(Vegetation.BUSHES, 0.6, 3, 5));
+                b.biome(MinecraftBiome.JUNGLE, 0.6, 3, 2);
+                break;
+            }
+            case RED_CLIFFS: {
+                // Stacked plateaus with layered red rock walls, snow on the ledges and tall spruces on the shelves
+                final PlateausNode plateaus = b.add(new PlateausNode(), 0, 0);
+                plateaus.set(PlateausNode.SCALE, 700);
+                plateaus.set(PlateausNode.LEVELS, 3);
+                plateaus.set(PlateausNode.COVERAGE, 0.6);
+                plateaus.set(Node.VARIANT, 41);
+                final NoiseNode relief = b.noise(NoiseNode.Kind.RIDGED, 260, 5, 42, 40, 1);
+                final CombineNode rough = b.add(new CombineNode(CombineNode.Mode.ADD), 1, 0);
+                rough.set(CombineNode.STRENGTH, 0.12);
+                b.wire(plateaus, rough, 0);
+                b.wire(relief, rough, 1);
+                final StrataNode strata = b.add(new StrataNode(), 2, 0);
+                strata.set(StrataNode.LAYERS, 26);
+                strata.set(StrataNode.SHARPNESS, 0.75);
+                strata.set(Node.VARIANT, 43);
+                b.wire(rough, strata);
+                final ThermalErosionNode crumble = b.add(new ThermalErosionNode(), 3, 0);
+                crumble.set(ErosionNode.ITERATIONS, 8.0);
+                crumble.set(ThermalErosionNode.ANGLE, 70.0);
+                b.wire(strata, crumble);
+                b.output(crumble, 4, 0, w + 4, w + 190, minHeight, maxHeight);
+                final SlopeMaskNode walls = b.slope(40, 90, 6, 0, 2);
+                b.wire(walls, b.material(MaterialGroup.RED_CLIFFS, 1.4, 1, 2));
+                final SlopeMaskNode ledges = b.slope(0, 30, 6, 0, 3);
+                final HeightMaskNode high = b.height(w + 110, 4096, 12, 0, 4);
+                final CombineNode snowy = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 1, 4);
+                b.wire(ledges, snowy, 0);
+                b.wire(high, snowy, 1);
+                b.wire(snowy, b.material(MaterialGroup.SNOWY_ROCK, 1.2, 2, 4));
+                b.wire(snowy, b.flora(Vegetation.SNOW, 1, 3, 4));
+                b.wire(ledges, b.material(MaterialGroup.FOREST_FLOOR, 1, 1, 3));
+                b.wire(ledges, b.flora(Vegetation.TALL_SPRUCES, 0.45, 2, 3));
+                b.wire(ledges, b.flora(Vegetation.GRASS_AND_FLOWERS, 0.25, 3, 3));
+                b.biome(MinecraftBiome.WINDSWEPT_HILLS, 0.6, 3, 2);
+                break;
+            }
+            case ALPINE_VALLEY: {
+                // High ridged mountains around a wide valley with a river and lakes; firs and spruces below the snow
+                final NoiseNode base = b.noise(NoiseNode.Kind.PERLIN, 2000, 4, 51, 0, 0);
+                final NoiseNode peaks = b.noise(NoiseNode.Kind.RIDGED, 700, 7, 52, 80, 1);
+                final CurveNode ranges = b.add(new CurveNode(0, 0, 0.35f, 0.04f, 0.7f, 0.45f, 1, 0.55f), 1, 0);
+                b.wire(base, ranges);
+                final CombineNode mountains = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 2, 0);
+                b.wire(peaks, mountains, 0);
+                b.wire(ranges, mountains, 1);
+                final CombineNode land = b.add(new CombineNode(CombineNode.Mode.ADD), 3, 0);
+                land.set(CombineNode.STRENGTH, 0.5);
+                b.wire(ranges, land, 0);
+                b.wire(mountains, land, 1);
+                // Keep the sum within range, with wide valley floors
+                final ClampNode heights = b.add(new ClampNode(), 3, 1);
+                b.wire(land, heights);
+                final GullyErosionNode erosion = b.add(new GullyErosionNode(), 4, 0);
+                erosion.set(GullyErosionNode.DEPTH, 45);
+                erosion.set(Node.VARIANT, 53);
+                b.wire(heights, erosion);
+                final LakeNode lakes = b.add(new LakeNode(), 5, 0);
+                lakes.set(LakeNode.MAX_HEIGHT, w + 40);
+                lakes.set(Node.VARIANT, 54);
+                b.wire(erosion, lakes);
+                final RiverNode rivers = b.add(new RiverNode(), 6, 0);
+                rivers.set(RiverNode.MAX_HEIGHT, w + 60);
+                rivers.set(RiverNode.WIDTH, 7);
+                rivers.set(Node.VARIANT, 55);
+                b.wire(lakes, rivers);
+                b.output(rivers, 7, 0, w - 4, w + 200, minHeight, maxHeight);
+                final SlopeMaskNode cliffs = b.slope(42, 90, 6, 0, 2);
+                b.wire(cliffs, b.material(MaterialGroup.GREY_CLIFFS, 1.3, 1, 2));
+                final SlopeMaskNode steep = b.slope(30, 42, 4, 0, 3);
+                b.wire(steep, b.material(MaterialGroup.SCREE, 1.1, 1, 3));
+                final HeightMaskNode snowline = b.height(w + 150, 4096, 25, 2, 2);
+                b.wire(snowline, b.material(MaterialGroup.SNOWY_ROCK, 1.2, 3, 2));
+                b.wire(snowline, b.flora(Vegetation.SNOW, 1, 4, 2));
+                b.wire(snowline, b.biome(MinecraftBiome.SNOWY_SLOPES, 1.1, 5, 2));
+                final HeightMaskNode forestBelt = b.height(w + 2, w + 140, 15, 2, 4);
+                final SlopeMaskNode gentle = b.slope(0, 32, 6, 2, 5);
+                final CombineNode forests = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 3, 4);
+                b.wire(forestBelt, forests, 0);
+                b.wire(gentle, forests, 1);
+                b.wire(forests, b.material(MaterialGroup.FOREST_FLOOR, 1, 4, 3));
+                b.wire(forests, b.flora(Vegetation.FIRS, 0.55, 4, 4));
+                b.wire(forests, b.flora(Vegetation.TALL_SPRUCES, 0.3, 4, 5));
+                b.wire(forests, b.biome(MinecraftBiome.OLD_GROWTH_SPRUCE_TAIGA, 1, 5, 4));
+                b.biome(MinecraftBiome.MEADOW, 0.55, 5, 5);
+                break;
+            }
             case ERODE_CURRENT_MAP: {
                 final CurrentMapNode current = b.add(new CurrentMapNode(), 0, 0);
                 final GullyErosionNode erosion = b.add(new GullyErosionNode(), 1, 0);
@@ -273,6 +400,9 @@ public final class ExampleGraphs {
         VOLCANIC_ISLAND("Volcanic island"),
         LAKES_AND_FORESTS("Lakes and forests"),
         RIVER_VALLEYS("River valleys"),
+        TOWER_KARST("Tower karst jungle"),
+        RED_CLIFFS("Red cliffs and spruces"),
+        ALPINE_VALLEY("Alpine valley"),
         ERODE_CURRENT_MAP("Erode the current map");
 
         Example(String displayName) {
@@ -337,6 +467,12 @@ public final class ExampleGraphs {
         BiomePainterNode biome(MinecraftBiome biome, double strength, int column, int row) {
             final BiomePainterNode node = add(new BiomePainterNode(biome), column, row);
             node.set(BiomePainterNode.STRENGTH, strength);
+            return node;
+        }
+
+        MaterialPainterNode material(MaterialGroup group, double strength, int column, int row) {
+            final MaterialPainterNode node = add(new MaterialPainterNode(group), column, row);
+            node.set(MaterialPainterNode.STRENGTH, strength);
             return node;
         }
 

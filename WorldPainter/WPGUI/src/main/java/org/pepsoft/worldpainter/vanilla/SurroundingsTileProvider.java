@@ -153,12 +153,13 @@ public class SurroundingsTileProvider implements TileProvider {
     }
 
     /**
-     * The distance from a location to the rectangular extent of the map.
+     * The distance from a location to the rectangular extent of the map. It is measured as a "squircle" rather than a
+     * circle around the corners, so that the shown area has only gently rounded corners.
      */
     private float distanceToMap(int x, int y) {
         final int x1 = bounds.x + margin, y1 = bounds.y + margin, x2 = bounds.x + bounds.width - margin, y2 = bounds.y + bounds.height - margin;
-        final int dx = Math.max(Math.max(x1 - x, 0), x - x2), dy = Math.max(Math.max(y1 - y, 0), y - y2);
-        return (float) Math.sqrt(dx * dx + dy * dy);
+        final double dx = Math.max(Math.max(x1 - x, 0), x - x2), dy = Math.max(Math.max(y1 - y, 0), y - y2);
+        return (float) Math.pow(Math.pow(dx, 6) + Math.pow(dy, 6), 1.0 / 6);
     }
 
     private static int darken(int colour) {

@@ -621,6 +621,8 @@ public class NodeGraphDialog extends WorldPainterDialog {
             return ((MinecraftBiome) target).getColour();
         } else if (target instanceof Vegetation) {
             return ((Vegetation) target).getColour();
+        } else if (target instanceof org.pepsoft.worldpainter.MaterialGroup) {
+            return ((org.pepsoft.worldpainter.MaterialGroup) target).getColour();
         } else {
             return 0xffffff;
         }

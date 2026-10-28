@@ -1,5 +1,8 @@
 package org.pepsoft.worldpainter.procedural;
 
+import org.pepsoft.worldpainter.layers.Biome;
+import org.pepsoft.worldpainter.vanilla.VanillaBiomeSource;
+import org.pepsoft.worldpainter.vanilla.VanillaBiomes;
 import org.pepsoft.util.ProgressReceiver;
 import org.pepsoft.util.ProgressReceiver.OperationCancelled;
 import org.pepsoft.util.SubProgressReceiver;
@@ -74,6 +77,19 @@ public class EdgeBlendOperation {
 
     public void setTarget(ProceduralTerrainSettings target) {
         this.target = target;
+    }
+
+    /**
+     * The land Minecraft generates for a seed, to blend into instead of a procedural terrain or a flat level: its
+     * (approximate) height, its biomes and matching terrain types, so that the map joins the chunks Minecraft generates
+     * around it. {@code null} to not blend into the vanilla land.
+     */
+    public VanillaBiomeSource getVanillaTarget() {
+        return vanillaTarget;
+    }
+
+    public void setVanillaTarget(VanillaBiomeSource vanillaTarget) {
+        this.vanillaTarget = vanillaTarget;
     }
 
     public int getTargetHeight() {
@@ -185,6 +201,9 @@ public class EdgeBlendOperation {
 
         // Process the new tiles first, since they need to sample the unmodified edge of the original map
         final Context context = new Context(dimension, original, targetTerrainGenerator, irregularityNoise);
+        if (vanillaTarget != null) {
+            context.sampleVanilla(vanillaTarget, newTiles, edgeTiles);
+        }
         final float split = (float) newTiles.size() / Math.max(newTiles.size() + edgeTiles.size(), 1);
         if (! newTiles.isEmpty()) {
             ParallelTileProcessor.process(newTiles, tile -> processOutsideTile(context, tile), ((progressReceiver != null) && (split < 1.0f)) ? new SubProgressReceiver(progressReceiver, 0.0f, split) : progressReceiver);
@@ -290,7 +309,13 @@ public class EdgeBlendOperation {
                 if (newTile || (targetWeights[i] >= 0.5f)) {
                     if (applyTerrain) {
                         final float slope = ProceduralTerrain.slope(heights[clampedIndex(x - 1, y)], heights[clampedIndex(x + 1, y)], heights[clampedIndex(x, y - 1)], heights[clampedIndex(x, y + 1)]);
-                        tile.setTerrain(x, y, context.surface.getTerrain(x0 + x, y0 + y, heights[i], slope));
+                        if (context.vanillaBiomes != null) {
+                            final int biome = context.vanillaBiome(x0 + x, y0 + y);
+                            tile.setTerrain(x, y, vanillaTerrain(VanillaBiomes.getCategory(biome), heights[i], slope));
+                            tile.setLayerValue(Biome.INSTANCE, x, y, VanillaBiomes.toWorldPainterBiome(biome));
+                        } else {
+                            tile.setTerrain(x, y, context.surface.getTerrain(x0 + x, y0 + y, heights[i], slope));
+                        }
                     }
                     if (applyWater) {
                         tile.setWaterLevel(x, y, (heights[i] < waterLevel) ? waterLevel : noWater);
@@ -302,6 +327,38 @@ public class EdgeBlendOperation {
                     tile.setWaterLevel(x, y, waterLevel);
                 }
             }
+        }
+    }
+
+    /**
+     * A terrain type which looks like what Minecraft puts on the surface of a biome.
+     */
+    private static Terrain vanillaTerrain(VanillaBiomes.Category category, float height, float slope) {
+        if (slope > 50) {
+            return Terrain.ROCK;
+        }
+        switch (category) {
+            case OCEAN:
+            case RIVER:
+                return (height < 50) ? Terrain.GRAVEL : Terrain.SAND;
+            case BEACH:
+                return Terrain.BEACHES;
+            case DESERT:
+                return Terrain.DESERT;
+            case BADLANDS:
+                return (slope > 25) ? Terrain.MESA : Terrain.RED_DESERT;
+            case SNOWY:
+                return Terrain.SNOW;
+            case MOUNTAINS:
+                return (height > 140) ? Terrain.DEEP_SNOW : ((slope > 30) ? Terrain.STONE_MIX : Terrain.GRASS);
+            case TAIGA:
+                return Terrain.PODZOL;
+            case MUSHROOM:
+                return Terrain.MYCELIUM;
+            case SWAMP:
+                return Terrain.MUD;
+            default:
+                return (slope > 35) ? Terrain.STONE_MIX : Terrain.GRASS;
         }
     }
 
@@ -396,10 +453,15 @@ public class EdgeBlendOperation {
     private Curve curve = Curve.SMOOTH;
     private float irregularity = 0.5f;
     private ProceduralTerrainSettings target;
+    private VanillaBiomeSource vanillaTarget;
     private Terrain targetTerrain = Terrain.GRASS;
     private boolean applyTerrain = true, applyWater = true;
     private long seed;
 
+    /**
+     * The water level of Minecraft's oceans (the top of the water is at 62).
+     */
+    private static final int VANILLA_SEA_LEVEL = 63;
     private static final int BLUR_RADIUS = 2, COARSE_CELL_BITS = 2, MIP_LEVELS = TILE_SIZE_BITS - COARSE_CELL_BITS + 1;
     private static final float[] BLUR_WEIGHTS = new float[(2 * BLUR_RADIUS + 1) * (2 * BLUR_RADIUS + 1)];
 
@@ -428,8 +490,82 @@ public class EdgeBlendOperation {
         }
 
         float targetHeight(int x, int y) {
+            if (vanillaHeights != null) {
+                return vanillaHeight(x, y);
+            }
             return (targetTerrainGenerator != null) ? targetTerrainGenerator.getHeight(x, y) : targetHeight;
         }
+
+        /**
+         * Work out the vanilla height and biome, at Minecraft's biome resolution (every four blocks), for the area
+         * covered by the tiles which will be changed.
+         */
+        void sampleVanilla(VanillaBiomeSource source, List<Tile> newTiles, List<Tile> edgeTiles) {
+            int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
+            for (List<Tile> tiles: List.of(newTiles, edgeTiles)) {
+                for (Tile tile: tiles) {
+                    minX = Math.min(minX, tile.getX());
+                    minY = Math.min(minY, tile.getY());
+                    maxX = Math.max(maxX, tile.getX());
+                    maxY = Math.max(maxY, tile.getY());
+                }
+            }
+            if (minX > maxX) {
+                return;
+            }
+            // In biome coordinates, with a margin of one for the interpolation
+            quartX0 = (minX << TILE_SIZE_BITS >> 2) - 1;
+            quartY0 = (minY << TILE_SIZE_BITS >> 2) - 1;
+            quartWidth = ((maxX - minX + 1) << TILE_SIZE_BITS >> 2) + 3;
+            quartHeight = ((maxY - minY + 1) << TILE_SIZE_BITS >> 2) + 3;
+            final float[] heights = new float[quartWidth * quartHeight];
+            final int[] biomes = new int[quartWidth * quartHeight];
+            java.util.stream.IntStream.range(0, quartHeight).parallel().forEach(qy -> {
+                for (int qx = 0; qx < quartWidth; qx++) {
+                    final int i = qy * quartWidth + qx;
+                    final int biome = source.getSurfaceBiome(quartX0 + qx, quartY0 + qy);
+                    float height = source.getApproximateSurfaceHeight(quartX0 + qx, quartY0 + qy);
+                    // Keep land above the sea and water below it, as Minecraft's own surface does
+                    switch (VanillaBiomes.getCategory(biome)) {
+                        case OCEAN:
+                            height = Math.min(height, VANILLA_SEA_LEVEL - 6);
+                            break;
+                        case RIVER:
+                            height = Math.min(height, VANILLA_SEA_LEVEL - 3);
+                            break;
+                        case BEACH:
+                            height = Math.max(VANILLA_SEA_LEVEL, Math.min(height, VANILLA_SEA_LEVEL + 4));
+                            break;
+                        default:
+                            height = Math.max(height, VANILLA_SEA_LEVEL + 2);
+                            break;
+                    }
+                    heights[i] = height;
+                    biomes[i] = biome;
+                }
+            });
+            vanillaHeights = heights;
+            vanillaBiomes = biomes;
+        }
+
+        private float vanillaHeight(int x, int y) {
+            // Bilinear interpolation between the centres of the biome cells
+            final double qx = (x - 1.5) / 4.0 - quartX0, qy = (y - 1.5) / 4.0 - quartY0;
+            final int ix = Math.max(0, Math.min(quartWidth - 2, (int) Math.floor(qx))), iy = Math.max(0, Math.min(quartHeight - 2, (int) Math.floor(qy)));
+            final float fx = (float) Math.max(0, Math.min(1, qx - ix)), fy = (float) Math.max(0, Math.min(1, qy - iy));
+            final int i = iy * quartWidth + ix;
+            return (vanillaHeights[i] * (1 - fx) + vanillaHeights[i + 1] * fx) * (1 - fy)
+                    + (vanillaHeights[i + quartWidth] * (1 - fx) + vanillaHeights[i + quartWidth + 1] * fx) * fy;
+        }
+
+        int vanillaBiome(int x, int y) {
+            final int qx = Math.max(0, Math.min(quartWidth - 1, (x >> 2) - quartX0)), qy = Math.max(0, Math.min(quartHeight - 1, (y >> 2) - quartY0));
+            return vanillaBiomes[qy * quartWidth + qx];
+        }
+
+        private float[] vanillaHeights;
+        private int[] vanillaBiomes;
+        private int quartX0, quartY0, quartWidth, quartHeight;
 
         /**
          * Sample the height of the original map at a location, smoothed to a level of detail (0 = averaged over 4x4

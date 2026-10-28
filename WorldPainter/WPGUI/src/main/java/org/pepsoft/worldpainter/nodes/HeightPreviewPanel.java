@@ -147,7 +147,7 @@ public class HeightPreviewPanel extends JComponent {
         final List<Integer> terrainIndices = new ArrayList<>(), biomeIndices = new ArrayList<>(), vegetationIndices = new ArrayList<>();
         for (int p = 0; p < painters.size(); p++) {
             final Object target = painters.get(p).getTarget();
-            if (target instanceof Terrain) {
+            if ((target instanceof Terrain) || (target instanceof org.pepsoft.worldpainter.MaterialGroup)) {
                 terrainIndices.add(p);
             } else if (target instanceof MinecraftBiome) {
                 biomeIndices.add(p);
@@ -178,8 +178,14 @@ public class HeightPreviewPanel extends JComponent {
                 } else {
                     final int winner = SurfaceRules.winner(terrainStrengths, index, worldX, worldY, terrainSalts);
                     final int intHeight = Math.round(h);
-                    colour = (winner >= 0) ? ((Terrain) painters.get(terrainIndices.get(winner)).getTarget()).getColour(seed, worldX, worldY, intHeight, intHeight, platform, colourScheme)
-                            : elevationColour(h - seaLevelForColours);
+                    final Object terrain = (winner >= 0) ? painters.get(terrainIndices.get(winner)).getTarget() : null;
+                    if (terrain instanceof Terrain) {
+                        colour = ((Terrain) terrain).getColour(seed, worldX, worldY, intHeight, intHeight, platform, colourScheme);
+                    } else if (terrain instanceof org.pepsoft.worldpainter.MaterialGroup) {
+                        colour = ((org.pepsoft.worldpainter.MaterialGroup) terrain).getColour();
+                    } else {
+                        colour = elevationColour(h - seaLevelForColours);
+                    }
                     for (int p: vegetationIndices) {
                         final Vegetation vegetation = (Vegetation) painters.get(p).getTarget();
                         final float strength = Math.min(1.0f, strengths[p][index]);

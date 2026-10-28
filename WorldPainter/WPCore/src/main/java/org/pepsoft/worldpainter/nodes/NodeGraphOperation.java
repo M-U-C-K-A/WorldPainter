@@ -1,5 +1,8 @@
 package org.pepsoft.worldpainter.nodes;
 
+import org.pepsoft.worldpainter.MaterialGroup;
+import org.pepsoft.worldpainter.layers.Bo2Layer;
+import org.pepsoft.worldpainter.layers.bo2.TreePack;
 import org.pepsoft.util.ProgressReceiver;
 import org.pepsoft.util.ProgressReceiver.OperationCancelled;
 import org.pepsoft.worldpainter.Dimension;
@@ -131,7 +134,7 @@ public class NodeGraphOperation {
         final MapSource mapSource = graph.contains(CurrentMapNode.class) ? new FrozenMapSource(dimension)
                 : (graph.contains(SelectionMaskNode.class) ? new DimensionMapSource(dimension) : null);
         final CompiledGraph compiled = graph.compile(getMapBounds(dimension), mapSource);
-        final List<Painter> painters = applyPainters ? compiled.getPainters() : Collections.emptyList();
+        final List<Painter> painters = applyPainters ? resolveMaterialGroups(compiled.getPainters()) : Collections.emptyList();
         final Map<Vegetation, Layer> vegetationLayers = resolveVegetationLayers(painters);
         final Set<Point> tileCoords = selectionOnly ? SelectionWeights.affectedTiles(dimension, feather) : dimension.getTileCoords();
         final Map<Point, List<Tile>> groups = new HashMap<>();
@@ -161,6 +164,22 @@ public class NodeGraphOperation {
     }
 
     /**
+     * Turn the material mixes painted by the painters into custom terrain types (setting them up if necessary).
+     */
+    private static List<Painter> resolveMaterialGroups(List<Painter> painters) {
+        final List<Painter> result = new ArrayList<>(painters.size());
+        for (Painter painter: painters) {
+            if (painter.getTarget() instanceof MaterialGroup) {
+                final Terrain terrain = ((MaterialGroup) painter.getTarget()).install();
+                result.add(painter.withTarget((terrain != null) ? terrain : Terrain.STONE));
+            } else {
+                result.add(painter);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Find or create the layers for the vegetation painted by the painters.
      */
     private Map<Vegetation, Layer> resolveVegetationLayers(List<Painter> painters) {
@@ -170,6 +189,21 @@ public class NodeGraphOperation {
                 final Vegetation vegetation = (Vegetation) painter.getTarget();
                 if (vegetation.getLayer() != null) {
                     layers.put(vegetation, vegetation.getLayer());
+                } else if (vegetation.getTreeKind() != null) {
+                    final TreePack.Kind kind = vegetation.getTreeKind();
+                    Layer layer = null;
+                    for (CustomLayer existingLayer: existingLayers) {
+                        if ((existingLayer instanceof Bo2Layer) && existingLayer.getName().equals(kind.getLayerName())) {
+                            layer = existingLayer;
+                            break;
+                        }
+                    }
+                    if (layer == null) {
+                        final Bo2Layer created = TreePack.createLayer(kind);
+                        createdLayers.add(created);
+                        layer = created;
+                    }
+                    layers.put(vegetation, layer);
                 } else {
                     final PlantLayerPresets.Preset preset = vegetation.getPlantPreset();
                     PlantLayer layer = null;

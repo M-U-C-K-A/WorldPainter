@@ -37,6 +37,13 @@ public final class Painter {
         return evaluation.evaluate(mask, region);
     }
 
+    /**
+     * The same painter, painting something else.
+     */
+    Painter withTarget(Object target) {
+        return new Painter(nodeId, target, onlyOnLand, mask);
+    }
+
     private final int nodeId;
     private final Object target;
     private final boolean onlyOnLand;

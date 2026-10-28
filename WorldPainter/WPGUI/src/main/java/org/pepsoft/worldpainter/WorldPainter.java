@@ -746,6 +746,9 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
                 if (drawOverlays) {
                     drawOverlays(g2);
                 }
+                if (toolOverlay != null) {
+                    toolOverlay.paint(g2, scale);
+                }
                 if (drawBrush || drawViewDistance || drawWalkingDistance) {
                     g2.setColor(Color.BLACK);
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -764,6 +767,25 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
                 g2.setFont(savedFont);
             }
         }
+    }
+
+    /**
+     * Set something which a tool draws over the map, such as the points of a path being laid out, or {@code null}.
+     */
+    public void setToolOverlay(ToolOverlay toolOverlay) {
+        this.toolOverlay = toolOverlay;
+        repaint();
+    }
+
+    /**
+     * Draws over the map, in world coordinates (one unit is one block).
+     */
+    public interface ToolOverlay {
+        /**
+         * @param g2 The graphics, transformed to world coordinates.
+         * @param scale The number of pixels per block.
+         */
+        void paint(Graphics2D g2, float scale);
     }
 
     private void drawBrushEtc(Graphics2D g2, float scale, boolean dashed) {
@@ -1092,6 +1114,7 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
     private Dimension dimension, backgroundDimension; // TODO make this more generic
     private int mouseX, mouseY, radius, effectiveRadius, contourSeparation, brushRotation, backgroundDimensionZoom,
             viewDistance;
+    private ToolOverlay toolOverlay;
     private boolean drawBrush, drawOverlays, drawContours, drawViewDistance, drawWalkingDistance,
             drawMinecraftBorder = true, drawBorders = true, drawBiomes = true;
     private BrushShape brushShape;

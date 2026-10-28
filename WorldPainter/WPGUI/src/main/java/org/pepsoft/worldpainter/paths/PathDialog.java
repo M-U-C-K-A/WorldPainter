@@ -23,18 +23,19 @@ import java.util.concurrent.ExecutionException;
  * height profile, showing where it runs on the ground, on bridges and through tunnels.
  */
 public class PathDialog extends WorldPainterDialog {
-    public PathDialog(Window parent, Dimension dimension, WorldPainterView view, ColourScheme colourScheme, Point start, Point end, int layerNumber) {
+    public PathDialog(Window parent, Dimension dimension, WorldPainterView view, ColourScheme colourScheme, List<Point> waypoints, int layerNumber) {
         super(parent);
         this.dimension = dimension;
         this.view = view;
-        this.start = start;
-        this.end = end;
+        this.waypoints = waypoints;
+        final Point start = waypoints.get(0), end = waypoints.get(waypoints.size() - 1);
         this.layerNumber = layerNumber;
         setTitle("Path");
 
         final JPanel content = new JPanel(new BorderLayout(12, 12));
         content.setBorder(new EmptyBorder(12, 12, 12, 12));
-        content.add(new JLabel("<html><div style=\"width: 640px\">A path from <b>" + start.x + ", " + start.y + "</b> to <b>" + end.x + ", " + end.y + "</b>, "
+        content.add(new JLabel("<html><div style=\"width: 640px\">A path from <b>" + start.x + ", " + start.y + "</b> to <b>" + end.x + ", " + end.y + "</b>"
+                + ((waypoints.size() > 2) ? (" through " + (waypoints.size() - 2) + " point" + ((waypoints.size() > 3) ? "s" : "")) : "") + ", "
                 + "laid out over the land with a limited slope. Bridges and tunnels are created as layers, which you can edit afterwards like any other.</div></html>"), BorderLayout.NORTH);
 
         final JPanel form = new JPanel(new GridBagLayout());
@@ -196,7 +197,7 @@ public class PathDialog extends WorldPainterDialog {
         new SwingWorker<PathPlan, Void>() {
             @Override
             protected PathPlan doInBackground() {
-                return PathGenerator.plan(dimension, start, end, settings);
+                return PathGenerator.plan(dimension, waypoints, settings);
             }
 
             @Override
@@ -259,7 +260,7 @@ public class PathDialog extends WorldPainterDialog {
 
     private final Dimension dimension;
     private final WorldPainterView view;
-    private final Point start, end;
+    private final List<Point> waypoints;
     private final int layerNumber;
     private final JSlider curvatureSlider;
     private final JLabel curvatureLabel, infoLabel;
