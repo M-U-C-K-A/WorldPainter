@@ -1,25 +1,67 @@
 package org.pepsoft.worldpainter.nodes;
 
 import java.awt.*;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.List;
 
 /**
  * A compiled, thread safe evaluator for a {@link NodeGraph}. The values are deterministic functions of the world
  * coordinates and the seed, so arbitrarily large areas can be generated tile by tile, in parallel, without seams.
  */
 public final class CompiledGraph {
-    CompiledGraph(NodeGraph graph, Rectangle mapBounds) {
+    CompiledGraph(NodeGraph graph, Rectangle mapBounds, MapSource mapSource) {
         final OutputNode outputNode = graph.getOutputNode();
         minHeight = (float) outputNode.getDouble(OutputNode.MIN_HEIGHT);
         maxHeight = (float) outputNode.getDouble(OutputNode.MAX_HEIGHT);
-        context = new CompileContext(graph.getSeed(), minHeight, maxHeight, mapBounds);
+        context = new CompileContext(graph.getSeed(), minHeight, maxHeight, mapBounds, mapSource);
+        terrainNode = graph.getInput(outputNode, 0);
         for (Node node: graph.getNodes()) {
             compile(graph, node, new HashSet<>());
         }
         output = compiled.get(outputNode.getId());
+        outputNodeId = outputNode.getId();
+        final List<Painter> painters = new ArrayList<>();
+        final List<WaterBody> waterBodies = new ArrayList<>();
+        for (Node node: graph.getNodes()) {
+            if (node instanceof PainterNode) {
+                painters.add(new Painter(node.getId(), ((PainterNode) node).getTarget(), (node instanceof FloraPainterNode) && ((FloraPainterNode) node).isOnlyOnLand(), compiled.get(node.getId())));
+            } else if ((node instanceof WaterNode) && (terrainNode != null) && graph.dependsOn(terrainNode, node)) {
+                // Only water which is carved into the final terrain is filled; it also paints its bed and biome
+                final WaterNode waterNode = (WaterNode) node;
+                final WaterNode.CompiledWater water = (WaterNode.CompiledWater) compiled.get(node.getId());
+                waterBodies.add(new WaterBody(node.getId(), water));
+                if (waterNode.getBedTerrain() != null) {
+                    painters.add(new Painter(node.getId(), waterNode.getBedTerrain(), false, water.getStrengths()));
+                }
+                if (waterNode.getBiome() != null) {
+                    painters.add(new Painter(node.getId(), waterNode.getBiome(), false, water.getStrengths()));
+                }
+            }
+        }
+        this.painters = Collections.unmodifiableList(painters);
+        this.waterBodies = Collections.unmodifiableList(waterBodies);
+    }
+
+    /**
+     * The ID of the output node, for {@link #evaluate(Evaluation, int, Region)}.
+     */
+    public int getOutputNodeId() {
+        return outputNodeId;
+    }
+
+    /**
+     * The rivers and lakes carved into the final terrain.
+     */
+    public List<WaterBody> getWaterBodies() {
+        return waterBodies;
+    }
+
+    /**
+     * The surface painters of the graph, in the order of the graph, including those for the beds and biomes of the
+     * {@link #getWaterBodies() water bodies}.
+     */
+    public List<Painter> getPainters() {
+        return painters;
     }
 
     /**
@@ -98,7 +140,11 @@ public final class CompiledGraph {
         final int inputCount = node.getInputNames().size();
         final CompiledNode[] inputs = new CompiledNode[inputCount];
         for (int i = 0; i < inputCount; i++) {
-            final Node input = graph.getInput(node, i);
+            Node input = graph.getInput(node, i);
+            if ((input == null) && node.isTerrainInput(i) && (terrainNode != null) && (! graph.dependsOn(terrainNode, node))) {
+                // Unconnected terrain inputs receive the final terrain, unless the node is itself part of it
+                input = terrainNode;
+            }
             if (input != null) {
                 inputs[i] = compile(graph, input, inProgress);
             }
@@ -113,4 +159,8 @@ public final class CompiledGraph {
     private final CompileContext context;
     private final Map<Integer, CompiledNode> compiled = new HashMap<>();
     private final CompiledNode output;
+    private final Node terrainNode;
+    private final int outputNodeId;
+    private final List<Painter> painters;
+    private final List<WaterBody> waterBodies;
 }

@@ -9,18 +9,18 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
 import java.awt.image.BufferedImage;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Consumer;
 
 /**
  * A pannable and zoomable editor for a {@link NodeGraph}: nodes with input and output ports, connected by bezier
  * wires, each showing a thumbnail of its output.
  *
- * <p>Drag a node to move it, drag empty space to pan and use the mouse wheel to zoom. Drag from an output to an input
- * (or the other way around) to connect them; drag a connected input away to disconnect it; release a wire on empty
- * space to add a node there which is connected to it. Right-click or double-click for a menu.
+ * <p>Drag a node to move it, drag empty space to pan and use the mouse wheel to zoom. Shift-click or Shift-drag on empty
+ * space to select several nodes. Drag from an output to an input (or the other way around) to connect them; drag a
+ * connected input away to disconnect it; release a wire on empty space to add a node there which is connected to it.
+ * Right-click or double-click for a menu.
  */
 public class NodeCanvas extends JComponent {
     public NodeCanvas(NodeGraph graph) {
@@ -43,24 +43,65 @@ public class NodeCanvas extends JComponent {
      * Show a different graph, clearing the selection and fitting the view to it.
      */
     public void setGraph(NodeGraph graph) {
-        this.graph = graph;
-        thumbnails.clear();
-        setSelectedNode(null);
-        fitView();
+        setGraph(graph, true);
     }
 
+    /**
+     * Show a different graph. If {@code fit} is {@code false} the view is kept, as is the selection for the nodes
+     * which have the same IDs (for undo and redo).
+     */
+    public void setGraph(NodeGraph graph, boolean fit) {
+        final List<Integer> selectedIds = new ArrayList<>();
+        selection.forEach(node -> selectedIds.add(node.getId()));
+        final int primaryId = (selectedNode != null) ? selectedNode.getId() : -1;
+        this.graph = graph;
+        selection.clear();
+        selectedNode = null;
+        if (fit) {
+            thumbnails.clear();
+            notifySelection(null);
+            fitView();
+        } else {
+            for (int id: selectedIds) {
+                final Node node = graph.getNode(id);
+                if (node != null) {
+                    selection.add(node);
+                }
+            }
+            notifySelection(graph.getNode(primaryId));
+            repaint();
+        }
+    }
+
+    /**
+     * The node whose settings are shown: the one selected last.
+     */
     public Node getSelectedNode() {
         return selectedNode;
     }
 
+    /**
+     * All selected nodes.
+     */
+    public Set<Node> getSelectedNodes() {
+        return Collections.unmodifiableSet(selection);
+    }
+
+    /**
+     * Select only one node, or nothing.
+     */
     public void setSelectedNode(Node node) {
-        if (node != selectedNode) {
-            selectedNode = node;
-            repaint();
-            if (listener != null) {
-                listener.selectionChanged(node);
-            }
+        selection.clear();
+        if (node != null) {
+            selection.add(node);
         }
+        notifySelection(node);
+        repaint();
+    }
+
+    public void selectAll() {
+        selection.addAll(graph.getNodes());
+        repaint();
     }
 
     public void setListener(Listener listener) {
@@ -122,38 +163,114 @@ public class NodeCanvas extends JComponent {
     }
 
     /**
-     * Delete the selected node, unless it is the output node.
+     * Delete the selected nodes, except the output node.
      */
-    public void deleteSelectedNode() {
-        if ((selectedNode != null) && (! (selectedNode instanceof OutputNode))) {
-            graph.remove(selectedNode);
-            setSelectedNode(null);
-            graphChanged(true);
-        } else {
+    public void deleteSelection() {
+        final List<Node> nodes = getEditableSelection();
+        if (nodes.isEmpty()) {
             DesktopUtils.beep();
+            return;
+        }
+        nodes.forEach(graph::remove);
+        setSelectedNode(null);
+        graphChanged(true);
+    }
+
+    /**
+     * Duplicate the selected nodes (except the output node), with the connections between them and to their inputs.
+     */
+    public void duplicateSelection() {
+        final List<Node> nodes = getEditableSelection();
+        if (nodes.isEmpty()) {
+            DesktopUtils.beep();
+            return;
+        }
+        final Set<Integer> ids = new HashSet<>();
+        nodes.forEach(node -> ids.add(node.getId()));
+        final List<Connection> connections = new ArrayList<>();
+        for (Connection connection: graph.getConnections()) {
+            if (ids.contains(connection.getToNodeId())) {
+                connections.add(connection);
+            }
+        }
+        insertCopies(nodes, connections, 32);
+    }
+
+    /**
+     * Copy the selected nodes (except the output node) and the connections between them to the clipboard, which is
+     * shared by all editors.
+     */
+    public void copySelection() {
+        final List<Node> nodes = getEditableSelection();
+        if (nodes.isEmpty()) {
+            DesktopUtils.beep();
+            return;
+        }
+        final Set<Integer> ids = new HashSet<>();
+        nodes.forEach(node -> ids.add(node.getId()));
+        clipboardNodes = new ArrayList<>();
+        nodes.forEach(node -> clipboardNodes.add(node.clone()));
+        clipboardConnections = new ArrayList<>();
+        for (Connection connection: graph.getConnections()) {
+            if (ids.contains(connection.getFromNodeId()) && ids.contains(connection.getToNodeId())) {
+                clipboardConnections.add(connection);
+            }
         }
     }
 
     /**
-     * Duplicate the selected node, with the same inputs, unless it is the output node.
+     * Paste the nodes on the clipboard into the graph.
      */
-    public void duplicateSelectedNode() {
-        if ((selectedNode == null) || (selectedNode instanceof OutputNode)) {
+    public void paste() {
+        if (clipboardNodes == null) {
             DesktopUtils.beep();
             return;
         }
-        final Node original = selectedNode;
-        final Node copy = original.clone();
-        graph.add(copy);
-        copy.setLocation(original.getX() + 32, original.getY() + 32);
-        for (int i = 0; i < original.getInputNames().size(); i++) {
-            final Node input = graph.getInput(original, i);
-            if (input != null) {
-                graph.connect(input, copy, i);
+        insertCopies(clipboardNodes, clipboardConnections, 48);
+    }
+
+    private void insertCopies(List<Node> originals, List<Connection> connections, double offset) {
+        final Map<Integer, Node> copies = new LinkedHashMap<>();
+        for (Node original: originals) {
+            final Node copy = original.clone();
+            graph.add(copy);
+            copy.setLocation(original.getX() + offset, original.getY() + offset);
+            copies.put(original.getId(), copy);
+        }
+        for (Connection connection: connections) {
+            final Node to = copies.get(connection.getToNodeId());
+            final Node from = copies.containsKey(connection.getFromNodeId()) ? copies.get(connection.getFromNodeId()) : graph.getNode(connection.getFromNodeId());
+            if ((to != null) && (from != null) && graph.canConnect(from, to, connection.getToInput())) {
+                graph.connect(from, to, connection.getToInput());
             }
         }
-        setSelectedNode(copy);
+        selection.clear();
+        selection.addAll(copies.values());
+        Node last = null;
+        for (Node copy: copies.values()) {
+            last = copy;
+        }
+        notifySelection(last);
         graphChanged(true);
+    }
+
+    private List<Node> getEditableSelection() {
+        final List<Node> nodes = new ArrayList<>();
+        for (Node node: selection) {
+            if (! (node instanceof OutputNode)) {
+                nodes.add(node);
+            }
+        }
+        return nodes;
+    }
+
+    private void notifySelection(Node primary) {
+        if (primary != selectedNode) {
+            selectedNode = primary;
+            if (listener != null) {
+                listener.selectionChanged(primary);
+            }
+        }
     }
 
     @Override
@@ -187,12 +304,20 @@ public class NodeCanvas extends JComponent {
             for (Connection connection: graph.getConnections()) {
                 final Node from = graph.getNode(connection.getFromNodeId()), to = graph.getNode(connection.getToNodeId());
                 if ((from != null) && (to != null)) {
-                    final boolean highlighted = (from == selectedNode) || (to == selectedNode);
+                    final boolean highlighted = selection.contains(from) || selection.contains(to);
                     paintWire(g2, getOutputPort(from), getInputPort(to, connection.getToInput()), getCategoryColour(from.getCategory()), highlighted);
                 }
             }
             for (Node node: graph.getNodes()) {
                 paintNode(g2, node);
+            }
+            if (marquee != null) {
+                final Color accent = ThemeUtils.getColour("WorldPainter.accent", Color.ORANGE);
+                g2.setColor(withAlpha(accent, 30));
+                g2.fill(marquee);
+                g2.setColor(accent);
+                g2.setStroke(new BasicStroke((float) (1 / zoom)));
+                g2.draw(marquee);
             }
             if (wireDrag != null) {
                 final Point2D start = wireDrag.reverse ? getInputPort(wireDrag.node, wireDrag.input) : getOutputPort(wireDrag.node);
@@ -229,7 +354,7 @@ public class NodeCanvas extends JComponent {
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2.setFont(getFont().deriveFont(getFont().getSize2D() - 1));
         g2.setColor(ThemeUtils.getColour("WorldPainter.mutedForeground", Color.GRAY));
-        g2.drawString("Right-click or double-click to add nodes \u00b7 drag from a port to connect \u00b7 scroll to zoom, drag to pan", 12, getHeight() - 12);
+        g2.drawString("Right-click or double-click to add nodes \u00b7 drag from a port to connect \u00b7 Shift-drag to select several \u00b7 scroll to zoom, drag to pan", 12, getHeight() - 12);
     }
 
     private void paintWire(Graphics2D g2, Point2D from, Point2D to, Color colour, boolean highlighted) {
@@ -249,7 +374,7 @@ public class NodeCanvas extends JComponent {
         final Color muted = ThemeUtils.getColour("WorldPainter.mutedForeground", Color.GRAY);
         final Color foreground = ThemeUtils.getColour("Label.foreground", Color.BLACK);
         final Color categoryColour = getCategoryColour(node.getCategory());
-        final boolean selected = node == selectedNode;
+        final boolean selected = selection.contains(node);
 
         // Shadow and card
         g2.setColor(ThemeUtils.getColour("WorldPainter.node.shadow", new Color(0, 0, 0, 20)));
@@ -280,7 +405,8 @@ public class NodeCanvas extends JComponent {
             final boolean hot = (hoverNode == node) && (hoverInput == i);
             paintPort(g2, port, (source != null) ? getCategoryColour(source.getCategory()) : null, hot ? accent : muted, background);
             g2.setColor(muted);
-            drawClipped(g2, inputNames.get(i), x + 14, port.getY(), width / 2 - 8);
+            final String hint = (source == null) ? node.getInputHint(i) : null;
+            drawClipped(g2, (hint != null) ? (inputNames.get(i) + " \u00b7 " + hint) : inputNames.get(i), x + 14, port.getY(), node.hasOutput() ? (width / 2 + 8) : (width - 28));
         }
         if (node.hasOutput()) {
             final Point2D port = getOutputPort(node);
@@ -427,9 +553,16 @@ public class NodeCanvas extends JComponent {
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0), "deleteNode");
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()), "duplicateNode");
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F, 0), "fitView");
-        actionMap.put("deleteNode", action(e -> deleteSelectedNode()));
-        actionMap.put("duplicateNode", action(e -> duplicateSelectedNode()));
+        final int menuShortcut = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, menuShortcut), "selectAll");
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_C, menuShortcut), "copy");
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_V, menuShortcut), "paste");
+        actionMap.put("deleteNode", action(e -> deleteSelection()));
+        actionMap.put("duplicateNode", action(e -> duplicateSelection()));
         actionMap.put("fitView", action(e -> fitView()));
+        actionMap.put("selectAll", action(e -> selectAll()));
+        actionMap.put("copy", action(e -> copySelection()));
+        actionMap.put("paste", action(e -> paste()));
     }
 
     /**
@@ -472,8 +605,12 @@ public class NodeCanvas extends JComponent {
         final boolean output = node instanceof OutputNode;
         final JMenuItem duplicateItem = new JMenuItem("Duplicate", Icons.get("copy"));
         duplicateItem.setEnabled(! output);
-        duplicateItem.addActionListener(e -> duplicateSelectedNode());
+        duplicateItem.addActionListener(e -> duplicateSelection());
         menu.add(duplicateItem);
+        final JMenuItem copyItem = new JMenuItem("Copy");
+        copyItem.setEnabled(! output);
+        copyItem.addActionListener(e -> copySelection());
+        menu.add(copyItem);
         final JMenuItem disconnectItem = new JMenuItem("Disconnect inputs");
         disconnectItem.setEnabled(! node.getInputNames().isEmpty());
         disconnectItem.addActionListener(e -> {
@@ -486,7 +623,7 @@ public class NodeCanvas extends JComponent {
         menu.addSeparator();
         final JMenuItem deleteItem = new JMenuItem("Delete", Icons.get("trash-2"));
         deleteItem.setEnabled(! output);
-        deleteItem.addActionListener(e -> deleteSelectedNode());
+        deleteItem.addActionListener(e -> deleteSelection());
         menu.add(deleteItem);
         menu.show(this, screenLocation.x, screenLocation.y);
     }
@@ -499,6 +636,12 @@ public class NodeCanvas extends JComponent {
                 return ThemeUtils.getColour("WorldPainter.node.combiner", new Color(0x8b5cf6));
             case FILTER:
                 return ThemeUtils.getColour("WorldPainter.node.filter", new Color(0x14b8a6));
+            case WATER:
+                return ThemeUtils.getColour("WorldPainter.node.water", new Color(0x3b82f6));
+            case MASK:
+                return ThemeUtils.getColour("WorldPainter.node.mask", new Color(0xec4899));
+            case SURFACE:
+                return ThemeUtils.getColour("WorldPainter.node.surface", new Color(0x22c55e));
             case OUTPUT:
                 return ThemeUtils.getColour("WorldPainter.node.output", new Color(0xf97316));
             default:
@@ -528,12 +671,17 @@ public class NodeCanvas extends JComponent {
     private double zoom = 1.0, offsetX, offsetY;
     private Listener listener;
     private WireDrag wireDrag;
+    private Rectangle2D marquee;
+    private final Set<Node> selection = new LinkedHashSet<>();
     private final Map<Integer, BufferedImage> thumbnails = new HashMap<>();
+
+    private static List<Node> clipboardNodes;
+    private static List<Connection> clipboardConnections;
 
     static final int NODE_WIDTH = 176, HEADER = 32, ROW = 22, PADDING = 8, THUMBNAIL_SIZE = 120;
     private static final double PORT_RADIUS = 5, PORT_HIT_RADIUS = 10, GRID_SPACING = 24, MIN_ZOOM = 0.2, MAX_ZOOM = 2.0;
-    private static final List<NodeCategory> ALL_CATEGORIES = List.of(NodeCategory.GENERATOR, NodeCategory.COMBINER, NodeCategory.FILTER);
-    private static final List<NodeCategory> CONSUMER_CATEGORIES = List.of(NodeCategory.COMBINER, NodeCategory.FILTER);
+    private static final List<NodeCategory> ALL_CATEGORIES = List.of(NodeCategory.GENERATOR, NodeCategory.COMBINER, NodeCategory.FILTER, NodeCategory.WATER, NodeCategory.MASK, NodeCategory.SURFACE);
+    private static final List<NodeCategory> CONSUMER_CATEGORIES = List.of(NodeCategory.COMBINER, NodeCategory.FILTER, NodeCategory.WATER, NodeCategory.MASK, NodeCategory.SURFACE);
     private static final long serialVersionUID = 1L;
 
     /**
@@ -619,7 +767,12 @@ public class NodeCanvas extends JComponent {
             final Point2D point = toCanvas(e.getPoint());
             final Node node = getNodeAt(point);
             if (node == null) {
-                panning = true;
+                if (e.isShiftDown()) {
+                    marqueeStart = point;
+                    marquee = new Rectangle2D.Double(point.getX(), point.getY(), 0, 0);
+                } else {
+                    panning = true;
+                }
                 return;
             }
             if (isOverOutput(node, point)) {
@@ -639,10 +792,33 @@ public class NodeCanvas extends JComponent {
                 }
                 return;
             }
-            setSelectedNode(node);
+            if (e.isShiftDown() || ((e.getModifiersEx() & Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()) != 0)) {
+                // Add to or remove from the selection
+                if (selection.remove(node)) {
+                    Node last = null;
+                    for (Node selected: selection) {
+                        last = selected;
+                    }
+                    notifySelection(last);
+                } else {
+                    selection.add(node);
+                    notifySelection(node);
+                }
+                repaint();
+                return;
+            }
+            if (selection.contains(node)) {
+                notifySelection(node);
+            } else {
+                setSelectedNode(node);
+            }
             graph.bringToFront(node);
             draggedNode = node;
-            dragOffset = new Point2D.Double(point.getX() - node.getX(), point.getY() - node.getY());
+            dragStart = point;
+            dragOrigins.clear();
+            for (Node selected: selection) {
+                dragOrigins.put(selected, new Point2D.Double(selected.getX(), selected.getY()));
+            }
         }
 
         @Override
@@ -656,7 +832,12 @@ public class NodeCanvas extends JComponent {
                 updateHover(point);
                 repaint();
             } else if (draggedNode != null) {
-                draggedNode.setLocation(point.getX() - dragOffset.getX(), point.getY() - dragOffset.getY());
+                final double dx = point.getX() - dragStart.getX(), dy = point.getY() - dragStart.getY();
+                dragOrigins.forEach((node, origin) -> node.setLocation(origin.getX() + dx, origin.getY() + dy));
+                repaint();
+            } else if (marquee != null) {
+                marquee = new Rectangle2D.Double(Math.min(marqueeStart.getX(), point.getX()), Math.min(marqueeStart.getY(), point.getY()),
+                        Math.abs(point.getX() - marqueeStart.getX()), Math.abs(point.getY() - marqueeStart.getY()));
                 repaint();
             } else if (panning) {
                 offsetX += e.getX() - lastPoint.x;
@@ -682,12 +863,24 @@ public class NodeCanvas extends JComponent {
                     if (moved) {
                         graphChanged(false);
                     }
+                } else if (marquee != null) {
+                    Node last = null;
+                    for (Node node: graph.getNodes()) {
+                        if (marquee.intersects(getBounds(node))) {
+                            selection.add(node);
+                            last = node;
+                        }
+                    }
+                    if (last != null) {
+                        notifySelection(last);
+                    }
                 } else if (panning && (! moved) && SwingUtilities.isLeftMouseButton(e)) {
                     setSelectedNode(null);
                 }
             } finally {
                 wireDrag = null;
                 draggedNode = null;
+                marquee = null;
                 panning = false;
                 setCursor(Cursor.getDefaultCursor());
                 repaint();
@@ -781,7 +974,9 @@ public class NodeCanvas extends JComponent {
             final Point2D point = toCanvas(e.getPoint());
             final Node node = getNodeAt(point);
             if (node != null) {
-                setSelectedNode(node);
+                if (! selection.contains(node)) {
+                    setSelectedNode(node);
+                }
                 showNodeMenu(node, e.getPoint());
             } else {
                 showAddMenu(e.getPoint(), point, ALL_CATEGORIES, null);
@@ -791,6 +986,7 @@ public class NodeCanvas extends JComponent {
         private Point pressPoint, lastPoint;
         private boolean moved, panning;
         private Node draggedNode;
-        private Point2D dragOffset;
+        private Point2D dragStart, marqueeStart;
+        private final Map<Node, Point2D> dragOrigins = new HashMap<>();
     }
 }

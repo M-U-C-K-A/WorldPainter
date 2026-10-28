@@ -65,6 +65,7 @@ public final class NodeType {
             new NodeType("Gradient", "A radial, square or linear gradient, for instance to make an island", NodeCategory.GENERATOR, GradientNode::new),
             new NodeType("Constant", "The same value everywhere", NodeCategory.GENERATOR, ConstantNode::new),
             new NodeType("Image", "An imported greyscale height map", NodeCategory.GENERATOR, ImageNode::new),
+            new NodeType("Current map", "The map as it is now, to build on terrain painted by hand", NodeCategory.GENERATOR, CurrentMapNode::new),
             new NodeType("Add", "A + B", NodeCategory.COMBINER, () -> new CombineNode(CombineNode.Mode.ADD)),
             new NodeType("Subtract", "A \u2212 B", NodeCategory.COMBINER, () -> new CombineNode(CombineNode.Mode.SUBTRACT)),
             new NodeType("Multiply", "A \u00d7 B: use B as a mask for A", NodeCategory.COMBINER, () -> new CombineNode(CombineNode.Mode.MULTIPLY)),
@@ -76,5 +77,13 @@ public final class NodeType {
             new NodeType("Clamp", "Limit the values to a range", NodeCategory.FILTER, ClampNode::new),
             new NodeType("Blur", "Smooth the terrain", NodeCategory.FILTER, BlurNode::new),
             new NodeType("Erosion", "Branching gullies and valleys carved down the slopes", NodeCategory.FILTER, GullyErosionNode::new),
-            new NodeType("Thermal erosion", "Steep slopes crumble into scree", NodeCategory.FILTER, ThermalErosionNode::new));
+            new NodeType("Thermal erosion", "Steep slopes crumble into scree", NodeCategory.FILTER, ThermalErosionNode::new),
+            new NodeType("Rivers", "Carve a network of winding rivers, with banks and water", NodeCategory.WATER, RiverNode::new),
+            new NodeType("Lakes", "Carve scattered lakes with irregular shores, filled with water", NodeCategory.WATER, LakeNode::new),
+            new NodeType("Height range", "Select the terrain between two heights, e.g. for snow or beaches", NodeCategory.MASK, HeightMaskNode::new),
+            new NodeType("Slope range", "Select the terrain by steepness, e.g. for rock on cliffs", NodeCategory.MASK, SlopeMaskNode::new),
+            new NodeType("Selection", "The area selected on the map", NodeCategory.MASK, SelectionMaskNode::new),
+            new NodeType("Paint terrain", "Paint a terrain type where the mask is strong", NodeCategory.SURFACE, TerrainPainterNode::new),
+            new NodeType("Paint biome", "Paint a Minecraft biome where the mask is strong", NodeCategory.SURFACE, BiomePainterNode::new),
+            new NodeType("Paint flora", "Plant forests, grass, flowers or snow, as dense as the mask", NodeCategory.SURFACE, FloraPainterNode::new));
 }
