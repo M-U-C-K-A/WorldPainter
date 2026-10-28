@@ -58,6 +58,7 @@ public class NodeGraphDialog extends WorldPainterDialog {
         mapSource = new NodeGraphOperation.DimensionMapSource(dimension);
         final TileFactory tileFactory = dimension.getTileFactory();
         waterLevel = (tileFactory instanceof HeightMapTileFactory) ? ((HeightMapTileFactory) tileFactory).getWaterHeight() : 62;
+        HeightPreviewPanel.setSeaLevel(waterLevel);
         final NodeGraph savedGraph = world.getAttribute(NodeGraph.ATTRIBUTE_NODE_GRAPH).orElse(null);
         graph = (savedGraph != null) ? savedGraph.clone() : createExample(ExampleGraphs.Example.ROLLING_HILLS, new Random().nextLong());
         committed = graph.clone();
@@ -554,6 +555,7 @@ public class NodeGraphDialog extends WorldPainterDialog {
                         min = Math.min(min, height);
                         max = Math.max(max, height);
                     }
+                    final float[] waterLevels = getWaterLevels(compiled, evaluation, region);
                     final BufferedImage image;
                     if ((mode == PreviewMode.SURFACE) || (mode == PreviewMode.BIOMES)) {
                         final List<Painter> painters = compiled.getPainters();
@@ -561,9 +563,9 @@ public class NodeGraphDialog extends WorldPainterDialog {
                         for (int p = 0; p < painters.size(); p++) {
                             strengths[p] = painters.get(p).evaluate(evaluation, region);
                         }
-                        image = HeightPreviewPanel.renderSurface(heights, region, waterLevel, painters, strengths, mode == PreviewMode.BIOMES, colourScheme, platform, seed);
+                        image = HeightPreviewPanel.renderSurface(heights, region, waterLevels, painters, strengths, mode == PreviewMode.BIOMES, colourScheme, platform, seed);
                     } else {
-                        image = HeightPreviewPanel.renderRelief(heights, PREVIEW_SIZE, region.getStep(), waterLevel);
+                        image = HeightPreviewPanel.renderRelief(heights, PREVIEW_SIZE, region.getStep(), waterLevels);
                     }
                     final int lowest = Math.round(min), highest = Math.round(max);
                     SwingUtilities.invokeLater(() -> {
@@ -579,7 +581,7 @@ public class NodeGraphDialog extends WorldPainterDialog {
                     if (node instanceof OutputNode) {
                         if (outputConnected) {
                             final float[] heights = toHeights(compiled, compiled.evaluate(thumbnailEvaluation, node.getId(), thumbnailRegion));
-                            thumbnails.put(node.getId(), HeightPreviewPanel.renderRelief(heights, THUMBNAIL_SIZE, thumbnailRegion.getStep(), waterLevel));
+                            thumbnails.put(node.getId(), HeightPreviewPanel.renderRelief(heights, THUMBNAIL_SIZE, thumbnailRegion.getStep(), getWaterLevels(compiled, thumbnailEvaluation, thumbnailRegion)));
                         }
                     } else if (node instanceof PainterNode) {
                         final float[] strengths = compiled.evaluate(thumbnailEvaluation, node.getId(), thumbnailRegion);
@@ -599,6 +601,17 @@ public class NodeGraphDialog extends WorldPainterDialog {
                 });
             }
         });
+    }
+
+    /**
+     * The water level of each sample of a region: the sea level, or the level of the rivers and lakes of the graph
+     * where that is higher.
+     */
+    private float[] getWaterLevels(CompiledGraph compiled, Evaluation evaluation, Region region) {
+        final float[] levels = new float[region.size()];
+        Arrays.fill(levels, waterLevel);
+        WaterBody.combine(compiled.getWaterBodies(), evaluation, region, levels);
+        return levels;
     }
 
     private int getColour(Object target, long seed) {

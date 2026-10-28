@@ -78,6 +78,8 @@ public final class NodeType {
             new NodeType("Blur", "Smooth the terrain", NodeCategory.FILTER, BlurNode::new),
             new NodeType("Erosion", "Branching gullies and valleys carved down the slopes", NodeCategory.FILTER, GullyErosionNode::new),
             new NodeType("Thermal erosion", "Steep slopes crumble into scree", NodeCategory.FILTER, ThermalErosionNode::new),
+            new NodeType("Rivers", "Carve a network of winding rivers, with banks and water", NodeCategory.WATER, RiverNode::new),
+            new NodeType("Lakes", "Carve scattered lakes with irregular shores, filled with water", NodeCategory.WATER, LakeNode::new),
             new NodeType("Height range", "Select the terrain between two heights, e.g. for snow or beaches", NodeCategory.MASK, HeightMaskNode::new),
             new NodeType("Slope range", "Select the terrain by steepness, e.g. for rock on cliffs", NodeCategory.MASK, SlopeMaskNode::new),
             new NodeType("Selection", "The area selected on the map", NodeCategory.MASK, SelectionMaskNode::new),

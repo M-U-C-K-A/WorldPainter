@@ -217,6 +217,36 @@ public final class ExampleGraphs {
                 b.biome(MinecraftBiome.PLAINS, 0.6, 4, 2);
                 break;
             }
+            case RIVER_VALLEYS: {
+                final NoiseNode land = b.noise(NoiseNode.Kind.PERLIN, 1400, 6, 20, 0, 0);
+                final CurveNode shape = b.add(new CurveNode(0, 0.05f, 0.5f, 0.3f, 1, 0.75f), 1, 0);
+                b.wire(land, shape);
+                final LakeNode lakes = b.add(new LakeNode(), 2, 0);
+                lakes.set(LakeNode.SIZE, 80);
+                lakes.set(LakeNode.DEPTH, 7);
+                lakes.set(LakeNode.MAX_HEIGHT, w + 80);
+                lakes.set(Node.VARIANT, 21);
+                b.wire(shape, lakes);
+                final RiverNode rivers = b.add(new RiverNode(), 3, 0);
+                rivers.set(RiverNode.SPACING, 1100);
+                rivers.set(RiverNode.WIDTH, 9);
+                rivers.set(RiverNode.MAX_HEIGHT, w + 70);
+                rivers.set(Node.VARIANT, 22);
+                b.wire(lakes, rivers);
+                b.output(rivers, 4, 0, w - 20, w + 110, minHeight, maxHeight);
+                // Woods and flowery meadows in the valleys, pines and taiga higher up; the rivers paint their own biome
+                final NoiseNode woods = b.noise(NoiseNode.Kind.PERLIN, 400, 4, 23, 0, 1);
+                final CurveNode forestMask = b.add(new CurveNode(0, 0, 0.48f, 0, 0.6f, 1, 1, 1), 1, 1);
+                b.wire(woods, forestMask);
+                b.wire(forestMask, b.flora(Vegetation.DECIDUOUS_FOREST, 0.6, 2, 1));
+                b.wire(forestMask, b.biome(MinecraftBiome.FOREST, 1, 3, 1));
+                b.flora(Vegetation.GRASS_AND_FLOWERS, 0.3, 2, 2);
+                b.biome(MinecraftBiome.PLAINS, 0.6, 3, 2);
+                final HeightMaskNode highlands = b.height(w + 55, 4096, 15, 0, 3);
+                b.wire(highlands, b.flora(Vegetation.PINE_FOREST, 0.6, 1, 3));
+                b.wire(highlands, b.biome(MinecraftBiome.TAIGA, 1.2, 2, 3));
+                break;
+            }
             case ERODE_CURRENT_MAP: {
                 final CurrentMapNode current = b.add(new CurrentMapNode(), 0, 0);
                 final GullyErosionNode erosion = b.add(new GullyErosionNode(), 1, 0);
@@ -242,6 +272,7 @@ public final class ExampleGraphs {
         DESERT_DUNES("Desert dunes"),
         VOLCANIC_ISLAND("Volcanic island"),
         LAKES_AND_FORESTS("Lakes and forests"),
+        RIVER_VALLEYS("River valleys"),
         ERODE_CURRENT_MAP("Erode the current map");
 
         Example(String displayName) {

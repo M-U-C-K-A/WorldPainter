@@ -17,6 +17,10 @@ public enum NodeCategory {
      */
     FILTER("Filters"),
     /**
+     * Nodes which carve rivers and lakes into the terrain and fill them with water.
+     */
+    WATER("Water"),
+    /**
      * Nodes which select parts of the terrain, for instance by height or slope, producing values between zero and one.
      */
     MASK("Masks"),

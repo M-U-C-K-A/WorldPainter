@@ -3,6 +3,7 @@ package org.pepsoft.worldpainter.nodes;
 import org.pepsoft.util.ProgressReceiver;
 import org.pepsoft.util.ProgressReceiver.OperationCancelled;
 import org.pepsoft.worldpainter.Dimension;
+import org.pepsoft.worldpainter.HeightMapTileFactory;
 import org.pepsoft.worldpainter.Terrain;
 import org.pepsoft.worldpainter.Tile;
 import org.pepsoft.worldpainter.TileFactory;
@@ -211,18 +212,27 @@ public class NodeGraphOperation {
             strengths[p] = painters.get(p).evaluate(evaluation, region);
         }
         final SurfacePlan plan = new SurfacePlan(painters, vegetationLayers, strengths);
+        final float[] waterLevels;
+        if (compiled.getWaterBodies().isEmpty()) {
+            waterLevels = null;
+        } else {
+            waterLevels = new float[generated.length];
+            Arrays.fill(waterLevels, Float.NaN);
+            WaterBody.combine(compiled.getWaterBodies(), evaluation, region, waterLevels);
+        }
         for (Tile tile: group) {
             final int offsetX = (tile.getX() - minX) << TILE_SIZE_BITS, offsetY = (tile.getY() - minY) << TILE_SIZE_BITS;
-            processTile(dimension, compiled, tile, generated, plan, offsetX + offsetY * width, width);
+            processTile(dimension, compiled, tile, generated, waterLevels, plan, offsetX + offsetY * width, width);
         }
     }
 
-    private void processTile(Dimension dimension, CompiledGraph compiled, Tile tile, float[] generated, SurfacePlan plan, int offset, int stride) {
+    private void processTile(Dimension dimension, CompiledGraph compiled, Tile tile, float[] generated, float[] waterLevels, SurfacePlan plan, int offset, int stride) {
         final int x0 = tile.getX() << TILE_SIZE_BITS, y0 = tile.getY() << TILE_SIZE_BITS;
         final int minHeight = tile.getMinHeight(), maxHeight = tile.getMaxHeight() - 1;
         final float baseHeight = compiled.getMinHeight();
         final float[] weights = selectionOnly ? SelectionWeights.forTile(dimension, x0, y0, feather) : null;
         final TileFactory tileFactory = applyTheme ? dimension.getTileFactory() : null;
+        final int seaLevel = (dimension.getTileFactory() instanceof HeightMapTileFactory) ? ((HeightMapTileFactory) dimension.getTileFactory()).getWaterHeight() : Integer.MIN_VALUE;
         for (int y = 0; y < TILE_SIZE; y++) {
             for (int x = 0; x < TILE_SIZE; x++) {
                 final float weight = strength * ((weights != null) ? weights[x | (y << TILE_SIZE_BITS)] : 1.0f);
@@ -254,6 +264,8 @@ public class NodeGraphOperation {
                 if (weight >= 0.5f) {
                     if (waterLevel != Integer.MIN_VALUE) {
                         tile.setWaterLevel(x, y, waterLevel);
+                    } else if (waterLevels != null) {
+                        setWater(tile, x, y, newHeight, waterLevels[index], seaLevel);
                     }
                     if (tileFactory != null) {
                         tileFactory.applyTheme(tile, x, y);
@@ -263,6 +275,21 @@ public class NodeGraphOperation {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Fill a column with the water of the rivers and lakes of the graph if it is below their level. When replacing
+     * the terrain, water left over from earlier rivers and lakes which stands higher than the sea is lowered to it.
+     */
+    private void setWater(Tile tile, int x, int y, float height, float level, int seaLevel) {
+        final int current = tile.getWaterLevel(x, y);
+        int target = ((mode == Mode.REPLACE) && (seaLevel != Integer.MIN_VALUE)) ? Math.min(current, seaLevel) : current;
+        if ((! Float.isNaN(level)) && (height < level)) {
+            target = Math.max(target, (int) level);
+        }
+        if (target != current) {
+            tile.setWaterLevel(x, y, target);
         }
     }
 

@@ -21,12 +21,25 @@ public final class CompiledGraph {
         output = compiled.get(outputNode.getId());
         outputNodeId = outputNode.getId();
         final List<Painter> painters = new ArrayList<>();
+        final List<WaterBody> waterBodies = new ArrayList<>();
         for (Node node: graph.getNodes()) {
             if (node instanceof PainterNode) {
                 painters.add(new Painter(node.getId(), ((PainterNode) node).getTarget(), (node instanceof FloraPainterNode) && ((FloraPainterNode) node).isOnlyOnLand(), compiled.get(node.getId())));
+            } else if ((node instanceof WaterNode) && (terrainNode != null) && graph.dependsOn(terrainNode, node)) {
+                // Only water which is carved into the final terrain is filled; it also paints its bed and biome
+                final WaterNode waterNode = (WaterNode) node;
+                final WaterNode.CompiledWater water = (WaterNode.CompiledWater) compiled.get(node.getId());
+                waterBodies.add(new WaterBody(node.getId(), water));
+                if (waterNode.getBedTerrain() != null) {
+                    painters.add(new Painter(node.getId(), waterNode.getBedTerrain(), false, water.getStrengths()));
+                }
+                if (waterNode.getBiome() != null) {
+                    painters.add(new Painter(node.getId(), waterNode.getBiome(), false, water.getStrengths()));
+                }
             }
         }
         this.painters = Collections.unmodifiableList(painters);
+        this.waterBodies = Collections.unmodifiableList(waterBodies);
     }
 
     /**
@@ -37,7 +50,15 @@ public final class CompiledGraph {
     }
 
     /**
-     * The surface painters of the graph, in the order of the graph.
+     * The rivers and lakes carved into the final terrain.
+     */
+    public List<WaterBody> getWaterBodies() {
+        return waterBodies;
+    }
+
+    /**
+     * The surface painters of the graph, in the order of the graph, including those for the beds and biomes of the
+     * {@link #getWaterBodies() water bodies}.
      */
     public List<Painter> getPainters() {
         return painters;
@@ -141,4 +162,5 @@ public final class CompiledGraph {
     private final Node terrainNode;
     private final int outputNodeId;
     private final List<Painter> painters;
+    private final List<WaterBody> waterBodies;
 }

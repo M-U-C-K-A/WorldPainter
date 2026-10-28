@@ -61,7 +61,7 @@ public class NodeGraphTest {
      */
     @Test
     public void testSeamlessAcrossTiles() {
-        for (NodeGraph graph: new NodeGraph[] {createExample(ExampleGraphs.Example.ARCHIPELAGO), createExample(ExampleGraphs.Example.MESA), createExample(ExampleGraphs.Example.ERODED_MOUNTAINS), createBlurred()}) {
+        for (NodeGraph graph: new NodeGraph[] {createExample(ExampleGraphs.Example.ARCHIPELAGO), createExample(ExampleGraphs.Example.MESA), createExample(ExampleGraphs.Example.ERODED_MOUNTAINS), createExample(ExampleGraphs.Example.RIVER_VALLEYS), createBlurred()}) {
             final CompiledGraph compiled = graph.compile(BOUNDS);
             final int size = 2 * TILE_SIZE, x0 = -TILE_SIZE, y0 = 3 * TILE_SIZE;
             final float[] whole = compiled.evaluate(new Region(x0, y0, 1, size, size));
@@ -338,6 +338,85 @@ public class NodeGraphTest {
                 }
             }
         }
+    }
+
+    @Test
+    public void testRivers() throws Exception {
+        final Dimension dimension = TestData.createDimension(new Rectangle(0, 0, 4 * TILE_SIZE, 4 * TILE_SIZE), 62);
+        final NodeGraph graph = flatGraph(0.5);
+        final RiverNode rivers = graph.add(new RiverNode());
+        rivers.set(RiverNode.SPACING, 300);
+        rivers.set(RiverNode.WIDTH, 8);
+        insertBeforeOutput(graph, rivers);
+        new NodeGraphOperation(graph).apply(dimension, null);
+        int water = 0;
+        for (int x = 0; x < 4 * TILE_SIZE; x++) {
+            for (int y = 0; y < 4 * TILE_SIZE; y++) {
+                final float height = dimension.getHeightAt(x, y);
+                assertTrue(height <= 100.01f);
+                final int level = dimension.getWaterLevelAt(x, y);
+                if (level > height) {
+                    water++;
+                    // Level with the smoothed valley floor, which is flat here
+                    assertEquals(98, level);
+                    assertEquals(Terrain.GRAVEL, dimension.getTerrainAt(x, y));
+                    assertEquals(MinecraftBiome.RIVER.getId(), dimension.getLayerValueAt(Biome.INSTANCE, x, y));
+                }
+            }
+        }
+        assertTrue("Only " + water + " blocks of river", water > 500);
+    }
+
+    @Test
+    public void testLakes() throws Exception {
+        final Dimension dimension = TestData.createDimension(new Rectangle(0, 0, 4 * TILE_SIZE, 4 * TILE_SIZE), 62);
+        final NodeGraph graph = flatGraph(0.5);
+        final LakeNode lakes = graph.add(new LakeNode());
+        lakes.set(LakeNode.SPACING, 200);
+        lakes.set(LakeNode.FREQUENCY, 1.0);
+        lakes.set(LakeNode.SIZE, 40);
+        insertBeforeOutput(graph, lakes);
+        new NodeGraphOperation(graph).apply(dimension, null);
+        int water = 0;
+        for (int x = 0; x < 4 * TILE_SIZE; x++) {
+            for (int y = 0; y < 4 * TILE_SIZE; y++) {
+                final int level = dimension.getWaterLevelAt(x, y);
+                if (level > dimension.getHeightAt(x, y)) {
+                    water++;
+                    // Just below the rim, which is at height 100 everywhere
+                    assertEquals(99, level);
+                    assertEquals(Terrain.SAND, dimension.getTerrainAt(x, y));
+                }
+            }
+        }
+        assertTrue("Only " + water + " blocks of lake", water > 2000);
+    }
+
+    @Test
+    public void testWaterIsSeamless() {
+        final CompiledGraph compiled = createExample(ExampleGraphs.Example.RIVER_VALLEYS).compile(BOUNDS);
+        assertEquals(2, compiled.getWaterBodies().size());
+        final int size = 2 * TILE_SIZE;
+        final Region whole = new Region(-TILE_SIZE, -TILE_SIZE, 1, size, size), tile = new Region(0, 0, 1, TILE_SIZE, TILE_SIZE);
+        final float[] wholeLevels = new float[whole.size()], tileLevels = new float[tile.size()];
+        java.util.Arrays.fill(wholeLevels, Float.NaN);
+        java.util.Arrays.fill(tileLevels, Float.NaN);
+        WaterBody.combine(compiled.getWaterBodies(), compiled.createEvaluation(), whole, wholeLevels);
+        WaterBody.combine(compiled.getWaterBodies(), compiled.createEvaluation(), tile, tileLevels);
+        for (int y = 0; y < TILE_SIZE; y++) {
+            for (int x = 0; x < TILE_SIZE; x++) {
+                assertEquals("at " + x + "," + y, wholeLevels[(TILE_SIZE + x) + (TILE_SIZE + y) * size], tileLevels[x + y * TILE_SIZE], 0.0f);
+            }
+        }
+    }
+
+    /**
+     * Insert a filter between the output and the node connected to it.
+     */
+    private static void insertBeforeOutput(NodeGraph graph, Node filter) {
+        final Node terrain = graph.getInput(graph.getOutputNode(), 0);
+        graph.connect(terrain, filter, 0);
+        graph.connect(filter, graph.getOutputNode(), 0);
     }
 
     private static NodeGraph flatGraph(double value) {
