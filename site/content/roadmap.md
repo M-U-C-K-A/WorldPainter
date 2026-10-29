@@ -7,18 +7,29 @@ description: What is being worked on in WorldPainter Modernised.
 
 WorldPainter Modernised is released as previews on [GitHub Releases](https://github.com/M-U-C-K-A/WorldPainter/releases): it is used to make real maps, but it is still being tested. This is what is being worked on.
 
-## Before a stable release
+The roadmap is followed on GitHub, with an [issue](https://github.com/M-U-C-K-A/WorldPainter/issues) per item and a [milestone](https://github.com/M-U-C-K-A/WorldPainter/milestones) per version: comment on them, or give a 👍 to the ones that matter to you.
 
-- [ ] Test the exported maps in Minecraft more widely: every node, layer and material mix
-- [ ] Show floating islands, custom trees and objects in the 3D view
-- [ ] Signed and notarised application for macOS, signed installer for Windows
+## Next preview
 
-## Next
+- [ ] [Automated export tests in CI](https://github.com/M-U-C-K-A/WorldPainter/issues/1)
+- [ ] [Sign and notarise the macOS app](https://github.com/M-U-C-K-A/WorldPainter/issues/2)
+- [ ] [Merge the latest WorldPainter](https://github.com/M-U-C-K-A/WorldPainter/issues/3)
 
-- More structures as nodes: arches, caves and overhangs, waterfalls
-- Underwater features: kelp forests, sea grass, geysers
-- More examples, and a gallery of graphs shared by users
-- Translations of the interface and of this documentation
+## Before the stable release
+
+- [ ] [Show trees, objects and floating islands in the 3D view](https://github.com/M-U-C-K-A/WorldPainter/issues/4)
+- [ ] [Large maps: memory and processing in chunks](https://github.com/M-U-C-K-A/WorldPainter/issues/5)
+- [ ] [Realistic erosion node](https://github.com/M-U-C-K-A/WorldPainter/issues/6)
+- [ ] [Map templates when creating a world](https://github.com/M-U-C-K-A/WorldPainter/issues/7)
+- [ ] [Signed Windows installer](https://github.com/M-U-C-K-A/WorldPainter/issues/8)
+- [ ] [Check for updates in the app](https://github.com/M-U-C-K-A/WorldPainter/issues/9)
+
+## Later
+
+- [Caves and overhangs as 3D nodes](https://github.com/M-U-C-K-A/WorldPainter/issues/10)
+- [Underwater features](https://github.com/M-U-C-K-A/WorldPainter/issues/11)
+- [Gallery of shared node graphs](https://github.com/M-U-C-K-A/WorldPainter/issues/12)
+- [French translation of the interface](https://github.com/M-U-C-K-A/WorldPainter/issues/13)
 
 ## Done
 
