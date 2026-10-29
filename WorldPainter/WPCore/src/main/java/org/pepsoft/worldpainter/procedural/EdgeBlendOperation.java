@@ -196,11 +196,12 @@ public class EdgeBlendOperation {
         final Map<Point, boolean[]> notPresent = new HashMap<>();
         for (Point coords: original) {
             final Tile tile = dimension.getTile(coords);
-            if (tile.hasLayer(NotPresent.INSTANCE)) {
+            // (Round maps mark the blocks outside the circle with either layer)
+            if (tile.hasLayer(NotPresent.INSTANCE) || tile.hasLayer(NotPresentBlock.INSTANCE)) {
                 final boolean[] mask = new boolean[TILE_SIZE * TILE_SIZE];
                 for (int x = 0; x < TILE_SIZE; x++) {
                     for (int y = 0; y < TILE_SIZE; y++) {
-                        mask[x | (y << TILE_SIZE_BITS)] = tile.getBitLayerValue(NotPresent.INSTANCE, x, y);
+                        mask[x | (y << TILE_SIZE_BITS)] = tile.getBitLayerValue(NotPresent.INSTANCE, x, y) || tile.getBitLayerValue(NotPresentBlock.INSTANCE, x, y);
                     }
                 }
                 notPresent.put(coords, mask);
@@ -312,6 +313,7 @@ public class EdgeBlendOperation {
                 tile.setHeight(x, y, height);
                 if (missing != null) {
                     tile.setBitLayerValue(NotPresent.INSTANCE, x, y, false);
+                    tile.setBitLayerValue(NotPresentBlock.INSTANCE, x, y, false);
                 }
             }
         }

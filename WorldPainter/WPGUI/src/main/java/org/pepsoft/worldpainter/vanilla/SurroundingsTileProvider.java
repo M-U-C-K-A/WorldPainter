@@ -6,6 +6,8 @@ import org.pepsoft.util.swing.TileListener;
 import org.pepsoft.util.swing.TileProvider;
 import org.pepsoft.worldpainter.*;
 import org.pepsoft.worldpainter.Dimension;
+import org.pepsoft.worldpainter.layers.NotPresent;
+import org.pepsoft.worldpainter.layers.NotPresentBlock;
 import org.pepsoft.worldpainter.procedural.EdgeBlendOperation;
 import org.pepsoft.worldpainter.procedural.ProceduralTerrain;
 
@@ -174,7 +176,12 @@ public class SurroundingsTileProvider implements TileProvider {
      * Whether a location lies in the margin around the map (and not on the map itself).
      */
     private boolean isShown(int x, int y) {
-        return bounds.contains(x, y) && (! dimension.isTilePresent(x >> TILE_SIZE_BITS, y >> TILE_SIZE_BITS)) && (distanceToMap(x, y) <= margin);
+        if ((! bounds.contains(x, y)) || (distanceToMap(x, y) > margin)) {
+            return false;
+        }
+        // Outside the tiles of the map, or on a block of a tile which is not part of the map (round maps)
+        return (! dimension.isTilePresent(x >> TILE_SIZE_BITS, y >> TILE_SIZE_BITS))
+                || dimension.getBitLayerValueAt(NotPresentBlock.INSTANCE, x, y) || dimension.getBitLayerValueAt(NotPresent.INSTANCE, x, y);
     }
 
     /**
