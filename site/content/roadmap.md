@@ -7,7 +7,7 @@ description: What is being worked on in WorldPainter Modernised.
 
 WorldPainter Modernised is released as previews on [GitHub Releases](https://github.com/M-U-C-K-A/WorldPainter/releases): it is used to make real maps, but it is still being tested. This is what is being worked on.
 
-The roadmap is followed on GitHub, with an [issue](https://github.com/M-U-C-K-A/WorldPainter/issues) per item and a [milestone](https://github.com/M-U-C-K-A/WorldPainter/milestones) per version: comment on them, or give a 👍 to the ones that matter to you.
+The roadmap is followed on GitHub, on the [roadmap board](https://github.com/users/M-U-C-K-A/projects/4), with an [issue](https://github.com/M-U-C-K-A/WorldPainter/issues) per item and a [milestone](https://github.com/M-U-C-K-A/WorldPainter/milestones) per version: comment on them, or give a 👍 to the ones that matter to you.
 
 ## Next preview
 
