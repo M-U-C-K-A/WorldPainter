@@ -113,6 +113,40 @@ public class PathSettings implements Cloneable {
         this.borderMaterial = borderMaterial;
     }
 
+    /**
+     * Whether the width varies with the land: narrower on steep hillsides, on bridges and in tunnels, wider on flat open
+     * ground, around the chosen width.
+     */
+    public boolean isDynamicWidth() {
+        return dynamicWidth;
+    }
+
+    public void setDynamicWidth(boolean dynamicWidth) {
+        this.dynamicWidth = dynamicWidth;
+    }
+
+    /**
+     * Whether trees, plants and other objects on the path are removed.
+     */
+    public boolean isClearVegetation() {
+        return clearVegetation;
+    }
+
+    public void setClearVegetation(boolean clearVegetation) {
+        this.clearVegetation = clearVegetation;
+    }
+
+    /**
+     * What lines the sides of the path on the ground.
+     */
+    public Sides getSides() {
+        return sides;
+    }
+
+    public void setSides(Sides sides) {
+        this.sides = (sides != null) ? sides : Sides.NONE;
+    }
+
     @Override
     public PathSettings clone() {
         try {
@@ -122,8 +156,65 @@ public class PathSettings implements Cloneable {
         }
     }
 
-    private int width = 4, curvature = 60, maxSpan = 96, tunnelHeight = 5;
-    private boolean bridges = true, tunnels, borders = true;
+    private int width = Size.MEDIUM.width, curvature = 60, maxSpan = 96, tunnelHeight = 5;
+    private boolean bridges = true, tunnels, borders = true, dynamicWidth = true, clearVegetation = true;
+    private Sides sides = Sides.NONE;
     private double maxGrade = 0.25;
     private Terrain material = Terrain.GRAVEL, borderMaterial = Terrain.STONE;
+
+    /**
+     * The widths to choose from.
+     */
+    public enum Size {
+        NARROW("Narrow", 3), MEDIUM("Medium", 5), WIDE("Wide", 7);
+
+        Size(String displayName, int width) {
+            this.displayName = displayName;
+            this.width = width;
+        }
+
+        public int getWidth() {
+            return width;
+        }
+
+        /**
+         * The size closest to a width.
+         */
+        public static Size of(int width) {
+            Size best = MEDIUM;
+            for (Size size: values()) {
+                if (Math.abs(size.width - width) < Math.abs(best.width - width)) {
+                    best = size;
+                }
+            }
+            return best;
+        }
+
+        @Override
+        public String toString() {
+            return displayName + " (" + width + " blocks)";
+        }
+
+        private final String displayName;
+        private final int width;
+    }
+
+    /**
+     * What can line the sides of a path.
+     */
+    public enum Sides {
+        NONE("Nothing"), FENCE("Wooden fence"), FENCE_AND_HEDGE("Fence and hedges"), HEDGE("Hedge"), STONE_WALL("Low stone wall"),
+        LANTERN_POSTS("Posts with lanterns"), FLOWERS("Flowers");
+
+        Sides(String displayName) {
+            this.displayName = displayName;
+        }
+
+        @Override
+        public String toString() {
+            return displayName;
+        }
+
+        private final String displayName;
+    }
 }

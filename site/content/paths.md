@@ -21,11 +21,13 @@ The **Path** tool, in the *Sculpt terrain* group, lays out a road or a track thr
 |---|---|
 | **Bends** | 0 is a straight line between the points; 100 is the route which follows the land best, going round hills rather than over them |
 | **Crossings** | *Natural*: the path goes up and down with the land. *Bridges* over valleys and water, *Tunnels* through hills, or both |
-| **Width** | In blocks |
+| **Width** | Narrow (3 blocks), medium (5) or wide (7). With **Dynamic**, the width varies with the land: narrower across steep hillsides, on bridges and in tunnels, wider on flat open ground, and always gradually |
 | **Steepest slope** | The steepest the path may climb, in blocks of height per 100 blocks of length |
 | **Longest bridge or tunnel** | Longer crossings stay on the ground |
 | **Surface** | The terrain type of the path |
 | **Borders** | Edges of another material along both sides, and low parapets on bridges |
+| **Sides** | What lines both sides on the ground: a wooden fence, a fence alternating with hedges, a hedge, a low stone wall, posts with lanterns, or flowers. They are custom object layers, which you can edit or remove afterwards |
+| **Remove trees and plants on the path** | Clears the trees, plants and custom objects on the path and overhanging it |
 
 The preview shows the route over the land (orange on the ground, purple on bridges, grey and dashed in tunnels) and the height profile of the path over the land. Below them: the length, how much is on bridges and in tunnels, the steepest slope, and how much land is dug out and filled in.
 

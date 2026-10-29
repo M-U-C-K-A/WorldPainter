@@ -3,6 +3,8 @@ package org.pepsoft.worldpainter.help;
 import org.pepsoft.minecraft.Material;
 import org.pepsoft.worldpainter.ColourScheme;
 import org.pepsoft.worldpainter.MixedMaterial;
+import org.pepsoft.worldpainter.Platform;
+import org.pepsoft.worldpainter.Terrain;
 import org.pepsoft.worldpainter.layers.plants.Plant;
 import org.pepsoft.worldpainter.layers.plants.PlantLayer;
 
@@ -51,6 +53,37 @@ public final class CompositionCards {
     }
 
     /**
+     * What the surface of a terrain type is made of, worked out by sampling its top blocks over an area (built in terrain
+     * types are defined in code, as noise, patterns or rules, rather than as a list of blocks).
+     */
+    public static ToolCard forTerrain(Terrain terrain, Platform platform, ColourScheme colourScheme) {
+        final Map<String, Integer> counts = new HashMap<>();
+        final Map<String, Material> materials = new HashMap<>();
+        int total = 0;
+        // The top block and a few below it, since some terrain types have pockets of other blocks just under the top
+        for (int depth: new int[] {0, 0, 1, 2, 4}) {
+            for (int x = 0; x < SAMPLES; x++) {
+                for (int y = 0; y < SAMPLES; y++) {
+                    final Material material = terrain.getMaterial(platform, SEED, x * 3, y * 3, 64 - depth, 64);
+                    if ((material == null) || (material == Material.AIR)) {
+                        continue;
+                    }
+                    counts.merge(material.simpleName, 1, Integer::sum);
+                    materials.putIfAbsent(material.simpleName, material);
+                    total++;
+                }
+            }
+        }
+        final int sum = Math.max(1, total);
+        final List<ToolCard.Row> rows = new ArrayList<>();
+        counts.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(8)
+                .forEach(entry -> rows.add(new ToolCard.Row(BlockIcons.block(materials.get(entry.getKey()), colourScheme), humanise(entry.getKey()), percentage(entry.getValue(), sum))));
+        return new ToolCard(terrain.getName(), terrain.getDescription(), null, null, rows);
+    }
+
+    /**
      * A block ID as words: {@code coarse_dirt} becomes "Coarse dirt".
      */
     static String humanise(String name) {
@@ -62,4 +95,7 @@ public final class CompositionCards {
         final int percent = Math.round(count * 100f / total);
         return (percent < 1) ? "<1%" : (percent + "%");
     }
+
+    private static final int SAMPLES = 64;
+    private static final long SEED = 1234567L;
 }

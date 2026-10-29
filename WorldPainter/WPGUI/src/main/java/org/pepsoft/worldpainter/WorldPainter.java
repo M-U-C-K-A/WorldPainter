@@ -820,6 +820,19 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
                     }
                     break;
                 case BITMAP:
+                    // The actual shape of the brush (including its rotation), if it is known
+                    final App app = App.getInstanceIfExists();
+                    final org.pepsoft.worldpainter.operations.Operation operation = (app != null) ? app.getActiveOperation() : null;
+                    if ((operation instanceof org.pepsoft.worldpainter.operations.BrushOperation) && (((org.pepsoft.worldpainter.operations.BrushOperation) operation).getBrush() != null) && (radius > 0)) {
+                        final AffineTransform transform = g2.getTransform();
+                        try {
+                            g2.translate(mouseX, mouseY);
+                            g2.draw(org.pepsoft.worldpainter.brushes.BrushOutline.of(((org.pepsoft.worldpainter.operations.BrushOperation) operation).getBrush(), radius));
+                        } finally {
+                            g2.setTransform(transform);
+                        }
+                        break;
+                    }
                     final int arrowSize = radius / 2;
                     if (brushRotation == 0) {
                         g2.drawRect(mouseX - radius, mouseY - radius, diameter, diameter);

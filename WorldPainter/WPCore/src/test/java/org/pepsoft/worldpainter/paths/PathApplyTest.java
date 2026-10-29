@@ -61,4 +61,74 @@ public class PathApplyTest {
         // The ground part of the path is painted
         assertEquals(Terrain.GRAVEL, dimension.getTerrainAt(100, 128));
     }
+
+    @Test
+    public void testClearsVegetationAndLinesTheSides() {
+        final long seed = 1;
+        final World2 world = new World2(JAVA_ANVIL_1_20_5, -64, 320);
+        final TileFactory tileFactory = TileFactoryFactory.createFlatTileFactory(seed, Terrain.GRASS, -64, 320, 70, 62, false, false);
+        final Dimension dimension = new Dimension(world, "Surface", seed, tileFactory, NORMAL_DETAIL);
+        world.addDimension(dimension);
+        for (int x = 0; x < 3; x++) {
+            for (int y = 0; y < 2; y++) {
+                dimension.addTile(tileFactory.createTile(x, y));
+            }
+        }
+        // A forest everywhere
+        for (int x = 0; x < 384; x++) {
+            for (int y = 0; y < 256; y++) {
+                dimension.setLayerValueAt(org.pepsoft.worldpainter.layers.DeciduousForest.INSTANCE, x, y, 10);
+            }
+        }
+        final PathSettings settings = new PathSettings();
+        settings.setCurvature(0);
+        settings.setWidth(PathSettings.Size.WIDE.getWidth());
+        settings.setDynamicWidth(false);
+        settings.setSides(PathSettings.Sides.FENCE);
+        final PathPlan plan = PathGenerator.plan(dimension, new Point(20, 128), new Point(360, 128), settings);
+        final List<CustomLayer> layers = PathGenerator.apply(dimension, plan, settings, 1);
+
+        // No trees on the path, still trees well away from it
+        assertEquals(0, dimension.getLayerValueAt(org.pepsoft.worldpainter.layers.DeciduousForest.INSTANCE, 150, 128));
+        assertEquals(0, dimension.getLayerValueAt(org.pepsoft.worldpainter.layers.DeciduousForest.INSTANCE, 150, 131));
+        assertEquals(10, dimension.getLayerValueAt(org.pepsoft.worldpainter.layers.DeciduousForest.INSTANCE, 150, 160));
+        // A fence along both sides, just outside the seven blocks of the path, and none on it
+        assertEquals(1, layers.size());
+        final CustomLayer fence = layers.get(0);
+        assertTrue(dimension.getLayerValueAt(fence, 150, 128 - 4) > 0 || dimension.getLayerValueAt(fence, 150, 128 - 5) > 0);
+        assertTrue(dimension.getLayerValueAt(fence, 150, 128 + 4) > 0 || dimension.getLayerValueAt(fence, 150, 128 + 5) > 0);
+        assertEquals(0, dimension.getLayerValueAt(fence, 150, 128));
+    }
+
+    @Test
+    public void testDynamicWidthVariesSmoothly() {
+        final long seed = 1;
+        final World2 world = new World2(JAVA_ANVIL_1_20_5, -64, 320);
+        final TileFactory tileFactory = TileFactoryFactory.createFlatTileFactory(seed, Terrain.GRASS, -64, 320, 70, 62, false, false);
+        final Dimension dimension = new Dimension(world, "Surface", seed, tileFactory, NORMAL_DETAIL);
+        world.addDimension(dimension);
+        for (int x = 0; x < 4; x++) {
+            for (int y = 0; y < 2; y++) {
+                dimension.addTile(tileFactory.createTile(x, y));
+            }
+        }
+        // A steep hillside across the second half of the route
+        for (int x = 256; x < 512; x++) {
+            for (int y = 0; y < 256; y++) {
+                dimension.setHeightAt(x, y, 70 + (y - 128) * 1.5f);
+            }
+        }
+        final PathSettings settings = new PathSettings();
+        settings.setCurvature(0);
+        settings.setWidth(5);
+        settings.setDynamicWidth(true);
+        final PathPlan plan = PathGenerator.plan(dimension, new Point(20, 128), new Point(490, 128), settings);
+        final float[] halves = PathGenerator.halfWidths(dimension, plan, settings);
+        final int n = halves.length;
+        // Wider on the flat, narrower across the hillside, and never changing abruptly
+        assertTrue("flat " + halves[n / 5] + " hillside " + halves[n * 4 / 5], halves[n / 5] > halves[n * 4 / 5]);
+        for (int i = 1; i < n; i++) {
+            assertTrue(Math.abs(halves[i] - halves[i - 1]) < 0.2f);
+        }
+    }
 }

@@ -9,7 +9,16 @@ import org.pepsoft.worldpainter.Platform;
 import org.pepsoft.worldpainter.Terrain;
 import org.pepsoft.worldpainter.TileFactoryFactory;
 import org.pepsoft.worldpainter.World2;
+import org.pepsoft.minecraft.Material;
+import org.pepsoft.worldpainter.Tile;
+import org.pepsoft.worldpainter.layers.Bo2Layer;
 import org.pepsoft.worldpainter.layers.CustomLayer;
+import org.pepsoft.worldpainter.layers.Layer;
+import org.pepsoft.worldpainter.layers.TreeLayer;
+import org.pepsoft.worldpainter.layers.bo2.Bo2ObjectTube;
+import org.pepsoft.worldpainter.layers.plants.PlantLayer;
+import org.pepsoft.worldpainter.objects.GenericObject;
+import org.pepsoft.worldpainter.objects.WPObject;
 import org.pepsoft.worldpainter.layers.tunnel.TunnelLayer;
 
 import java.awt.*;
@@ -19,6 +28,7 @@ import java.util.List;
 import java.util.PriorityQueue;
 
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE_BITS;
+import static org.pepsoft.worldpainter.Constants.TILE_SIZE_MASK;
 import static org.pepsoft.worldpainter.Dimension.Role.CAVE_FLOOR;
 import static org.pepsoft.worldpainter.Dimension.Role.FLOATING_FLOOR;
 import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.EdgeShape.SHEER;
@@ -120,7 +130,13 @@ public final class PathGenerator {
         if (n == 0) {
             return createdLayers;
         }
-        final float half = settings.getWidth() / 2.0f, falloff = Math.max(3, settings.getWidth() * 0.75f), reach = half + falloff;
+        // The width at every point of the path: as set, or varying with the land
+        final float[] halves = halfWidths(dimension, plan, settings);
+        float maxHalf = 0;
+        for (float h: halves) {
+            maxHalf = Math.max(maxHalf, h);
+        }
+        final float reach = maxHalf + Math.max(3, maxHalf * 1.5f) + 1;
 
         // For every block near the path, find the nearest point of the path and the distance to it
         double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
@@ -198,6 +214,14 @@ public final class PathGenerator {
                 }
                 final int i = nearest[j];
                 final float target = profile[i];
+                final float half = halves[i], falloff = Math.max(3, half * 1.5f);
+                if (d > half + falloff) {
+                    continue;
+                }
+                if (settings.isClearVegetation() && (types[i] == PathPlan.GROUND) && (d <= half + 3)) {
+                    // No trees, plants or objects on the path or overhanging it
+                    clearVegetation(dimension, wx, wy);
+                }
                 switch (types[i]) {
                     case PathPlan.GROUND:
                         if (d <= half) {
@@ -226,21 +250,218 @@ public final class PathGenerator {
             }
         }
 
+        // What lines the sides, on the ground on either side of the path
+        if (settings.getSides() != PathSettings.Sides.NONE) {
+            createdLayers.addAll(lineSides(dimension, settings.getSides(), layerNumber, distances, nearest, types, halves, x0, y0, width, height));
+        }
+
         // The floor dimensions of the bridges and tunnels, which hold the height and material of the deck or floor
         if (bridgeLayer != null) {
             final Dimension floor = createFloorDimension(dimension, bridgeLayer, FLOATING_FLOOR, settings.getMaterial(), averageProfile(plan, PathPlan.BRIDGE));
             bridgeLayer.updateFloorDimension(dimension, bridgeLayer.getName() + " Deck");
-            shapeFloor(floor, plan, PathPlan.BRIDGE, settings, distances, nearest, x0, y0, width, height, half, true);
+            shapeFloor(floor, plan, PathPlan.BRIDGE, settings, distances, nearest, x0, y0, width, height, maxHalf, true);
         }
         if (tunnelLayer != null) {
             final Dimension floor = createFloorDimension(dimension, tunnelLayer, CAVE_FLOOR, settings.getMaterial(), averageProfile(plan, PathPlan.TUNNEL));
             tunnelLayer.updateFloorDimension(dimension, tunnelLayer.getName() + " Floor");
-            shapeFloor(floor, plan, PathPlan.TUNNEL, settings, distances, nearest, x0, y0, width, height, half, false);
+            shapeFloor(floor, plan, PathPlan.TUNNEL, settings, distances, nearest, x0, y0, width, height, maxHalf, false);
         }
         if (progressReceiver != null) {
             progressReceiver.setProgress(1.0f);
         }
         return createdLayers;
+    }
+
+    /**
+     * Half the width of the path at each of its points: as set, or, for a dynamic width, varying with the land around
+     * the set width: narrower across steep hillsides and on bridges and in tunnels, wider on flat open ground, with a
+     * gentle variation, and smoothed so that the width never changes abruptly.
+     */
+    static float[] halfWidths(Dimension dimension, PathPlan plan, PathSettings settings) {
+        final List<double[]> points = plan.getPoints();
+        final byte[] types = plan.getTypes();
+        final int n = points.size(), width = settings.getWidth();
+        float[] widths = new float[n];
+        Arrays.fill(widths, width);
+        if (settings.isDynamicWidth() && (n > 2)) {
+            for (int i = 0; i < n; i++) {
+                final double[] before = points.get(Math.max(0, i - 2)), after = points.get(Math.min(n - 1, i + 2)), here = points.get(i);
+                double dx = after[0] - before[0], dy = after[1] - before[1];
+                final double length = Math.hypot(dx, dy);
+                if (length > 0) {
+                    dx /= length;
+                    dy /= length;
+                }
+                // The slope of the land across the path
+                final double reach = Math.max(3, width);
+                final float left = heightAt(dimension, here[0] - dy * reach, here[1] + dx * reach), right = heightAt(dimension, here[0] + dy * reach, here[1] - dx * reach);
+                final double cross = (Float.isNaN(left) || Float.isNaN(right)) ? 0 : Math.abs(left - right) / (2 * reach);
+                double factor = 1.15 - Math.min(0.5, cross * 1.2);
+                if (types[i] != PathPlan.GROUND) {
+                    factor = Math.min(factor, 0.85);
+                }
+                factor += 0.08 * Math.sin(i * 0.045) + 0.05 * Math.sin(i * 0.13 + 1.3);
+                widths[i] = (float) Math.max(2, width * factor);
+            }
+            // Smooth twice with a moving average, so that the width changes gradually
+            for (int pass = 0; pass < 2; pass++) {
+                final float[] smoothed = new float[n];
+                final int window = 12;
+                for (int i = 0; i < n; i++) {
+                    float sum = 0;
+                    int count = 0;
+                    for (int k = Math.max(0, i - window); k <= Math.min(n - 1, i + window); k++) {
+                        sum += widths[k];
+                        count++;
+                    }
+                    smoothed[i] = sum / count;
+                }
+                widths = smoothed;
+            }
+        }
+        final float[] halves = new float[n];
+        for (int i = 0; i < n; i++) {
+            halves[i] = widths[i] / 2;
+        }
+        return halves;
+    }
+
+    private static float heightAt(Dimension dimension, double x, double y) {
+        final int bx = (int) Math.floor(x), by = (int) Math.floor(y);
+        return dimension.isTilePresent(bx >> TILE_SIZE_BITS, by >> TILE_SIZE_BITS) ? dimension.getHeightAt(bx, by) : Float.NaN;
+    }
+
+    /**
+     * Remove the trees, plants and custom objects at a block.
+     */
+    private static void clearVegetation(Dimension dimension, int x, int y) {
+        final Tile tile = dimension.getTileForEditing(x >> TILE_SIZE_BITS, y >> TILE_SIZE_BITS);
+        if (tile == null) {
+            return;
+        }
+        final int xInTile = x & TILE_SIZE_MASK, yInTile = y & TILE_SIZE_MASK;
+        for (Layer layer: new ArrayList<>(tile.getLayers())) {
+            if ((layer instanceof TreeLayer) || (layer instanceof Bo2Layer) || (layer instanceof PlantLayer)) {
+                if ((layer.getDataSize() == Layer.DataSize.BIT) || (layer.getDataSize() == Layer.DataSize.BIT_PER_CHUNK)) {
+                    tile.setBitLayerValue(layer, xInTile, yInTile, false);
+                } else {
+                    tile.setLayerValue(layer, xInTile, yInTile, 0);
+                }
+            }
+        }
+    }
+
+    /**
+     * Line the sides of the ground parts of a path with fences, hedges, walls, lanterns or flowers: custom object
+     * layers of single blocks (or short columns), placed on every marked block, which connect to each other.
+     */
+    private static List<CustomLayer> lineSides(Dimension dimension, PathSettings.Sides sides, int layerNumber, float[] distances, int[] nearest, byte[] types, float[] halves, int x0, int y0, int width, int height) {
+        final Material fence = Material.get("minecraft:oak_fence"), leaves = Material.get("minecraft:oak_leaves", "distance", "1", "persistent", "true", "waterlogged", "false");
+        final Bo2Layer main, other;
+        switch (sides) {
+            case FENCE:
+                main = sideLayer("Path " + layerNumber + " fence", new Color(0x9a6b3f), sideObject("Fence", fence));
+                other = null;
+                break;
+            case FENCE_AND_HEDGE:
+                main = sideLayer("Path " + layerNumber + " fence", new Color(0x9a6b3f), sideObject("Fence", fence));
+                other = sideLayer("Path " + layerNumber + " hedge", new Color(0x3f7f2f), sideObject("Hedge", leaves));
+                break;
+            case HEDGE:
+                main = sideLayer("Path " + layerNumber + " hedge", new Color(0x3f7f2f), sideObject("Hedge", leaves));
+                other = null;
+                break;
+            case STONE_WALL:
+                main = sideLayer("Path " + layerNumber + " wall", new Color(0x8a8a8a), sideObject("Wall", Material.get("minecraft:cobblestone_wall")));
+                other = null;
+                break;
+            case LANTERN_POSTS:
+                main = sideLayer("Path " + layerNumber + " lanterns", new Color(0xf5b642), sideObject("Lantern post", fence, Material.get("minecraft:lantern", "hanging", "false", "waterlogged", "false")));
+                other = null;
+                break;
+            case FLOWERS:
+                main = sideLayer("Path " + layerNumber + " flowers", new Color(0xe07ab8),
+                        sideObject("Poppy", Material.get("minecraft:poppy")), sideObject("Dandelion", Material.get("minecraft:dandelion")),
+                        sideObject("Cornflower", Material.get("minecraft:cornflower")), sideObject("Oxeye daisy", Material.get("minecraft:oxeye_daisy")),
+                        sideObject("Azure bluet", Material.get("minecraft:azure_bluet")), sideObject("Allium", Material.get("minecraft:allium")));
+                other = null;
+                break;
+            default:
+                return new ArrayList<>();
+        }
+        boolean mainUsed = false, otherUsed = false;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                final int j = y * width + x;
+                final int i = nearest[j];
+                if (types[i] != PathPlan.GROUND) {
+                    continue;
+                }
+                final float d = distances[j], half = halves[i];
+                if ((d < half + 0.5f) || (d >= half + 1.9f)) {
+                    continue;
+                }
+                final int wx = x0 + x, wy = y0 + y;
+                if ((! dimension.isTilePresent(wx >> TILE_SIZE_BITS, wy >> TILE_SIZE_BITS)) || (dimension.getWaterLevelAt(wx, wy) > dimension.getIntHeightAt(wx, wy))) {
+                    continue;
+                }
+                final Bo2Layer layer;
+                if (sides == PathSettings.Sides.FENCE_AND_HEDGE) {
+                    // Runs of fence alternating with runs of hedge
+                    layer = (((i / 7) & 1) == 0) ? main : other;
+                } else if (sides == PathSettings.Sides.LANTERN_POSTS) {
+                    // A post every few blocks
+                    if ((i % 9) != 0) {
+                        continue;
+                    }
+                    layer = main;
+                } else if (sides == PathSettings.Sides.FLOWERS) {
+                    if (((wx * 0x9E3779B1) ^ (wy * 0x85EBCA6B)) % 5 == 0) {
+                        continue;
+                    }
+                    layer = main;
+                } else {
+                    layer = main;
+                }
+                dimension.setLayerValueAt(layer, wx, wy, 15);
+                if (layer == main) {
+                    mainUsed = true;
+                } else {
+                    otherUsed = true;
+                }
+            }
+        }
+        final List<CustomLayer> layers = new ArrayList<>();
+        if (mainUsed) {
+            layers.add(main);
+        }
+        if (otherUsed) {
+            layers.add(other);
+        }
+        return layers;
+    }
+
+    /**
+     * A custom object layer which places one of its objects on every block where it is set.
+     */
+    private static Bo2Layer sideLayer(String name, Color colour, WPObject... objects) {
+        final Bo2Layer layer = new Bo2Layer(new Bo2ObjectTube(name, Arrays.asList(objects)), "Placed along the sides of a path", colour);
+        layer.setGridX(1);
+        layer.setGridY(1);
+        layer.setRandomDisplacement(0);
+        layer.setDensity(1);
+        return layer;
+    }
+
+    /**
+     * An object of a single column of blocks, which connects to the same blocks next to it (as fences and walls do).
+     */
+    private static WPObject sideObject(String name, Material... column) {
+        final GenericObject object = new GenericObject(name, 1, 1, column.length, column);
+        object.setAttribute(WPObject.ATTRIBUTE_RANDOM_ROTATION, false);
+        object.setAttribute(WPObject.ATTRIBUTE_CONNECT_BLOCKS, true);
+        object.setAttribute(WPObject.ATTRIBUTE_LEAF_DECAY_MODE, WPObject.LEAF_DECAY_OFF);
+        return object;
     }
 
     // Routing

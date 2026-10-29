@@ -46,7 +46,7 @@ A single **Brushes** panel with six basic shapes and twenty-two **terrain stamps
 | Volcanoes & craters | Volcano, shield volcano, crater rim |
 | Valleys | Valley, to carve with the lower tool (hold <kbd>Ctrl</kbd> with the height tool) |
 
-Hover over a brush to see its shape in 3D, turning slowly on a block of ground. Custom brushes (in the `brushes` folder of the configuration) are still supported.
+Hover over a brush to see its shape in 3D, turning slowly on a block of ground. On the map the outline of a brush shows its actual shape, rotation included. Rotate it with <kbd>[</kbd> and <kbd>]</kbd> (or <kbd>Alt</kbd>+scroll), and zoom the map with <kbd>Ctrl</kbd>+scroll or <kbd>⌘</kbd>+scroll. Custom brushes (in the `brushes` folder of the configuration) are still supported.
 
 ## Canvas
 

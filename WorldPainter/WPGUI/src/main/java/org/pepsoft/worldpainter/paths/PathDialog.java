@@ -90,10 +90,15 @@ public class PathDialog extends WorldPainterDialog {
         c.gridx = 1;
         c.gridwidth = 2;
         final JPanel sizes = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
-        widthSpinner = new JSpinner(new SpinnerNumberModel(last.getWidth(), 1, 24, 1));
-        widthSpinner.addChangeListener(e -> schedulePlan());
-        sizes.add(widthSpinner);
-        sizes.add(new JLabel("blocks     Steepest slope:"));
+        sizeComboBox = new JComboBox<>(PathSettings.Size.values());
+        sizeComboBox.setSelectedItem(PathSettings.Size.of(last.getWidth()));
+        sizeComboBox.addActionListener(e -> schedulePlan());
+        sizes.add(sizeComboBox);
+        dynamicWidthCheckBox = new JCheckBox("Dynamic", last.isDynamicWidth());
+        dynamicWidthCheckBox.setToolTipText("Let the width vary with the land: narrower across steep hillsides, on bridges and in tunnels, wider on flat open ground");
+        dynamicWidthCheckBox.addActionListener(e -> schedulePlan());
+        sizes.add(dynamicWidthCheckBox);
+        sizes.add(new JLabel("     Steepest slope:"));
         slopeSpinner = new JSpinner(new SpinnerNumberModel((int) Math.round(last.getMaxGrade() * 100), 2, 100, 1));
         slopeSpinner.setToolTipText("The steepest the path may climb or descend, in blocks of height per 100 blocks of length");
         slopeSpinner.addChangeListener(e -> schedulePlan());
@@ -127,6 +132,23 @@ public class PathDialog extends WorldPainterDialog {
         bordersCheckBox.addActionListener(e -> borderComboBox.setEnabled(bordersCheckBox.isSelected()));
         materials.add(borderComboBox);
         form.add(materials, c);
+        c.gridwidth = 1;
+
+        // Sides and vegetation
+        c.gridy++;
+        c.gridx = 0;
+        form.add(new JLabel("Sides:"), c);
+        c.gridx = 1;
+        c.gridwidth = 2;
+        final JPanel sides = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
+        sidesComboBox = new JComboBox<>(PathSettings.Sides.values());
+        sidesComboBox.setSelectedItem(last.getSides());
+        sidesComboBox.setToolTipText("What lines both sides of the path on the ground: fences, hedges, a low wall, lantern posts or flowers");
+        sides.add(sidesComboBox);
+        clearVegetationCheckBox = new JCheckBox("Remove trees and plants on the path", last.isClearVegetation());
+        clearVegetationCheckBox.setToolTipText("Remove the trees, plants and custom objects on the path and overhanging it");
+        sides.add(clearVegetationCheckBox);
+        form.add(sides, c);
         c.gridwidth = 1;
 
         // Preview
@@ -179,7 +201,10 @@ public class PathDialog extends WorldPainterDialog {
         final Crossings crossings = (Crossings) crossingsComboBox.getSelectedItem();
         settings.setBridges((crossings == Crossings.BRIDGES) || (crossings == Crossings.BOTH));
         settings.setTunnels((crossings == Crossings.TUNNELS) || (crossings == Crossings.BOTH));
-        settings.setWidth((Integer) widthSpinner.getValue());
+        settings.setWidth(((PathSettings.Size) sizeComboBox.getSelectedItem()).getWidth());
+        settings.setDynamicWidth(dynamicWidthCheckBox.isSelected());
+        settings.setSides((PathSettings.Sides) sidesComboBox.getSelectedItem());
+        settings.setClearVegetation(clearVegetationCheckBox.isSelected());
         settings.setMaxGrade((Integer) slopeSpinner.getValue() / 100.0);
         settings.setMaxSpan((Integer) spanSpinner.getValue());
         settings.setMaterial((Terrain) materialComboBox.getSelectedItem());
@@ -292,7 +317,10 @@ public class PathDialog extends WorldPainterDialog {
     private final JSlider curvatureSlider;
     private final JLabel curvatureLabel, infoLabel;
     private final JComboBox<Crossings> crossingsComboBox;
-    private final JSpinner widthSpinner, slopeSpinner, spanSpinner;
+    private final JSpinner slopeSpinner, spanSpinner;
+    private final JComboBox<PathSettings.Size> sizeComboBox;
+    private final JComboBox<PathSettings.Sides> sidesComboBox;
+    private final JCheckBox dynamicWidthCheckBox, clearVegetationCheckBox;
     private final JComboBox<Terrain> materialComboBox, borderComboBox;
     private final JCheckBox bordersCheckBox;
     private final JButton applyButton;

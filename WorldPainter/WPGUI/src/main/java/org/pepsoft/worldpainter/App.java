@@ -2889,7 +2889,8 @@ public final class App extends JFrame implements BrushControl,
 
             @Override
             public void mouseWheelMoved(MouseWheelEvent e) {
-                if (e.isControlDown()) {
+                // (On a Mac, Cmd+scroll zooms too, since macOS may use Ctrl+scroll to zoom the whole screen)
+                if (e.isControlDown() || e.isMetaDown()) {
                     int oldZoom = view.getZoom(), zoom;
                     if (e.getWheelRotation() < 0) {
                         zoom = Math.min(oldZoom - e.getWheelRotation(), 6);
@@ -3016,6 +3017,9 @@ public final class App extends JFrame implements BrushControl,
         inputMap.put(getKeyStroke(VK_MINUS,    platformCommandMask),                   ACTION_NAME_ZOOM_OUT);
         inputMap.put(getKeyStroke(VK_EQUALS,   platformCommandMask | SHIFT_DOWN_MASK), ACTION_NAME_ZOOM_IN);
         inputMap.put(getKeyStroke(VK_NUMPAD0,  platformCommandMask),                   ACTION_ZOOM_RESET.getName());
+        // [ and ] rotate the brush too, as in image editors, without a modifier which the operating system might use
+        inputMap.put(getKeyStroke(VK_OPEN_BRACKET, 0),                                 ACTION_ROTATE_BRUSH_LEFT.getName());
+        inputMap.put(getKeyStroke(VK_CLOSE_BRACKET, 0),                                ACTION_ROTATE_BRUSH_RIGHT.getName());
         inputMap.put(getKeyStroke(VK_SUBTRACT, ALT_DOWN_MASK),                         ACTION_ROTATE_BRUSH_LEFT.getName());
         inputMap.put(getKeyStroke(VK_MINUS,    ALT_DOWN_MASK),                         ACTION_ROTATE_BRUSH_LEFT.getName());
         inputMap.put(getKeyStroke(VK_ADD,      ALT_DOWN_MASK),                         ACTION_ROTATE_BRUSH_RIGHT.getName());
@@ -3684,13 +3688,29 @@ public final class App extends JFrame implements BrushControl,
                     continue;
                 }
                 final MixedMaterial material = group.newMaterial();
-                final JButton button = org.pepsoft.worldpainter.help.ToolCard.button();
+                final JToggleButton button = org.pepsoft.worldpainter.help.ToolCard.toggleButton();
                 button.setIcon(new ImageIcon(material.getIcon(selectedColourScheme)));
                 button.setMargin(App.SMALLER_BUTTON_INSETS);
                 button.setToolTipText(group.toString());
-                org.pepsoft.worldpainter.help.ToolCard.install(button, () -> org.pepsoft.worldpainter.help.CompositionCards.forMaterial(group.toString(), "A mix of blocks. Click to add it as a custom terrain type and paint with it.", material, selectedColourScheme));
+                org.pepsoft.worldpainter.help.ToolCard.install(button, () -> org.pepsoft.worldpainter.help.CompositionCards.forMaterial(group.toString(), "A mix of blocks. Click to paint with it; it is added as a custom terrain type.", material, selectedColourScheme));
                 button.putClientProperty(KEY_SEARCH_TEXT, (group + " " + family + " mix").toLowerCase());
-                button.addActionListener(e -> useMaterialGroup(group));
+                // Paint with it straight from this panel, setting it up as a custom terrain type the first time
+                paintButtonGroup.add(button);
+                button.addItemListener(e -> {
+                    if (e.getStateChange() == ItemEvent.SELECTED) {
+                        final Terrain terrain = installMaterialGroup(group);
+                        if (terrain == null) {
+                            paintButtonGroup.clearSelection();
+                            return;
+                        }
+                        button.putClientProperty(KEY_PAINT_ID, createTerrainPaintId(terrain));
+                        paintUpdater = () -> {
+                            paint = PaintFactory.createTerrainPaint(terrain);
+                            paintChanged();
+                        };
+                        paintUpdater.updatePaint();
+                    }
+                });
                 grid.add(button);
                 buttons.add(button);
             }
@@ -4760,26 +4780,39 @@ public final class App extends JFrame implements BrushControl,
      * Add a mix of blocks as a custom terrain type, unless it already is one, and select it for painting.
      */
     private void useMaterialGroup(MaterialGroup group) {
+        final Terrain terrain = installMaterialGroup(group);
+        if (terrain != null) {
+            // Select it without switching to the Custom Terrain panel, so that the user stays where they are
+            customMaterialButtons[terrain.getCustomTerrainIndex()].setSelected(true);
+        }
+    }
+
+    /**
+     * The custom terrain type for a mix of blocks: the one which already has it, or a free one which is set up with it
+     * (with its button in the Custom Terrain panel, which is not brought to the front).
+     *
+     * @return The terrain type, or {@code null} if there is no world or all custom terrain types are in use.
+     */
+    private Terrain installMaterialGroup(MaterialGroup group) {
         if (dimension == null) {
             DesktopUtils.beep();
-            return;
+            return null;
         }
         for (int i = 0; i < CUSTOM_TERRAIN_COUNT; i++) {
             if (Terrain.isCustomMaterialConfigured(i) && group.toString().equals(Terrain.getCustomMaterial(i).getName())) {
-                if (customMaterialButtons[i] != null) {
-                    selectPaint(createTerrainPaintId(Terrain.getCustomTerrain(i)));
-                } else {
-                    addButtonForNewCustomTerrain(i, Terrain.getCustomMaterial(i), true);
+                if (customMaterialButtons[i] == null) {
+                    addButtonForNewCustomTerrain(i, Terrain.getCustomMaterial(i), false);
                 }
-                return;
+                return Terrain.getCustomTerrain(i);
             }
         }
         final int index = findNextCustomTerrainIndex();
         if (index < 0) {
             beepAndShowWarning(this, "All " + CUSTOM_TERRAIN_COUNT + " custom terrain types are in use.", "No Free Custom Terrain");
-            return;
+            return null;
         }
-        addButtonForNewCustomTerrain(index, MixedMaterialManager.getInstance().register(group.newMaterial()), true);
+        addButtonForNewCustomTerrain(index, MixedMaterialManager.getInstance().register(group.newMaterial()), false);
+        return Terrain.getCustomTerrain(index);
     }
 
     /**
@@ -6089,6 +6122,9 @@ public final class App extends JFrame implements BrushControl,
             org.pepsoft.worldpainter.help.ToolCard.install(button, () -> Terrain.isCustomMaterialConfigured(terrain.getCustomTerrainIndex())
                     ? org.pepsoft.worldpainter.help.CompositionCards.forMaterial(Terrain.getCustomMaterial(terrain.getCustomTerrainIndex()).getName(), "A custom terrain type. Right-click to change it.", Terrain.getCustomMaterial(terrain.getCustomTerrainIndex()), selectedColourScheme)
                     : null);
+        } else {
+            // Show what its surface is made of
+            org.pepsoft.worldpainter.help.ToolCard.install(button, () -> org.pepsoft.worldpainter.help.CompositionCards.forTerrain(terrain, (world != null) ? world.getPlatform() : DefaultPlugin.JAVA_ANVIL_1_20_5, selectedColourScheme));
         }
         button.putClientProperty(KEY_PAINT_ID, createTerrainPaintId(terrain));
         button.setMargin(App.SMALLER_BUTTON_INSETS);
