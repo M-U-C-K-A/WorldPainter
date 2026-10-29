@@ -1,33 +1,33 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-dark.svg">
-  <img alt="WorldPainter, éditeur de cartes Minecraft, édition modernisée" src="docs/assets/hero-light.svg" width="100%">
+  <img alt="WorldPainter, Minecraft map editor, modernised edition" src="docs/assets/hero-light.svg" width="100%">
 </picture>
 
 <p align="center">
-  <b>Peindre des mondes Minecraft complets, plus vite.</b><br>
-  Vue 3D intégrée, aperçu du monde autour de la carte, recherche de seed, bords de carte adoucis et interface claire et sombre, en application native sur macOS, Windows et Linux.
+  <b>Paint complete Minecraft worlds, faster.</b><br>
+  An integrated 3D view, a preview of the land around the map, seed search, soft map edges and a light and dark interface, as a native application for macOS, Windows and Linux.
 </p>
 
 <p align="center">
   <a href="https://github.com/M-U-C-K-A/WorldPainter/actions/workflows/build.yml"><img alt="Build" src="https://github.com/M-U-C-K-A/WorldPainter/actions/workflows/build.yml/badge.svg"></a>
   <img alt="Minecraft 26.x" src="https://img.shields.io/badge/Minecraft-1.20.5_%E2%86%92_26.x-3d9a50">
   <img alt="Java 21" src="https://img.shields.io/badge/Java-21-f97316">
-  <img alt="Plateformes" src="https://img.shields.io/badge/macOS_%C2%B7_Windows_%C2%B7_Linux-natif-18181b">
-  <a href="LICENSE"><img alt="Licence GPL v3" src="https://img.shields.io/badge/licence-GPL_v3-blue"></a>
+  <img alt="Platforms" src="https://img.shields.io/badge/macOS_%C2%B7_Windows_%C2%B7_Linux-native-18181b">
+  <a href="LICENSE"><img alt="GPL v3 licence" src="https://img.shields.io/badge/licence-GPL_v3-blue"></a>
 </p>
 
 <p align="center">
   <b><a href="https://m-u-c-k-a.github.io/WorldPainter/">Documentation</a></b> ·
-  <a href="https://m-u-c-k-a.github.io/WorldPainter/tutorial-first-archipelago.html">Premier tutoriel</a> ·
-  <a href="#aperçu">Aperçu</a> ·
-  <a href="#vue-3d-intégrée">Vue 3D</a> ·
-  <a href="#autour-de-la-carte">Autour de la carte</a> ·
+  <a href="https://m-u-c-k-a.github.io/WorldPainter/tutorial-first-archipelago.html">First tutorial</a> ·
+  <a href="#overview">Overview</a> ·
+  <a href="#integrated-3d-view">3D view</a> ·
+  <a href="#around-the-map">Around the map</a> ·
   <a href="#seeds">Seeds</a> ·
   <a href="#interface">Interface</a> ·
-  <a href="#pinceaux-et-tampons-de-relief">Pinceaux</a> ·
-  <a href="#fondu-des-bords">Bords</a> ·
-  <a href="#génération-procédurale">Procédural</a> ·
-  <a href="#installer">Installer</a>
+  <a href="#brushes-and-terrain-stamps">Brushes</a> ·
+  <a href="#edge-blending">Edges</a> ·
+  <a href="#procedural-generation">Procedural</a> ·
+  <a href="#install">Install</a>
 </p>
 
 <picture>
@@ -35,62 +35,64 @@
   <img alt="" src="docs/assets/divider-light.svg" width="100%">
 </picture>
 
-## Aperçu
+## Overview
 
-> La documentation complète (fonctionnalités, nœuds, tutoriels pas à pas, feuille de route) est sur **[m-u-c-k-a.github.io/WorldPainter](https://m-u-c-k-a.github.io/WorldPainter/)** ; ses sources sont dans [`site/`](site/).
+> The full documentation (features, nodes, step by step tutorials, roadmap) is at **[m-u-c-k-a.github.io/WorldPainter](https://m-u-c-k-a.github.io/WorldPainter/)**; its sources are in [`site/`](site/).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshot-dark.png">
-  <img alt="L'éditeur WorldPainter, avec en transparence les biomes que Minecraft générera autour de la carte" src="docs/images/screenshot-light.png" width="100%">
+  <img alt="The WorldPainter editor, with the biomes Minecraft will generate around the map shown in transparency" src="docs/images/screenshot-light.png" width="100%">
 </picture>
 
-WorldPainter permet de « peindre » des paysages Minecraft avec des outils proches de ceux d'un logiciel de dessin : sculpter le relief, peindre les matériaux, les arbres, la neige, les biomes… puis exporter une carte jouable. Ce fork part de la dernière version du projet d'origine, [Captain-Chaos/WorldPainter](https://github.com/Captain-Chaos/WorldPainter) 2.27, compatible de **Minecraft 1.20.5 à 26.x**. Il le rend plus simple à prendre en main et ajoute ce qui manquait pour créer vite une carte complète : voir le résultat en 3D, savoir ce qu'il y aura autour, et choisir la bonne seed.
+WorldPainter lets you "paint" Minecraft landscapes with tools much like those of a drawing program: sculpt the relief, paint the materials, the trees, the snow, the biomes… then export a playable map. This fork starts from the latest version of the original project, [Captain-Chaos/WorldPainter](https://github.com/Captain-Chaos/WorldPainter) 2.27, compatible with **Minecraft 1.20.5 to 26.x**. It makes it easier to pick up and adds what was missing to create a complete map quickly: seeing the result in 3D, knowing what will lie around it, and choosing the right seed.
+
+This is an unofficial fork, not affiliated with or supported by the original project: please report problems [here](https://github.com/M-U-C-K-A/WorldPainter/issues).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/divider-dark.svg">
   <img alt="" src="docs/assets/divider-light.svg" width="100%">
 </picture>
 
-## Vue 3D intégrée
+## Integrated 3D view
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/view3d-dark.svg">
-  <img alt="Terrain en blocs avec les modes d'affichage et la fiche d'un bloc survolé" src="docs/assets/view3d-light.svg" width="560">
+  <img alt="Block terrain with the display modes and the details of the block under the cursor" src="docs/assets/view3d-light.svg" width="560">
 </picture>
 
-Les boutons **Map / 3D** en haut à droite basculent l'espace de travail entre la carte et une vue 3D de la dimension, dans la même fenêtre.
+The **Map / 3D** buttons at the top right switch the workspace between the map and a 3D view of the dimension, in the same window.
 
-- **Fiche du bloc survolé** : position X / Z, hauteur Y, pente, terrain, biome (peint ou automatique), profondeur d'eau et calques présents.
-- **5 modes d'affichage** : *Terrain* (couleurs des blocs), *Height* (dégradé d'altitude), *Slope* (du bleu pour le plat au rouge pour les pentes de 60° et plus), *Biome* et *Relief* (ombrage et courbes de niveau), avec leur légende.
-- **Eau** et **courbes de niveau** activables, **exagération du relief** réglable.
-- Vraie **perspective** ou projection **orthographique** (sans déformation, les distances restent comparables), vue rasante, plongeante ou **vue de dessus** orientée au nord.
-- Navigation : glisser pour tourner, <kbd>⇧</kbd> + glisser pour se déplacer, molette pour zoomer, double-clic pour centrer sur un point ; boutons de rotation et de recadrage.
-- La carte est affichée comme une maquette posée sur un socle, rendue en maillage 3D sur tous les cœurs (environ 10 ms par image) ; les très grandes cartes sont simplifiées pour rester fluides.
+- **Details of the block under the cursor**: X / Z position, Y height, slope, terrain, biome (painted or automatic), water depth and the layers present.
+- **5 display modes**: *Terrain* (block colours), *Height* (altitude gradient), *Slope* (from blue for flat ground to red for slopes of 60° and more), *Biome* and *Relief* (shading and contour lines), each with its legend.
+- **Water** and **contour lines** can be switched on, and the **relief exaggeration** adjusted.
+- True **perspective** or **orthographic** projection (no distortion, so distances stay comparable), low, high or **top down** view facing north.
+- Navigation: drag to rotate, <kbd>⇧</kbd> + drag to pan, scroll to zoom, double-click to centre on a point; buttons to rotate and to fit the view.
+- The map is shown as a model on a base, rendered as a 3D mesh on all cores (about 10 ms per frame); very large maps are simplified to stay smooth.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/view3d-dark.png">
-  <img alt="La vue 3D en mode Terrain" src="docs/images/view3d-light.png" width="100%">
+  <img alt="The 3D view in Terrain mode" src="docs/images/view3d-light.png" width="100%">
 </picture>
 
-<img alt="La vue 3D en mode Slope : les pentes raides en rouge" src="docs/images/view3d-slope.png" width="100%">
+<img alt="The 3D view in Slope mode: steep slopes in red" src="docs/images/view3d-slope.png" width="100%">
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/divider-dark.svg">
   <img alt="" src="docs/assets/divider-light.svg" width="100%">
 </picture>
 
-## Autour de la carte
+## Around the map
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/surroundings-dark.svg">
-  <img alt="La carte entourée en transparence des biomes que Minecraft générera" src="docs/assets/surroundings-light.svg" width="560">
+  <img alt="The map surrounded, in transparency, by the biomes Minecraft will generate" src="docs/assets/surroundings-light.svg" width="560">
 </picture>
 
-Panneau **Surroundings**, case **Show what lies beyond the map**. Autour de la carte s'affichent, en transparence, les biomes que Minecraft générera pour la seed du monde : un désert à gauche, une plaine en haut, un océan à droite… On sait à l'avance sur quoi vont donner les bords de la carte.
+**Surroundings** panel, **Show what lies beyond the map** checkbox. Around the map, the biomes Minecraft will generate for the world seed are shown in transparency: a desert on the left, plains at the top, an ocean on the right… You know in advance what the edges of the map will run into.
 
-- **Marge** réglable de 64 à 1024 blocs autour de la carte (300 par défaut : une carte de 200 × 200 est montrée jusqu'à 800 × 800).
-- Les frontières entre biomes sont tracées, et la barre d'état indique le biome sous le curseur (« Minecraft will generate: River »).
-- Les biomes sont calculés par un portage Java de la génération de [Cubiomes](https://github.com/Cubitect/cubiomes), vérifié à l'identique sur des milliers de points. Disponible pour la surface des cartes Minecraft 1.18 et plus, en type de monde *Default* ou *Large Biomes*.
+- Adjustable **margin** of 64 to 1024 blocks around the map (300 by default: a 200 × 200 map is shown up to 800 × 800).
+- The borders between biomes are drawn, and the status bar shows the biome under the cursor ("Minecraft will generate: River").
+- The biomes are computed by a Java port of the generation of [Cubiomes](https://github.com/Cubitect/cubiomes), checked to be identical on thousands of points. Available for the surface of Minecraft 1.18 and later maps, with the *Default* or *Large Biomes* world type.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/divider-dark.svg">
@@ -99,12 +101,12 @@ Panneau **Surroundings**, case **Show what lies beyond the map**. Autour de la c
 
 ## Seeds
 
-La seed du monde se modifie directement dans le panneau **Surroundings** (un nombre, ou n'importe quel texte comme dans Minecraft), avec deux boutons :
+The world seed can be changed directly in the **Surroundings** panel (a number, or any text as in Minecraft), with two buttons:
 
-- **Seed aléatoire** : tire une nouvelle seed ; l'aperçu autour de la carte se met à jour aussitôt.
-- **Find a matching seed…** : cherche une seed pour laquelle le terrain généré autour de la carte correspond à ce qui est peint le long de ses bords. Une forêt d'épicéas en bas à gauche et de l'eau à droite ? La recherche vise une taïga en bas à gauche et un océan à droite. Jusqu'à un million de seeds sont testées en parallèle ; les 8 meilleures s'affichent avec leur pourcentage de correspondance et un aperçu, et s'il n'existe pas de correspondance parfaite, on choisit simplement la plus proche.
+- **Random seed**: picks a new seed; the preview around the map updates straight away.
+- **Find a matching seed…**: looks for a seed for which the land generated around the map matches what is painted along its edges. A spruce forest at the bottom left and water on the right? The search aims for a taiga at the bottom left and an ocean on the right. Up to a million seeds are tested in parallel; the best 8 are shown with their match percentage and a preview, and if there is no perfect match you simply pick the closest.
 
-<img alt="La recherche de seed : les meilleures candidates et l'aperçu des biomes autour de la carte" src="docs/images/seed-search.png" width="680">
+<img alt="The seed search: the best candidates and a preview of the biomes around the map" src="docs/images/seed-search.png" width="680">
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/divider-dark.svg">
@@ -115,120 +117,120 @@ La seed du monde se modifie directement dans le panneau **Surroundings** (un nom
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/interface-dark.svg">
-  <img alt="Fenêtre avec panneau de calques, canevas à points et infobulle" src="docs/assets/interface-light.svg" width="560">
+  <img alt="Window with a layer panel, a dotted canvas and a tooltip" src="docs/assets/interface-light.svg" width="560">
 </picture>
 
-- **Panneaux expliqués** : *Terrain* (le type de bloc du sol), *Layers* (ce qui se pose par-dessus : arbres, neige, minerais, cavernes…), *Biomes* et *Annotations* (repères de couleur pour planifier la carte, non exportés sauf si on l'active à l'export) ont chacun un en-tête qui dit à quoi ils servent.
-- **Thèmes clair et sombre** inspirés de shadcn/ui (palette zinc, accent orange, coins arrondis, séparateurs fins), police **Inter**, et un mode **automatique qui suit le système**. Bascule à chaud avec le bouton soleil/lune de la barre d'outils.
-- **Icônes [Lucide](https://lucide.dev)** pour la barre d'outils, les outils, les calques et les panneaux, et une nouvelle icône d'application.
-- **Infobulles explicatives** au survol de chaque outil (nom, raccourci, explication) à la place des anciennes bulles jaunes.
-- **Canevas à grille de points** autour de la carte.
-- **Panneaux ancrables** redimensionnables dans les deux sens, regroupés en onglets compacts, détachables dans une fenêtre et ré-affichables via **View › Panels**.
-- Sur macOS, la barre d'outils fait office de **barre de titre unifiée**.
+- **Self-explaining panels**: *Terrain* (the block type of the ground), *Layers* (what goes on top: trees, snow, ores, caves…), *Biomes* and *Annotations* (coloured markings to plan the map, not exported unless enabled on export) each have a header saying what they are for.
+- **Light and dark themes** inspired by shadcn/ui (zinc palette, orange accent, thin separators), the **Inter** font, and an **automatic mode which follows the system**. Switch on the fly with the sun/moon button in the toolbar.
+- **[Lucide](https://lucide.dev) icons** for the toolbar, the tools, the layers and the panels, and a new application icon.
+- **Explanatory cards** when hovering over each tool (name, shortcut, explanation) instead of the old yellow tooltips.
+- A **dotted grid canvas** around the map.
+- **Dockable panels**, resizable in both directions, grouped in compact tabs, which can be detached into a window, folded away on either side, and shown again with **View › Panels**.
+- On macOS, the toolbar doubles as a **unified title bar**.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/divider-dark.svg">
   <img alt="" src="docs/assets/divider-light.svg" width="100%">
 </picture>
 
-## Pinceaux et tampons de relief
+## Brushes and terrain stamps
 
-Un seul panneau **Brushes**, sans menu caché :
+A single **Brushes** panel, with no hidden menu:
 
-- **3 formes de base** : rond doux, rond plateau et carré.
-- **9 tampons de relief** générés procéduralement, pour sculpter en un geste avec les outils de hauteur : pic, chaîne de montagnes, massif, volcan, rebord de cratère, mesa, dunes, collines, dôme érodé.
-- Les pinceaux personnalisés (dossier `brushes` de la configuration) restent pris en charge.
+- **3 basic shapes**: soft round, flat round and square.
+- **Procedurally generated terrain stamps**, to sculpt in one stroke with the height tools: peak, mountain range, massif, volcano, crater rim, mesa, dunes, hills, eroded dome…
+- Custom brushes (the `brushes` folder of the configuration) are still supported.
 
-### Éditeur de nœuds
+### Node editor
 
-**Generate › Node graph terrain…** (<kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>N</kbd>), dans l'esprit de Gaia ou World Machine : on relie des nœuds sur un canevas et on obtient une carte complète, relief, terrains, biomes et végétation compris.
+**Generate › Node graph terrain…** (<kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>N</kbd>), in the spirit of Gaia or World Machine: connect nodes on a canvas and get a complete map, relief, terrain, biomes and vegetation included.
 
-- **Générateurs** : bruit de Perlin, bruit à crêtes, bruit « billow », dunes, cellules (Voronoï), dégradé (radial, carré ou linéaire, ajusté à la carte), constante, image en niveaux de gris importée et **carte actuelle** (pour retravailler un relief peint à la main).
-- **Combinaisons** : ajouter, soustraire, multiplier, maximum, minimum, mélange avec masque. **Filtres** : courbe éditable, terrasses, bornage, flou, érosion (ravines ramifiées qui descendent les pentes) et érosion thermique.
-- **Eau** : **rivières** sinueuses (largeur constante, lit creusé, berges en pente, eau au niveau du fond de vallée, biome rivière ou rivière gelée, elles s'effacent au-dessus d'une altitude choisie) et **lacs** aux rives irrégulières, remplis juste sous le point le plus bas de leur pourtour. Le fond (gravier, sable…) est peint automatiquement.
-- **Masques** : plage d'altitude, plage de pente et sélection. Sans branchement, les masques lisent le terrain final.
-- **Surface** : peindre un terrain (roche, sable, neige, terre cuite…), un **biome** Minecraft (43 biomes) ou de la **flore** (forêts de feuillus, de pins, jungle, marais, neige, herbes et fleurs, fougères, plantes du désert, champignons). Le masque le plus fort l'emporte, avec des bordures mouchetées naturelles.
-- Chaque nœud affiche une **vignette** ; aperçu **relief**, **surface**, **biomes** ou du nœud sélectionné.
-- Édition confortable : **annuler / rétablir**, **sélection multiple** (<kbd>⇧</kbd> clic, <kbd>⇧</kbd> glisser, <kbd>⌘</kbd> <kbd>A</kbd>), copier-coller et dupliquer, **ouverture et enregistrement de graphes** (`.wpgraph`) pour les réutiliser d'un monde à l'autre.
-- Application à toute la carte ou à la **sélection avec bords adoucis**, annulable ; le graphe est **enregistré avec le monde**.
-- **9 exemples** de cartes complètes : collines, montagnes érodées, archipel tropical, canyons de mesa, dunes du désert, île volcanique, lacs et forêts, vallées et rivières, et « éroder la carte actuelle ». Évaluation par tuiles en parallèle, identique au bit près à un calcul d'un seul tenant : aucune couture.
+- **Generators**: Perlin noise, ridged noise, billow noise, dunes, cells (Voronoi), gradient (radial, square or linear, fitted to the map), constant, imported greyscale image and **current map** (to rework a hand-painted relief).
+- **Combinations**: add, subtract, multiply, maximum, minimum, blend with a mask. **Filters**: editable curve, terraces, clamp, blur, erosion (branching gullies running down the slopes) and thermal erosion.
+- **Water**: winding **rivers** (constant width, carved bed, sloping banks, water at the level of the valley floor, river or frozen river biome, fading out above a chosen altitude) and **lakes** with irregular shores, filled to just below the lowest point of their rim. The bottom (gravel, sand…) is painted automatically.
+- **Masks**: height range, slope range and selection. When not connected, masks read the final terrain.
+- **Surface**: paint a terrain (rock, sand, snow, terracotta…), a Minecraft **biome** (43 biomes) or **vegetation** (deciduous, pine and jungle forests, swamp, snow, grass and flowers, ferns, desert plants, mushrooms). The strongest mask wins, with natural speckled borders.
+- Each node shows a **thumbnail**; preview the **relief**, the **surface**, the **biomes** or the selected node.
+- Comfortable editing: **undo / redo**, **multiple selection** (<kbd>⇧</kbd> click, <kbd>⇧</kbd> drag, <kbd>⌘</kbd> <kbd>A</kbd>), copy, paste and duplicate, **opening and saving graphs** (`.wpgraph`) to reuse them from one world to the next.
+- Apply to the whole map or to the **selection with soft edges**, with undo; the graph is **saved with the world**.
+- **Examples** of complete maps: hills, eroded mountains, tropical archipelago, mesa canyons, desert dunes, volcanic island, lakes and forests, valleys and rivers, and "erode the current map". Evaluated in parallel tiles, identical to the bit to a computation in one piece: no seams.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/divider-dark.svg">
   <img alt="" src="docs/assets/divider-light.svg" width="100%">
 </picture>
 
-## Fondu des bords
+## Edge blending
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/edges-dark.svg">
-  <img alt="Le bord de la carte descend en pente douce au lieu de former une falaise" src="docs/assets/edges-light.svg" width="560">
+  <img alt="The edge of the map slopes down gently instead of forming a cliff" src="docs/assets/edges-light.svg" width="560">
 </picture>
 
-**Generate › Blend map edges…**. Une carte de 200 × 200 ne se termine plus par une falaise brute : son relief rejoint progressivement le terrain qui l'entoure.
+**Generate › Blend map edges…**. A 200 × 200 map no longer ends in a sheer cliff: its relief goes over gradually into the land around it.
 
-- **Zone de transition** de 16 à 4096 blocs, à l'extérieur de la carte (qui est alors agrandie), à l'intérieur (le bord est adouci) ou à cheval sur le bord.
-- **Cible** : un terrain procédural (par défaut *Minecraft-like*, proche de ce que Minecraft génère au-delà de la carte) ou un niveau plat.
-- Forme de la courbe et **irrégularité** réglables ; Minecraft raccorde ensuite les derniers blocs lui-même grâce à son *chunk blending*.
+- **Transition zone** of 16 to 4096 blocks, outside the map (which is then enlarged), inside it (the edge is softened) or across the edge. Round maps are blended too.
+- **Target**: a procedural terrain (*Minecraft-like* by default, close to what Minecraft generates beyond the map) or a flat level.
+- Adjustable curve shape and **irregularity**; Minecraft then joins up the last few blocks itself with its *chunk blending*.
 
-<img alt="Avant / après le fondu des bords" src="docs/images/edge-blending.png" width="100%">
+<img alt="Before and after blending the edges" src="docs/images/edge-blending.png" width="100%">
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/divider-dark.svg">
   <img alt="" src="docs/assets/divider-light.svg" width="100%">
 </picture>
 
-## Génération procédurale
+## Procedural generation
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/procedural-dark.svg">
-  <img alt="Couches de bruit empilées qui forment un terrain" src="docs/assets/procedural-light.svg" width="460">
+  <img alt="Stacked layers of noise forming a terrain" src="docs/assets/procedural-light.svg" width="460">
 </picture>
 
-**Generate › Procedural terrain…** (<kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>G</kbd>) pour poser une base de relief avant de peindre :
+**Generate › Procedural terrain…** (<kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>G</kbd>) to lay down a base relief before painting:
 
-- une pile de couches de bruit à combiner (relief doux, crêtes, collines, cellules, dunes), avec terrasses, niveau de la mer et règles de surface (neige en altitude, roche sur les pentes, plages) ;
-- 8 préréglages, un aperçu en temps réel, et l'application à toute la carte ou à la sélection avec des bords adoucis ;
-- un calcul en parallèle sur tous les cœurs, sans couture entre les tuiles, adapté aux très grandes cartes.
+- a stack of noise layers to combine (gentle relief, ridges, hills, cells, dunes), with terraces, sea level and surface rules (snow up high, rock on the slopes, beaches);
+- 8 presets, a live preview, and applying to the whole map or to the selection with soft edges;
+- computed in parallel on all cores, with no seams between tiles, suited to very large maps.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/divider-dark.svg">
   <img alt="" src="docs/assets/divider-light.svg" width="100%">
 </picture>
 
-## Installer
+## Install
 
-Télécharger la dernière version sur la page [Releases](https://github.com/M-U-C-K-A/WorldPainter/releases) : une application native par plateforme (macOS Apple Silicon ou Intel, Windows, Linux), Java intégré, rien d'autre à installer. Le build non testé de chaque modification reste disponible dans l'onglet [Actions](https://github.com/M-U-C-K-A/WorldPainter/actions/workflows/build.yml).
+Download the latest version from the [Releases](https://github.com/M-U-C-K-A/WorldPainter/releases) page: a native application per platform (macOS Apple Silicon or Intel, Windows, Linux), with Java included and nothing else to install. The untested build of each change is also available in the [Actions](https://github.com/M-U-C-K-A/WorldPainter/actions/workflows/build.yml) tab.
 
-L'application n'est pas signée : sur macOS, l'ouvrir la première fois avec clic droit › Ouvrir. Elle garde ses réglages à part de ceux du WorldPainter d'origine, les deux peuvent donc être installés côte à côte.
+The application is not signed: on macOS, open it the first time with right-click › Open. It keeps its settings apart from those of the original WorldPainter, so both can be installed side by side.
 
-L'application peut utiliser **jusqu'à 75 % de la mémoire** de la machine (contre 25 % par défaut pour Java), ce qui permet de travailler sur des cartes environ trois fois plus grandes.
+The application can use **up to 75% of the memory** of the machine (instead of Java's default of 25%), which allows working on maps about three times larger.
 
-## Compiler
+## Build
 
-Il suffit d'un **JDK 21** et de **Maven** ; toutes les dépendances se téléchargent automatiquement. Détails dans [BUILDING.md](BUILDING.md).
+All you need is **JDK 21** and **Maven**; all dependencies are downloaded automatically. Details in [BUILDING.md](BUILDING.md).
 
 ```bash
 cd WorldPainter
-mvn -DskipTests install       # compiler
-mvn -pl WPGUI exec:exec       # lancer
+mvn -DskipTests install       # build
+mvn -pl WPGUI exec:exec       # run
 ```
 
-Créer l'application native pour la plateforme courante (dans `dist/`) :
+Create the native application for the current platform (in `dist/`):
 
 ```bash
-packaging/package.sh          # macOS : dist/WorldPainter.app
-packaging/package.sh dmg      # image disque à distribuer
+packaging/package.sh          # macOS: dist/WorldPainter.app
+packaging/package.sh dmg      # disk image to distribute
 ```
 
-Les illustrations de ce README sont générées par [`docs/assets/make_svgs.py`](docs/assets/make_svgs.py).
+The illustrations in this README are generated by [`docs/assets/make_svgs.py`](docs/assets/make_svgs.py).
 
-## Licence et crédits
+## Licence and credits
 
-WorldPainter est un logiciel libre sous **licence GPL version 3**. Si vous le distribuez, tel quel ou modifié, vous devez aussi distribuer le code source (avec vos modifications) sous GPL version 3 ou ultérieure. Voir [LICENSE](LICENSE).
+WorldPainter is free software under the **GNU General Public License version 3**. If you distribute it, as is or modified, you must also distribute the source code (with your changes) under the GPL version 3 or later. See [LICENSE](LICENSE).
 
-- WorldPainter a été créé par [Pepijn Schmitz (Captain-Chaos)](https://github.com/Captain-Chaos) et ses contributeurs.
-- Génération des biomes Minecraft portée de [Cubiomes](https://github.com/Cubitect/cubiomes) (licence MIT).
-- Icônes [Lucide](https://lucide.dev) (licence ISC), thèmes [FlatLaf](https://www.formdev.com/flatlaf/) (Apache 2.0), police [Inter](https://rsms.me/inter/) (SIL OFL).
+- WorldPainter was created by [Pepijn Schmitz (Captain-Chaos)](https://github.com/Captain-Chaos) and its contributors.
+- Minecraft biome generation ported from [Cubiomes](https://github.com/Cubitect/cubiomes) (MIT licence).
+- [Lucide](https://lucide.dev) icons (ISC licence), [FlatLaf](https://www.formdev.com/flatlaf/) themes (Apache 2.0), [Inter](https://rsms.me/inter/) font (SIL OFL).
 
 [![Contributors](https://contrib.rocks/image?repo=Captain-Chaos/WorldPainter)](https://github.com/Captain-Chaos/WorldPainter/graphs/contributors)
