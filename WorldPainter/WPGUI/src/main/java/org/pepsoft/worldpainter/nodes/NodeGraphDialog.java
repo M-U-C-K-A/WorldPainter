@@ -567,6 +567,9 @@ public class NodeGraphDialog extends WorldPainterDialog {
                     } else {
                         image = HeightPreviewPanel.renderRelief(heights, PREVIEW_SIZE, region.getStep(), waterLevels);
                     }
+                    if ((previewNodeId == outputId) && (mode != PreviewMode.BIOMES)) {
+                        HeightPreviewPanel.overlayFloatingIslands(image, compiled, evaluation, region);
+                    }
                     final int lowest = Math.round(min), highest = Math.round(max);
                     SwingUtilities.invokeLater(() -> {
                         previewPanel.setMessage(null);

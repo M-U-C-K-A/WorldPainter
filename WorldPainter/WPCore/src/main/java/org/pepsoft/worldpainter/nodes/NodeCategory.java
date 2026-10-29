@@ -29,6 +29,10 @@ public enum NodeCategory {
      */
     SURFACE("Surface"),
     /**
+     * Nodes which add structures of their own to the map, such as floating islands.
+     */
+    STRUCTURE("Structures"),
+    /**
      * The node which determines the final height of the terrain.
      */
     OUTPUT("Output");

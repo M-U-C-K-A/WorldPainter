@@ -142,6 +142,50 @@ public class HeightPreviewPanel extends JComponent {
      * @param biomes     Whether to show the biomes instead of the terrain and vegetation.
      */
     /**
+     * Draw the floating islands of a graph over a preview of the land, seen from above: their tops, lit like the land,
+     * with their shadow cast on the land below.
+     */
+    public static void overlayFloatingIslands(BufferedImage image, CompiledGraph compiled, Evaluation evaluation, Region region) {
+        final List<FloatingIslandsNode.Compiled> allIslands = compiled.getFloatingIslands();
+        if (allIslands.isEmpty()) {
+            return;
+        }
+        final int size = region.getWidth();
+        final double step = region.getStep();
+        for (FloatingIslandsNode.Compiled islands: allIslands) {
+            final float[] shape = islands.shape(evaluation, region);
+            final float[] tops = islands.tops(evaluation, region);
+            final int grass = 0x7dbb4f;
+            // The shadow, offset to the south east
+            final int shadow = (int) Math.max(1, Math.round(24 / step));
+            for (int y = size - 1; y >= 0; y--) {
+                for (int x = size - 1; x >= 0; x--) {
+                    final int sx = x - shadow, sy = y - shadow;
+                    if ((sx >= 0) && (sy >= 0) && (shape[sx + sy * size] > 0.5f) && (shape[x + y * size] <= 0.5f)) {
+                        image.setRGB(x, y, blend(image.getRGB(x, y) & 0xffffff, 0x0b1220, 0.35f));
+                    }
+                }
+            }
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    final int i = x + y * size;
+                    if (shape[i] <= 0.5f) {
+                        continue;
+                    }
+                    final float west = tops[(x > 0) ? (i - 1) : i], north = tops[(y > 0) ? (i - size) : i];
+                    final double light = Math.max(0.6, Math.min(1.25, 1 + ((tops[i] - west) + (tops[i] - north)) / step * 0.25));
+                    // A dark rim where the island ends
+                    final boolean edge = ((x > 0) && (shape[i - 1] <= 0.5f)) || ((y > 0) && (shape[i - size] <= 0.5f))
+                            || ((x < size - 1) && (shape[i + 1] <= 0.5f)) || ((y < size - 1) && (shape[i + size] <= 0.5f));
+                    final int colour = edge ? 0x5a4a3a : grass;
+                    final int r = (int) Math.min(255, ((colour >> 16) & 0xff) * light), g = (int) Math.min(255, ((colour >> 8) & 0xff) * light), b = (int) Math.min(255, (colour & 0xff) * light);
+                    image.setRGB(x, y, (r << 16) | (g << 8) | b);
+                }
+            }
+        }
+    }
+
+    /**
      * The colour of the water of a biome in Minecraft.
      */
     private static int waterColour(MinecraftBiome biome) {

@@ -6,6 +6,13 @@ import org.pepsoft.worldpainter.layers.bo2.TreePack;
 import org.pepsoft.util.ProgressReceiver;
 import org.pepsoft.util.ProgressReceiver.OperationCancelled;
 import org.pepsoft.worldpainter.Dimension;
+import org.pepsoft.worldpainter.NoiseSettings;
+import org.pepsoft.worldpainter.Platform;
+import org.pepsoft.worldpainter.TileFactoryFactory;
+import org.pepsoft.worldpainter.World2;
+import org.pepsoft.worldpainter.layers.Frost;
+import org.pepsoft.worldpainter.layers.tunnel.TunnelLayer;
+import org.pepsoft.worldpainter.themes.SimpleTheme;
 import org.pepsoft.worldpainter.HeightMapTileFactory;
 import org.pepsoft.worldpainter.Terrain;
 import org.pepsoft.worldpainter.Tile;
@@ -147,9 +154,134 @@ public class NodeGraphOperation {
         tiles.forEach(Tile::inhibitEvents);
         try {
             ParallelTileProcessor.forEach(groups.values(), group -> processGroup(dimension, compiled, painters, vegetationLayers, group), progressReceiver);
+            for (FloatingIslandsNode.Compiled islands: compiled.getFloatingIslands()) {
+                applyFloatingIslands(dimension, islands, tiles);
+            }
         } finally {
             tiles.forEach(Tile::releaseEvents);
         }
+    }
+
+    /**
+     * Turn the islands of a Floating islands node into a floating dimension layer: mark out where they are on the
+     * map, and create the floor dimension of the layer with the heights of their tops.
+     */
+    private void applyFloatingIslands(Dimension dimension, FloatingIslandsNode.Compiled islands, List<Tile> tiles) throws OperationCancelled {
+        final FloatingIslandsNode node = islands.getNode();
+        final World2 world = dimension.getWorld();
+        final Platform platform = world.getPlatform();
+        // Number the layers, so that islands made by applying the graph several times can be told apart
+        int count = 0;
+        for (CustomLayer existing: existingLayers) {
+            if ((existing instanceof TunnelLayer) && existing.getName().startsWith(FLOATING_ISLANDS_NAME)) {
+                count++;
+            }
+        }
+        for (CustomLayer created: createdLayers) {
+            if ((created instanceof TunnelLayer) && created.getName().startsWith(FLOATING_ISLANDS_NAME)) {
+                count++;
+            }
+        }
+        final String name = (count == 0) ? FLOATING_ISLANDS_NAME : (FLOATING_ISLANDS_NAME + " " + (count + 1));
+        final TunnelLayer layer = new TunnelLayer(name, TunnelLayer.LayerMode.FLOATING, new Color(0xeab308), platform);
+        final int thickness = node.getInt(FloatingIslandsNode.THICKNESS);
+        layer.setFloorMode(TunnelLayer.Mode.CUSTOM_DIMENSION);
+        layer.setRoofMode(TunnelLayer.Mode.FIXED_HEIGHT_ABOVE_FLOOR);
+        layer.setRoofLevel(thickness);
+        layer.setRoofWallDepth(Math.max(1, node.getInt(FloatingIslandsNode.TAPER)));
+        layer.setBottomEdgeShape(TunnelLayer.EdgeShape.LINEAR);
+        layer.setFloorWallDepth(1);
+        final double roughness = node.getDouble(FloatingIslandsNode.ROUGHNESS);
+        if (roughness > 0) {
+            layer.setRoofNoise(new NoiseSettings(dimension.getSeed() + 1, Math.max(1, (int) Math.round(thickness * roughness * 0.8)), (int) Math.round(roughness * 10), 0.6f));
+        }
+        final float density = (float) node.getDouble(FloatingIslandsNode.DENSITY);
+        final boolean snow = (density > 0) && (node.get(FloatingIslandsNode.VEGETATION) == Vegetation.SNOW);
+        // The trees are painted on the floor dimension (below), from which the floating layer exports them
+        final Layer forest = ((density > 0) && (! snow)) ? node.get(FloatingIslandsNode.VEGETATION).getLayer() : null;
+
+        // Mark out the islands on the map, and remember the heights of their tops
+        final Map<Point, float[]> tops = new HashMap<>();
+        final List<Tile> islandTiles = new ArrayList<>();
+        final double[] totalHeight = new double[2];
+        ParallelTileProcessor.process(tiles, tile -> {
+            final Region region = new Region(tile.getX() << TILE_SIZE_BITS, tile.getY() << TILE_SIZE_BITS, 1, TILE_SIZE, TILE_SIZE);
+            final Evaluation evaluation = islands.getCompiledGraph().createEvaluation();
+            final float[] shape = islands.shape(evaluation, region);
+            final float[] weights = selectionOnly ? SelectionWeights.forTile(dimension, tile.getX() << TILE_SIZE_BITS, tile.getY() << TILE_SIZE_BITS, feather) : null;
+            boolean any = false;
+            for (int i = 0; i < shape.length; i++) {
+                final boolean island = (shape[i] > 0.5f) && ((weights == null) || (weights[i] >= 0.5f));
+                tile.setBitLayerValue(layer, i & (TILE_SIZE - 1), i >> TILE_SIZE_BITS, island);
+                any |= island;
+            }
+            if (any) {
+                final float[] heights = islands.tops(evaluation, region);
+                double sum = 0;
+                int n = 0;
+                for (int i = 0; i < shape.length; i++) {
+                    if (shape[i] > 0.5f) {
+                        sum += heights[i];
+                        n++;
+                    }
+                }
+                synchronized (tops) {
+                    tops.put(new Point(tile.getX(), tile.getY()), heights);
+                    islandTiles.add(tile);
+                    totalHeight[0] += sum;
+                    totalHeight[1] += n;
+                }
+            }
+        }, null);
+        if (islandTiles.isEmpty()) {
+            return;
+        }
+
+        // The floor dimension, which holds the tops of the islands
+        final Dimension.Anchor anchor = dimension.getAnchor();
+        int id = 0;
+        for (Dimension existing: world.getDimensions()) {
+            final Dimension.Anchor existingAnchor = existing.getAnchor();
+            if ((existingAnchor.dim == anchor.dim) && (existingAnchor.role == Dimension.Role.FLOATING_FLOOR) && (existingAnchor.invert == anchor.invert)) {
+                id = Math.max(id, existingAnchor.id + 1);
+            }
+        }
+        final int averageTop = (int) Math.round(totalHeight[0] / Math.max(1, totalHeight[1]));
+        final Terrain terrain = node.get(FloatingIslandsNode.TERRAIN);
+        final long seed = dimension.getSeed() + 1 + id;
+        final HeightMapTileFactory floorTileFactory = TileFactoryFactory.createFlatTileFactory(seed, terrain, dimension.getMinHeight(), dimension.getMaxHeight(), averageTop, dimension.getMinHeight(), false, false);
+        // The default theme puts snow on everything high above its water level, which is at the bottom of the world
+        // here; the islands get exactly the terrain (and snow) of the node instead
+        if (floorTileFactory.getTheme() instanceof SimpleTheme) {
+            ((SimpleTheme) floorTileFactory.getTheme()).setLayerMap(Collections.emptyMap());
+        }
+        final Dimension floor = new Dimension(world, null, seed, floorTileFactory, new Dimension.Anchor(anchor.dim, Dimension.Role.FLOATING_FLOOR, anchor.invert, id));
+        world.addDimension(floor);
+        layer.setFloorDimensionId(id);
+        layer.setFloorLevel(averageTop);
+        layer.updateFloorDimension(dimension, name + " Tops");
+        floor.setEventsInhibited(true);
+        try {
+            for (Map.Entry<Point, float[]> entry: tops.entrySet()) {
+                final Tile floorTile = floor.getTileForEditing(entry.getKey().x, entry.getKey().y);
+                if (floorTile == null) {
+                    continue;
+                }
+                final float[] heights = entry.getValue();
+                for (int i = 0; i < heights.length; i++) {
+                    final int x = i & (TILE_SIZE - 1), y = i >> TILE_SIZE_BITS;
+                    floorTile.setHeight(x, y, Math.max(floor.getMinHeight(), Math.min(floor.getMaxHeight() - 1, heights[i])));
+                    floorTile.setTerrain(x, y, terrain);
+                    floorTile.setBitLayerValue(Frost.INSTANCE, x, y, snow && SurfaceRules.place(density, (entry.getKey().x << TILE_SIZE_BITS) + x, (entry.getKey().y << TILE_SIZE_BITS) + y, 7));
+                    if (forest != null) {
+                        floorTile.setLayerValue(forest, x, y, SurfaceRules.forestLevel(density));
+                    }
+                }
+            }
+        } finally {
+            floor.setEventsInhibited(false);
+        }
+        createdLayers.add(layer);
     }
 
     /**
@@ -362,6 +494,8 @@ public class NodeGraphOperation {
     private boolean selectionOnly, applyTheme = true, applyPainters = true;
     private int feather = 32, waterLevel = Integer.MIN_VALUE;
     private List<CustomLayer> existingLayers = Collections.emptyList();
+
+    private static final String FLOATING_ISLANDS_NAME = "Floating islands";
 
     private static final int GROUP_SIZE = 4;
 

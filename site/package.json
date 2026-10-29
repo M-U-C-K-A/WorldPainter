@@ -1,0 +1,16 @@
+{
+  "name": "worldpainter-modernised-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs && tailwindcss -i src/styles.css -o dist/assets/styles.css --minify",
+    "dev": "node build.mjs && tailwindcss -i src/styles.css -o dist/assets/styles.css"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.1.11",
+    "@tailwindcss/typography": "0.5.16",
+    "geist": "1.4.2",
+    "marked": "15.0.12",
+    "tailwindcss": "4.1.11"
+  }
+}

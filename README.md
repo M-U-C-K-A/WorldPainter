@@ -17,6 +17,8 @@
 </p>
 
 <p align="center">
+  <b><a href="https://m-u-c-k-a.github.io/WorldPainter/">Documentation</a></b> ·
+  <a href="https://m-u-c-k-a.github.io/WorldPainter/tutorial-first-archipelago.html">Premier tutoriel</a> ·
   <a href="#aperçu">Aperçu</a> ·
   <a href="#vue-3d-intégrée">Vue 3D</a> ·
   <a href="#autour-de-la-carte">Autour de la carte</a> ·
@@ -34,6 +36,8 @@
 </picture>
 
 ## Aperçu
+
+> La documentation complète (fonctionnalités, nœuds, tutoriels pas à pas, feuille de route) est sur **[m-u-c-k-a.github.io/WorldPainter](https://m-u-c-k-a.github.io/WorldPainter/)** ; ses sources sont dans [`site/`](site/).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshot-dark.png">

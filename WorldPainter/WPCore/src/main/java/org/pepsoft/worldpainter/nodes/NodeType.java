@@ -91,5 +91,6 @@ public final class NodeType {
             new NodeType("Paint terrain", "Paint a terrain type where the mask is strong", NodeCategory.SURFACE, TerrainPainterNode::new),
             new NodeType("Paint material mix", "Paint a ready made mix of blocks (mixed dirt, forest floor, scree, cliff strata...) where the mask is strong", NodeCategory.SURFACE, MaterialPainterNode::new),
             new NodeType("Paint biome", "Paint a Minecraft biome where the mask is strong", NodeCategory.SURFACE, BiomePainterNode::new),
+            new NodeType("Floating islands", "Islands floating in the sky where the Shape input is above one half, with their tops at the height of the Top input", NodeCategory.STRUCTURE, FloatingIslandsNode::new),
             new NodeType("Paint flora", "Plant forests, grass, flowers or snow, as dense as the mask", NodeCategory.SURFACE, FloraPainterNode::new));
 }

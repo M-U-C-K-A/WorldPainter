@@ -10,3 +10,7 @@ exports
 
 # macOS Finder metadata
 .DS_Store
+
+# Documentation site (built by site/build.mjs)
+/site/node_modules/
+/site/dist/

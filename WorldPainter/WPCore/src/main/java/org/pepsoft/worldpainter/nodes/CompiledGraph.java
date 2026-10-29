@@ -22,8 +22,13 @@ public final class CompiledGraph {
         outputNodeId = outputNode.getId();
         final List<Painter> painters = new ArrayList<>();
         final List<WaterBody> waterBodies = new ArrayList<>();
+        final List<FloatingIslandsNode.Compiled> floatingIslands = new ArrayList<>();
         for (Node node: graph.getNodes()) {
-            if (node instanceof PainterNode) {
+            if (node instanceof FloatingIslandsNode) {
+                final FloatingIslandsNode.Compiled islands = (FloatingIslandsNode.Compiled) compiled.get(node.getId());
+                islands.setCompiledGraph(this);
+                floatingIslands.add(islands);
+            } else if (node instanceof PainterNode) {
                 painters.add(new Painter(node.getId(), ((PainterNode) node).getTarget(), (node instanceof FloraPainterNode) && ((FloraPainterNode) node).isOnlyOnLand(), compiled.get(node.getId())));
             } else if ((node instanceof WaterNode) && (terrainNode != null) && graph.dependsOn(terrainNode, node)) {
                 // Only water which is carved into the final terrain is filled; it also paints its bed and biome
@@ -40,6 +45,14 @@ public final class CompiledGraph {
         }
         this.painters = Collections.unmodifiableList(painters);
         this.waterBodies = Collections.unmodifiableList(waterBodies);
+        this.floatingIslands = Collections.unmodifiableList(floatingIslands);
+    }
+
+    /**
+     * The floating islands of the graph.
+     */
+    public List<FloatingIslandsNode.Compiled> getFloatingIslands() {
+        return floatingIslands;
     }
 
     /**
@@ -163,4 +176,5 @@ public final class CompiledGraph {
     private final int outputNodeId;
     private final List<Painter> painters;
     private final List<WaterBody> waterBodies;
+    private final List<FloatingIslandsNode.Compiled> floatingIslands;
 }

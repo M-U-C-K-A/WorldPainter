@@ -735,6 +735,62 @@ public final class ExampleGraphs {
                 b.wire(land, b.biome(MinecraftBiome.JUNGLE, 1, 9, 15));
                 break;
             }
+            case SIMPLE_ARCHIPELAGO: {
+                // The beginner's version of the coral archipelago: 13 nodes. Islands are where the noise is high, faded
+                // out towards the edges of the map; the curve turns that into a sea floor, shallows, beaches and hills
+                final NoiseNode islands = b.noise(NoiseNode.Kind.PERLIN, 500, 5, 91, 40, 0);
+                final GradientNode middle = b.add(new GradientNode(), 0, 1);
+                final CombineNode faded = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 1, 0);
+                b.wire(islands, faded, 0);
+                b.wire(middle, faded, 1);
+                // Output range Y 22 to Y 152: sea level (62) is at 40 / 130 = 0.31
+                final CurveNode shape = b.add(new CurveNode(0, 0, 0.2f, 0.12f, 0.3f, 0.29f, 0.36f, 0.32f, 0.5f, 0.45f, 1, 0.85f), 2, 0);
+                b.wire(faded, shape);
+                b.output(shape, 3, 0, w - 40, w + 90, minHeight, maxHeight);
+                // Turquoise water over the shallows, white sand on the beaches, rock on the cliffs, palms on the land
+                final HeightMaskNode shallows = b.height(w - 20, w, 4, 0, 2);
+                b.wire(shallows, b.biome(MinecraftBiome.WARM_OCEAN, 1, 1, 2));
+                final HeightMaskNode beach = b.height(w - 3, w + 3, 1, 0, 3);
+                b.wire(beach, b.terrain(Terrain.SAND, 1.2, 1, 3));
+                final SlopeMaskNode cliffs = b.slope(40, 90, 6, 0, 4);
+                b.wire(cliffs, b.material(MaterialGroup.LIMESTONE, 1.3, 1, 4));
+                final HeightMaskNode land = b.height(w + 3, 4096, 2, 2, 2);
+                b.wire(land, b.flora(Vegetation.PALMS, 0.3, 3, 2));
+                b.wire(land, b.biome(MinecraftBiome.JUNGLE, 1, 3, 3));
+                break;
+            }
+            case FLOATING_ISLANDS: {
+                // Meadows below, and islands floating in the sky above them
+                final NoiseNode ground = b.noise(NoiseNode.Kind.PERLIN, 900, 4, 101, 0, 0);
+                final CurveNode meadows = b.add(new CurveNode(0, 0, 1, 1), 1, 0);
+                b.wire(ground, meadows);
+                b.output(meadows, 2, 0, w + 2, w + 40, minHeight, maxHeight);
+                b.flora(Vegetation.GRASS_AND_FLOWERS, 0.4, 3, 0);
+                // The islands: mounds of cellular noise, broken up by fine noise so that their outlines are ragged
+                final CellsNode cells = b.add(new CellsNode(), 0, 1);
+                cells.set(CellsNode.SCALE, 340);
+                cells.set(CellsNode.WARP, 60);
+                cells.set(Node.VARIANT, 102);
+                final NoiseNode ragged = b.noise(NoiseNode.Kind.PERLIN, 60, 3, 103, 0, 2);
+                final CombineNode outline = b.add(new CombineNode(CombineNode.Mode.ADD), 1, 1);
+                outline.set(CombineNode.STRENGTH, 0.2);
+                b.wire(cells, outline, 0);
+                b.wire(ragged, outline, 1);
+                final CurveNode shape = b.add(new CurveNode(0, 0, 0.8f, 0, 0.9f, 1, 1, 1), 2, 1);
+                b.wire(outline, shape);
+                // Each island at its own height, highest in the middle
+                final NoiseNode heights = b.noise(NoiseNode.Kind.PERLIN, 700, 3, 104, 0, 3);
+                final CombineNode tops = b.add(new CombineNode(CombineNode.Mode.ADD), 2, 2);
+                tops.set(CombineNode.STRENGTH, 0.5);
+                b.wire(heights, tops, 0);
+                b.wire(cells, tops, 1);
+                final FloatingIslandsNode floating = b.add(new FloatingIslandsNode(), 3, 1);
+                floating.set(FloatingIslandsNode.TOP_LOW, w + 80);
+                floating.set(FloatingIslandsNode.TOP_HIGH, w + 150);
+                b.wire(shape, floating, 0);
+                b.wire(tops, floating, 1);
+                break;
+            }
             case ERODE_CURRENT_MAP: {
                 final CurrentMapNode current = b.add(new CurrentMapNode(), 0, 0);
                 final GullyErosionNode erosion = b.add(new GullyErosionNode(), 1, 0);
@@ -766,6 +822,8 @@ public final class ExampleGraphs {
         ALPINE_VALLEY("Alpine valley"),
         CONTINENT("Continent and islands (5000 x 5000)"),
         CORAL_ARCHIPELAGO("Coral archipelago (3000 x 3000)"),
+        SIMPLE_ARCHIPELAGO("Simple archipelago (beginner)"),
+        FLOATING_ISLANDS("Floating islands"),
         ERODE_CURRENT_MAP("Erode the current map");
 
         Example(String displayName) {
