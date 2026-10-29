@@ -30,6 +30,11 @@ public enum MaterialGroup {
             return noise(this, row("stone", 40), row("andesite", 25), row("cobblestone", 15), row("gravel", 10), row("tuff", 10));
         }
     },
+    LIMESTONE("Limestone", 0x8e8a82) {
+        @Override MixedMaterial createMaterial() {
+            return blobs(this, 0.45f, row("stone", 35), row("andesite", 25), row("tuff", 15), row("diorite", 10), row("calcite", 10), row("cobblestone", 5));
+        }
+    },
     MOSSY_ROCK("Mossy rock", 0x5f7350) {
         @Override MixedMaterial createMaterial() {
             return blobs(this, 0.5f, row("stone", 40), row("mossy_cobblestone", 25), row("moss_block", 20), row("cobblestone", 15));

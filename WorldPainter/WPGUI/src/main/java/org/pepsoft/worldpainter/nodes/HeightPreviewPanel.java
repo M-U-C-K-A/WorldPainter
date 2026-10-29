@@ -141,6 +141,32 @@ public class HeightPreviewPanel extends JComponent {
      * @param strengths  The strengths of the painters for the region.
      * @param biomes     Whether to show the biomes instead of the terrain and vegetation.
      */
+    /**
+     * The colour of the water of a biome in Minecraft.
+     */
+    private static int waterColour(MinecraftBiome biome) {
+        if (biome == null) {
+            return 0x3f76e4;
+        }
+        switch (biome) {
+            case WARM_OCEAN:
+                return 0x43d5ee;
+            case LUKEWARM_OCEAN:
+                return 0x45adf2;
+            case COLD_OCEAN:
+                return 0x3d57d6;
+            case FROZEN_OCEAN:
+            case FROZEN_RIVER:
+                return 0x3938c9;
+            case SWAMP:
+                return 0x617b64;
+            case MANGROVE_SWAMP:
+                return 0x3a7a6a;
+            default:
+                return 0x3f76e4;
+        }
+    }
+
     public static BufferedImage renderSurface(float[] heights, Region region, float[] waterLevels, List<Painter> painters, float[][] strengths, boolean biomes,
                                               ColourScheme colourScheme, Platform platform, long seed) {
         final int size = region.getWidth();
@@ -174,7 +200,18 @@ public class HeightPreviewPanel extends JComponent {
                         colour = underWater ? 0x5b8fd6 : 0x9e9e9e;
                     }
                 } else if (underWater) {
-                    colour = blend(0x5b8fd6, 0x1e3a74, Math.min(1.0f, (waterLevel - h) / 40f));
+                    // As in Minecraft: the colour of the water depends on the biome (turquoise in warm oceans), and
+                    // the sea bed shows through shallow water
+                    final int biomeWinner = SurfaceRules.winner(biomeStrengths, index, worldX, worldY, biomeSalts);
+                    final int water = waterColour((biomeWinner >= 0) ? (MinecraftBiome) painters.get(biomeIndices.get(biomeWinner)).getTarget() : null);
+                    final int terrainWinner = SurfaceRules.winner(terrainStrengths, index, worldX, worldY, terrainSalts);
+                    final Object bed = (terrainWinner >= 0) ? painters.get(terrainIndices.get(terrainWinner)).getTarget() : null;
+                    final int intHeight = Math.round(h);
+                    final int bedColour = (bed instanceof Terrain) ? ((Terrain) bed).getColour(seed, worldX, worldY, intHeight, intHeight, platform, colourScheme)
+                            : ((bed instanceof org.pepsoft.worldpainter.MaterialGroup) ? ((org.pepsoft.worldpainter.MaterialGroup) bed).getColour() : 0xd8cfa0);
+                    final float depth = waterLevel - h;
+                    colour = blend(blend(bedColour, water, 0.45f), water, Math.min(1.0f, depth / 10f));
+                    colour = blend(colour, blend(water, 0x061a3a, 0.7f), Math.min(0.85f, Math.max(0, depth - 8) / 60f));
                 } else {
                     final int winner = SurfaceRules.winner(terrainStrengths, index, worldX, worldY, terrainSalts);
                     final int intHeight = Math.round(h);

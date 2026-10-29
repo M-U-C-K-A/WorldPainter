@@ -29,7 +29,8 @@ public final class TreePack {
         BIRCH("Birches", 0x6e9b45, 3, 3),
         CHERRY("Cherry trees", 0xf0a3c8, 6, 4),
         DEAD("Dead trees", 0x6b5a48, 5, 4),
-        BUSH("Bushes", 0x4d7a35, 2, 2);
+        BUSH("Bushes", 0x4d7a35, 2, 2),
+        PALM("Palm trees", 0x5c9a3a, 5, 4);
 
         Kind(String displayName, int colour, int grid, int density) {
             this.displayName = displayName;
@@ -94,6 +95,8 @@ public final class TreePack {
                 return dead(variant, random);
             case BUSH:
                 return bush(variant, random);
+            case PALM:
+                return palm(variant, random);
             default:
                 throw new InternalError();
         }
@@ -224,6 +227,37 @@ public final class TreePack {
             final double angle = random.nextDouble() * Math.PI * 2, reach = 2 + random.nextDouble() * 2.5;
             final int z = height / 2 + random.nextInt(Math.max(1, height / 2));
             b.line(log, 0.5, 0.5, z, 0.5 + Math.cos(angle) * reach, 0.5 + Math.sin(angle) * reach, z + 1 + random.nextInt(2));
+        }
+        return b.build();
+    }
+
+    /**
+     * A palm tree: a slender, leaning, curving trunk with a crown of long drooping fronds.
+     */
+    private static WPObject palm(int variant, Random random) {
+        final int height = 7 + random.nextInt(6);
+        final Builder b = new Builder("Palm tree " + (variant + 1), 17, height + 4);
+        final Material log = log("jungle"), leaves = leaves("jungle");
+        // The trunk leans more and more towards the top
+        final double angle = random.nextDouble() * Math.PI * 2, lean = 2 + random.nextDouble() * 2.5;
+        double topX = 0, topY = 0;
+        for (int z = 0; z < height; z++) {
+            final double t = (double) z / height;
+            topX = Math.cos(angle) * lean * t * t;
+            topY = Math.sin(angle) * lean * t * t;
+            b.set((int) Math.floor(topX + 0.5), (int) Math.floor(topY + 0.5), z, log);
+        }
+        final int cx = (int) Math.floor(topX + 0.5), cy = (int) Math.floor(topY + 0.5), cz = height;
+        b.set(cx, cy, cz, leaves);
+        // Fronds: arcs which rise a little and then droop
+        final int fronds = 6 + random.nextInt(3);
+        for (int f = 0; f < fronds; f++) {
+            final double a = f * Math.PI * 2 / fronds + random.nextDouble() * 0.4;
+            final int length = 4 + random.nextInt(2);
+            for (int i = 1; i <= length; i++) {
+                final double droop = (i <= 1) ? 0 : -0.35 * (i - 1) * (i - 1) / 2.0;
+                b.set(cx + (int) Math.round(Math.cos(a) * i), cy + (int) Math.round(Math.sin(a) * i), cz + (int) Math.round(droop), leaves);
+            }
         }
         return b.build();
     }

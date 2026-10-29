@@ -21,6 +21,7 @@ public enum Vegetation {
     CHERRY_TREES(TreePack.Kind.CHERRY),
     DEAD_TREES(TreePack.Kind.DEAD),
     BUSHES(TreePack.Kind.BUSH),
+    PALMS(TreePack.Kind.PALM),
     SNOW("Snow and ice", Frost.INSTANCE, null, 0xf4f8ff),
     GRASS_AND_FLOWERS("Grass and flowers", null, PlantLayerPresets.Preset.GRASS_AND_FLOWERS, 0x86c45f),
     TALL_GRASS("Tall grass", null, PlantLayerPresets.Preset.TALL_GRASS, 0x6aa84f),

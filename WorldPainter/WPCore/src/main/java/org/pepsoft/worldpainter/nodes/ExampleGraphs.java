@@ -550,6 +550,191 @@ public final class ExampleGraphs {
                 b.wire(savanna, b.biome(MinecraftBiome.SAVANNA, 1.05, 10, 10));
                 break;
             }
+            case CORAL_ARCHIPELAGO: {
+                // Heights: 0 is Y w - 90 (the deep sea floor), 1 is Y w + 150. Sea level is at 90 / 240 = 0.375.
+                // "Island potential": clusters of islands, the islands within them, raised around the centrepiece
+                // mountain and around the blue hole, and faded out towards the edges of the map
+                final NoiseNode clusters = b.noise(NoiseNode.Kind.PERLIN, 1300, 4, 81, 200, 0);
+                final NoiseNode detail = b.noise(NoiseNode.Kind.PERLIN, 380, 6, 82, 35, 1);
+                final CombineNode islandField = b.add(new CombineNode(CombineNode.Mode.ADD), 1, 0);
+                islandField.set(CombineNode.STRENGTH, 0.6);
+                b.wire(detail, islandField, 0);
+                b.wire(clusters, islandField, 1);
+                final GradientNode middle = b.add(new GradientNode(), 0, 2);
+                middle.set(GradientNode.FIT_TO_MAP, false);
+                middle.set(GradientNode.SIZE, 650);
+                final CombineNode raised = b.add(new CombineNode(CombineNode.Mode.ADD), 2, 0);
+                raised.set(CombineNode.STRENGTH, 0.35);
+                b.wire(islandField, raised, 0);
+                b.wire(middle, raised, 1);
+                final GradientNode holeShelf = b.add(new GradientNode(), 0, 3);
+                holeShelf.set(GradientNode.FIT_TO_MAP, false);
+                holeShelf.set(GradientNode.CENTRE_X, -620);
+                holeShelf.set(GradientNode.CENTRE_Y, 720);
+                holeShelf.set(GradientNode.SIZE, 360);
+                final CurveNode holeShelfShape = b.add(new CurveNode(0, 0, 0.5f, 0.6f, 1, 0.6f), 1, 3);
+                b.wire(holeShelf, holeShelfShape);
+                final CombineNode withShelf = b.add(new CombineNode(CombineNode.Mode.MAX), 3, 0);
+                b.wire(raised, withShelf, 0);
+                // The shelf around the blue hole: at reef flat level (in potential terms about 0.95)
+                final CurveNode holeShelfLevel = b.add(new CurveNode(0, 0, 0.01f, 0.6f, 0.6f, 0.95f, 1, 0.95f), 2, 3);
+                b.wire(holeShelfShape, holeShelfLevel);
+                b.wire(holeShelfLevel, withShelf, 1);
+                final GradientNode edgesOfMap = b.add(new GradientNode(), 0, 4);
+                final CurveNode edgeFade = b.add(new CurveNode(0, 0.45f, 0.25f, 1, 1, 1), 1, 4);
+                b.wire(edgesOfMap, edgeFade);
+                final CombineNode potential = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 4, 0);
+                b.wire(withShelf, potential, 0);
+                b.wire(edgeFade, potential, 1);
+                // From potential to height: a deep sea floor, a gradual slope up to wide, nearly flat reef flats just
+                // under the surface, wide beaches, then the land
+                final CurveNode profile = b.add(new CurveNode(0, 0.12f, 0.45f, 0.13f, 0.66f, 0.26f, 0.78f, 0.345f, 0.98f, 0.366f,
+                        1.03f, 0.377f, 1.1f, 0.39f, 1.18f, 0.415f, 1.4f, 0.48f, 1.9f, 0.58f), 5, 0);
+                b.wire(potential, profile);
+                // Rugged mountains on the larger islands
+                final CurveNode landMask = b.add(new CurveNode(0, 0, 1.15f, 0, 1.5f, 1, 2, 1), 5, 1);
+                b.wire(potential, landMask);
+                final NoiseNode ridges = b.noise(NoiseNode.Kind.RIDGED, 520, 4, 83, 60, 5);
+                final CombineNode mountains = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 6, 1);
+                b.wire(ridges, mountains, 0);
+                b.wire(landMask, mountains, 1);
+                final TowersNode karst = b.add(new TowersNode(), 0, 6);
+                karst.set(TowersNode.SPACING, 130);
+                karst.set(TowersNode.WIDTH, 0.28);
+                karst.set(TowersNode.DENSITY, 0.55);
+                karst.set(Node.VARIANT, 84);
+                final CombineNode karstOnLand = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 6, 2);
+                b.wire(karst, karstOnLand, 0);
+                b.wire(landMask, karstOnLand, 1);
+                final CombineNode rugged = b.add(new CombineNode(CombineNode.Mode.ADD), 7, 1);
+                rugged.set(CombineNode.STRENGTH, 0.35);
+                b.wire(mountains, rugged, 0);
+                b.wire(karstOnLand, rugged, 1);
+                final BlurNode softened = b.add(new BlurNode(), 8, 1);
+                softened.set(BlurNode.RADIUS, 3);
+                b.wire(rugged, softened);
+                final CombineNode relief = b.add(new CombineNode(CombineNode.Mode.ADD), 7, 0);
+                relief.set(CombineNode.STRENGTH, 0.2);
+                b.wire(profile, relief, 0);
+                b.wire(softened, relief, 1);
+                // The centrepiece: a high, jagged mountain island in the middle
+                final GradientNode peak = b.add(new GradientNode(), 5, 3);
+                peak.set(GradientNode.FIT_TO_MAP, false);
+                peak.set(GradientNode.CENTRE_X, 60);
+                peak.set(GradientNode.CENTRE_Y, -90);
+                peak.set(GradientNode.SIZE, 360);
+                final CurveNode peakCone = b.add(new CurveNode(0, 0, 0.3f, 0.12f, 0.7f, 0.55f, 1, 1), 6, 3);
+                b.wire(peak, peakCone);
+                final NoiseNode peakRidges = b.noise(NoiseNode.Kind.RIDGED, 200, 5, 86, 40, 7);
+                final CombineNode jagged = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 6, 4);
+                b.wire(peakCone, jagged, 0);
+                b.wire(peakRidges, jagged, 1);
+                final CombineNode massif = b.add(new CombineNode(CombineNode.Mode.ADD), 7, 4);
+                massif.set(CombineNode.STRENGTH, 0.8);
+                b.wire(peakCone, massif, 0);
+                b.wire(jagged, massif, 1);
+                final CurveNode peakDetail = b.add(new CurveNode(0, 0, 0.02f, 0.372f, 0.25f, 0.44f, 1.8f, 0.95f), 7, 3);
+                b.wire(massif, peakDetail);
+                final CombineNode withPeak = b.add(new CombineNode(CombineNode.Mode.MAX), 8, 0);
+                b.wire(relief, withPeak, 0);
+                b.wire(peakDetail, withPeak, 1);
+                // Sea stacks: small rock pillars standing in the shallows
+                final CurveNode shallowZone = b.add(new CurveNode(0, 0, 0.8f, 0, 0.86f, 1, 0.98f, 1, 1.02f, 0, 2, 0), 5, 2);
+                b.wire(potential, shallowZone);
+                final TowersNode stacks = b.add(new TowersNode(), 0, 8);
+                stacks.set(TowersNode.SPACING, 48);
+                stacks.set(TowersNode.WIDTH, 0.13);
+                stacks.set(TowersNode.DENSITY, 0.22);
+                stacks.set(Node.VARIANT, 87);
+                final CombineNode stacksInShallows = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 6, 5);
+                b.wire(stacks, stacksInShallows, 0);
+                b.wire(shallowZone, stacksInShallows, 1);
+                final CurveNode stackHeight = b.add(new CurveNode(0, 0, 0.02f, 0.3f, 1, 0.47f), 7, 5);
+                b.wire(stacksInShallows, stackHeight);
+                final CombineNode withStacks = b.add(new CombineNode(CombineNode.Mode.MAX), 9, 0);
+                b.wire(withPeak, withStacks, 0);
+                b.wire(stackHeight, withStacks, 1);
+                // The deep ocean: trenches, and a blue hole in the reef to the south west
+                final CurveNode deepZone = b.add(new CurveNode(0, 1, 0.55f, 1, 0.68f, 0, 2, 0), 5, 4);
+                b.wire(potential, deepZone);
+                final NoiseNode trenchNoise = b.noise(NoiseNode.Kind.RIDGED, 700, 3, 88, 150, 9);
+                final CurveNode trenchShape = b.add(new CurveNode(0, 0, 0.8f, 0, 1, 1), 1, 9);
+                b.wire(trenchNoise, trenchShape);
+                final CombineNode trenches = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 6, 6);
+                b.wire(trenchShape, trenches, 0);
+                b.wire(deepZone, trenches, 1);
+                final CombineNode withTrenches = b.add(new CombineNode(CombineNode.Mode.SUBTRACT), 10, 0);
+                withTrenches.set(CombineNode.STRENGTH, 0.1);
+                b.wire(withStacks, withTrenches, 0);
+                b.wire(trenches, withTrenches, 1);
+                final GradientNode blueHole = b.add(new GradientNode(), 0, 10);
+                blueHole.set(GradientNode.FIT_TO_MAP, false);
+                blueHole.set(GradientNode.CENTRE_X, -620);
+                blueHole.set(GradientNode.CENTRE_Y, 720);
+                blueHole.set(GradientNode.SIZE, 75);
+                final CurveNode holeShape = b.add(new CurveNode(0, 0, 0.08f, 0.85f, 1, 1), 1, 10);
+                b.wire(blueHole, holeShape);
+                final CombineNode withHole = b.add(new CombineNode(CombineNode.Mode.SUBTRACT), 11, 0);
+                withHole.set(CombineNode.STRENGTH, 0.3);
+                b.wire(withTrenches, withHole, 0);
+                b.wire(holeShape, withHole, 1);
+                final ClampNode clamp = b.add(new ClampNode(), 12, 0);
+                b.wire(withHole, clamp);
+                final GullyErosionNode erosion = b.add(new GullyErosionNode(), 13, 0);
+                erosion.set(GullyErosionNode.DEPTH, 14);
+                erosion.set(GullyErosionNode.SPACING, 70);
+                erosion.set(Node.VARIANT, 89);
+                b.wire(clamp, erosion);
+                b.output(erosion, 14, 0, w - 90, w + 150, minHeight, maxHeight);
+
+                // The sea: turquoise warm ocean over the shelf, lukewarm ocean over the deep water; a sandy sea bed with
+                // coral reefs in patches on the reef flats, gravel in the deep
+                b.biome(MinecraftBiome.LUKEWARM_OCEAN, 0.5, 1, 12);
+                final HeightMaskNode shelf = b.height(w - 30, w, 6, 0, 13);
+                b.wire(shelf, b.biome(MinecraftBiome.WARM_OCEAN, 1, 1, 13));
+                b.wire(shelf, b.terrain(Terrain.SAND, 0.8, 2, 13));
+                final HeightMaskNode deep = b.height(-4096, w - 30, 6, 0, 14);
+                b.wire(deep, b.terrain(Terrain.GRAVEL, 0.7, 1, 14));
+                final HeightMaskNode reefFlats = b.height(w - 14, w - 2, 2, 0, 15);
+                final NoiseNode reefNoise = b.noise(NoiseNode.Kind.PERLIN, 60, 3, 90, 20, 16);
+                final CurveNode reefPatches = b.add(new CurveNode(0, 0, 0.55f, 0, 0.65f, 1, 1, 1), 1, 16);
+                b.wire(reefNoise, reefPatches);
+                final CombineNode reefs = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 1, 15);
+                b.wire(reefFlats, reefs, 0);
+                b.wire(reefPatches, reefs, 1);
+                b.wire(reefs, b.material(MaterialGroup.CORAL_REEF, 1.2, 2, 15));
+                // Wide, gently sloping beaches of white sand
+                final HeightMaskNode beachHeight = b.height(w - 2, w + 5, 2, 3, 13);
+                final SlopeMaskNode beachSlope = b.slope(0, 22, 6, 3, 14);
+                final CombineNode beaches = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 4, 13);
+                b.wire(beachHeight, beaches, 0);
+                b.wire(beachSlope, beaches, 1);
+                b.wire(beaches, b.terrain(Terrain.SAND, 1.3, 5, 13));
+                b.wire(beaches, b.biome(MinecraftBiome.BEACH, 1.2, 6, 13));
+                // Palms along the shore
+                final HeightMaskNode shore = b.height(w + 2, w + 10, 2, 3, 15);
+                final CombineNode palmShore = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 4, 15);
+                b.wire(shore, palmShore, 0);
+                b.wire(beachSlope, palmShore, 1);
+                b.wire(palmShore, b.flora(Vegetation.PALMS, 0.22, 5, 15));
+                // Pale limestone cliffs, mossy rock on the steep slopes
+                final SlopeMaskNode cliffs = b.slope(48, 90, 6, 3, 16);
+                b.wire(cliffs, b.material(MaterialGroup.LIMESTONE, 1.35, 4, 16));
+                final SlopeMaskNode steep = b.slope(38, 48, 4, 3, 17);
+                b.wire(steep, b.material(MaterialGroup.MOSSY_ROCK, 1.1, 4, 17));
+                // Dense jungle on the land
+                final HeightMaskNode land = b.height(w + 4, 4096, 3, 6, 15);
+                final SlopeMaskNode gentle = b.slope(0, 44, 6, 6, 16);
+                final CombineNode jungle = b.add(new CombineNode(CombineNode.Mode.MULTIPLY), 7, 15);
+                b.wire(land, jungle, 0);
+                b.wire(gentle, jungle, 1);
+                b.wire(jungle, b.material(MaterialGroup.FOREST_FLOOR, 1, 8, 14));
+                b.wire(jungle, b.flora(Vegetation.RAINFOREST, 0.5, 8, 15));
+                b.wire(jungle, b.flora(Vegetation.BUSHES, 0.55, 8, 16));
+                b.wire(jungle, b.flora(Vegetation.FERNS, 0.4, 8, 17));
+                b.wire(land, b.biome(MinecraftBiome.JUNGLE, 1, 9, 15));
+                break;
+            }
             case ERODE_CURRENT_MAP: {
                 final CurrentMapNode current = b.add(new CurrentMapNode(), 0, 0);
                 final GullyErosionNode erosion = b.add(new GullyErosionNode(), 1, 0);
@@ -580,6 +765,7 @@ public final class ExampleGraphs {
         RED_CLIFFS("Red cliffs and spruces"),
         ALPINE_VALLEY("Alpine valley"),
         CONTINENT("Continent and islands (5000 x 5000)"),
+        CORAL_ARCHIPELAGO("Coral archipelago (3000 x 3000)"),
         ERODE_CURRENT_MAP("Erode the current map");
 
         Example(String displayName) {
