@@ -1,5 +1,11 @@
 package org.pepsoft.worldpainter.paths;
 
+import org.pepsoft.util.swing.ProgressTask;
+
+import org.pepsoft.util.swing.ProgressDialog;
+
+import org.pepsoft.util.ProgressReceiver;
+
 import org.pepsoft.worldpainter.ColourScheme;
 import org.pepsoft.worldpainter.Dimension;
 import org.pepsoft.worldpainter.Terrain;
@@ -246,8 +252,29 @@ public class PathDialog extends WorldPainterDialog {
         if (view != null) {
             view.setInhibitUpdates(true);
         }
+        final PathPlan plan = this.plan;
+        final PathSettings settings = planSettings;
+        final List<CustomLayer> layers;
         try {
-            createdLayers.addAll(PathGenerator.apply(dimension, plan, planSettings, layerNumber));
+            layers = ProgressDialog.executeTask(this, new ProgressTask<List<CustomLayer>>() {
+                @Override
+                public String getName() {
+                    return "Laying out the path";
+                }
+
+                @Override
+                public List<CustomLayer> execute(ProgressReceiver progressReceiver) throws ProgressReceiver.OperationCancelled {
+                    return PathGenerator.apply(dimension, plan, settings, layerNumber, progressReceiver);
+                }
+            });
+            if (layers == null) {
+                // Cancelled
+                if (dimension.undoChanges()) {
+                    dimension.clearRedo();
+                }
+                return;
+            }
+            createdLayers.addAll(layers);
             dimension.armSavePoint();
         } finally {
             if (view != null) {

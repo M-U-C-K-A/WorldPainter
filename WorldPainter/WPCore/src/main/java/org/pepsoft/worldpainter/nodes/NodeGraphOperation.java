@@ -4,6 +4,7 @@ import org.pepsoft.worldpainter.MaterialGroup;
 import org.pepsoft.worldpainter.layers.Bo2Layer;
 import org.pepsoft.worldpainter.layers.bo2.TreePack;
 import org.pepsoft.util.ProgressReceiver;
+import org.pepsoft.util.SubProgressReceiver;
 import org.pepsoft.util.ProgressReceiver.OperationCancelled;
 import org.pepsoft.worldpainter.Dimension;
 import org.pepsoft.worldpainter.NoiseSettings;
@@ -138,6 +139,9 @@ public class NodeGraphOperation {
 
     public void apply(Dimension dimension, ProgressReceiver progressReceiver) throws OperationCancelled {
         // Nodes which read the map must see it as it was before the operation started, not half modified
+        if (progressReceiver != null) {
+            progressReceiver.setMessage("Preparing the graph");
+        }
         final MapSource mapSource = graph.contains(CurrentMapNode.class) ? new FrozenMapSource(dimension)
                 : (graph.contains(SelectionMaskNode.class) ? new DimensionMapSource(dimension) : null);
         final CompiledGraph compiled = graph.compile(getMapBounds(dimension), mapSource);
@@ -153,9 +157,23 @@ public class NodeGraphOperation {
         }
         tiles.forEach(Tile::inhibitEvents);
         try {
-            ParallelTileProcessor.forEach(groups.values(), group -> processGroup(dimension, compiled, painters, vegetationLayers, group), progressReceiver);
-            for (FloatingIslandsNode.Compiled islands: compiled.getFloatingIslands()) {
-                applyFloatingIslands(dimension, islands, tiles);
+            final List<FloatingIslandsNode.Compiled> floatingIslands = compiled.getFloatingIslands();
+            // The land first; then the floating islands, if any, each with its share of the rest of the progress
+            final float landShare = floatingIslands.isEmpty() ? 1.0f : 0.8f;
+            if (progressReceiver != null) {
+                progressReceiver.setMessage("Generating the land");
+            }
+            ParallelTileProcessor.forEach(groups.values(), group -> processGroup(dimension, compiled, painters, vegetationLayers, group),
+                    ((progressReceiver != null) && (landShare < 1.0f)) ? new SubProgressReceiver(progressReceiver, 0.0f, landShare) : progressReceiver);
+            for (int i = 0; i < floatingIslands.size(); i++) {
+                if (progressReceiver != null) {
+                    progressReceiver.setMessage("Building the floating islands");
+                    progressReceiver.setProgress(landShare + (1 - landShare) * i / floatingIslands.size());
+                }
+                applyFloatingIslands(dimension, floatingIslands.get(i), tiles);
+            }
+            if (progressReceiver != null) {
+                progressReceiver.setProgress(1.0f);
             }
         } finally {
             tiles.forEach(Tile::releaseEvents);

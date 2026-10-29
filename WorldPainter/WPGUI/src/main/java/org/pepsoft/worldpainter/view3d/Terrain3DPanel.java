@@ -1,5 +1,9 @@
 package org.pepsoft.worldpainter.view3d;
 
+import org.pepsoft.util.SubProgressReceiver;
+
+import org.pepsoft.util.ProgressReceiver;
+
 import com.formdev.flatlaf.FlatClientProperties;
 import org.pepsoft.worldpainter.App;
 import org.pepsoft.worldpainter.ColourScheme;
@@ -203,7 +207,7 @@ public class Terrain3DPanel extends JPanel {
         new SwingWorker<TerrainModel, Void>() {
             @Override
             protected TerrainModel doInBackground() throws Exception {
-                return new TerrainModel(dimension, colourScheme, null);
+                return new TerrainModel(dimension, colourScheme, new StatusProgress("Building 3D view"));
             }
 
             @Override
@@ -262,15 +266,19 @@ public class Terrain3DPanel extends JPanel {
         final Dimension dimension = this.dimension;
         final TerrainModel overview = model;
         detailLoading = true;
+        statusLabel.setText("Loading the blocks…");
+        statusLabel.setVisible(true);
+        revalidate();
         new SwingWorker<TerrainModel, Void>() {
             @Override
             protected TerrainModel doInBackground() throws Exception {
-                return new TerrainModel(dimension, colourScheme, null, area, 1);
+                return new TerrainModel(dimension, colourScheme, new StatusProgress("Loading the blocks"), area, 1);
             }
 
             @Override
             protected void done() {
                 detailLoading = false;
+                statusLabel.setVisible(false);
                 try {
                     final TerrainModel detail = get();
                     if ((dimension == Terrain3DPanel.this.dimension) && (view.getModel() == overview)) {
@@ -286,6 +294,38 @@ public class Terrain3DPanel extends JPanel {
                 }
             }
         }.execute();
+    }
+
+    /**
+     * Shows the progress of building the 3D view (or loading its blocks) as a percentage in the status label.
+     */
+    private final class StatusProgress implements ProgressReceiver {
+        StatusProgress(String text) {
+            this.text = text;
+        }
+
+        @Override
+        public void setProgress(float progress) {
+            final int percent = Math.round(progress * 100);
+            if (percent != lastPercent) {
+                lastPercent = percent;
+                SwingUtilities.invokeLater(() -> {
+                    if (statusLabel.isVisible()) {
+                        statusLabel.setText(text + "… " + percent + "%");
+                    }
+                });
+            }
+        }
+
+        @Override public void exceptionThrown(Throwable exception) {}
+        @Override public void done() {}
+        @Override public void setMessage(String message) {}
+        @Override public void checkForCancellation() {}
+        @Override public void reset() {}
+        @Override public void subProgressStarted(SubProgressReceiver subProgressReceiver) {}
+
+        private final String text;
+        private volatile int lastPercent = -1;
     }
 
     /**

@@ -1,5 +1,8 @@
 package org.pepsoft.worldpainter.paths;
 
+import org.pepsoft.util.ProgressReceiver;
+import org.pepsoft.util.ProgressReceiver.OperationCancelled;
+
 import org.pepsoft.worldpainter.Dimension;
 import org.pepsoft.worldpainter.Dimension.Anchor;
 import org.pepsoft.worldpainter.Platform;
@@ -98,6 +101,19 @@ public final class PathGenerator {
      * @return The bridge and tunnel layers which were created, if any, so that they can be shown to the user.
      */
     public static List<CustomLayer> apply(Dimension dimension, PathPlan plan, PathSettings settings, int layerNumber) {
+        try {
+            return apply(dimension, plan, settings, layerNumber, null);
+        } catch (OperationCancelled e) {
+            throw new InternalError(e);
+        }
+    }
+
+    /**
+     * Lay out a path, reporting the progress.
+     *
+     * @see #apply(Dimension, PathPlan, PathSettings, int)
+     */
+    public static List<CustomLayer> apply(Dimension dimension, PathPlan plan, PathSettings settings, int layerNumber, ProgressReceiver progressReceiver) throws OperationCancelled {
         final List<CustomLayer> createdLayers = new ArrayList<>();
         final List<double[]> points = plan.getPoints();
         final int n = points.size();
@@ -120,6 +136,9 @@ public final class PathGenerator {
         final int[] nearest = new int[width * height];
         Arrays.fill(distances, Float.MAX_VALUE);
         for (int i = 0; i < n; i++) {
+            if ((progressReceiver != null) && ((i & 255) == 0)) {
+                progressReceiver.setProgress(0.3f * i / n);
+            }
             final double px = points.get(i)[0], py = points.get(i)[1];
             for (int y = (int) Math.floor(py - reach); y <= (int) Math.ceil(py + reach); y++) {
                 for (int x = (int) Math.floor(px - reach); x <= (int) Math.ceil(px + reach); x++) {
@@ -164,6 +183,9 @@ public final class PathGenerator {
         // The ground: cut and fill to the profile, with a soft transition to the land on either side, and paint it.
         // Bridges and tunnels: mark out their layers
         for (int y = 0; y < height; y++) {
+            if ((progressReceiver != null) && ((y & 63) == 0)) {
+                progressReceiver.setProgress(0.3f + 0.6f * y / height);
+            }
             for (int x = 0; x < width; x++) {
                 final int j = y * width + x;
                 final float d = distances[j];
@@ -214,6 +236,9 @@ public final class PathGenerator {
             final Dimension floor = createFloorDimension(dimension, tunnelLayer, CAVE_FLOOR, settings.getMaterial(), averageProfile(plan, PathPlan.TUNNEL));
             tunnelLayer.updateFloorDimension(dimension, tunnelLayer.getName() + " Floor");
             shapeFloor(floor, plan, PathPlan.TUNNEL, settings, distances, nearest, x0, y0, width, height, half, false);
+        }
+        if (progressReceiver != null) {
+            progressReceiver.setProgress(1.0f);
         }
         return createdLayers;
     }
