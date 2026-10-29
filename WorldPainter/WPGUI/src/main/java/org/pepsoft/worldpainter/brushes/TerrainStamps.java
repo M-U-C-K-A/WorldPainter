@@ -4,8 +4,7 @@ import org.pepsoft.worldpainter.procedural.SimplexNoise;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * A pack of procedurally generated "terrain stamp" brushes: height map shaped brushes for sculpting recognisable
@@ -23,6 +22,21 @@ public final class TerrainStamps {
             brushes.add(new BitmapBrush(render(stamp), stamp.displayName));
         }
         return brushes;
+    }
+
+    /**
+     * The stamps by family (mountains, hills and plateaus, ...), in the order in which to show them.
+     */
+    public static Map<String, List<Brush>> createBrushesByFamily() {
+        final Map<String, List<Brush>> families = new LinkedHashMap<>();
+        for (Family family: Family.values()) {
+            families.put(family.displayName, new ArrayList<>());
+        }
+        Arrays.stream(Stamp.values()).parallel()
+                .map(stamp -> Map.entry(stamp, (Brush) new BitmapBrush(render(stamp), stamp.displayName)))
+                .sequential()
+                .forEachOrdered(entry -> families.get(entry.getKey().family.displayName).add(entry.getValue()));
+        return families;
     }
 
     static BufferedImage render(Stamp stamp) {
@@ -108,6 +122,103 @@ public final class TerrainStamps {
                 final double channels = 1 - Math.pow(1 - ridged(noise, u * 3, v * 3, 5), 3);
                 return dome * (0.55 + 0.45 * channels) * edge;
             }
+            case ALPINE_PEAK: {
+                // A pyramidal horn with three sharp arêtes running down from the summit
+                final double theta = Math.atan2(v, u) + 0.35 * fbm(noise, u * 2, v * 2, 2);
+                final double arms = Math.pow(0.5 + 0.5 * Math.cos(3 * theta), 3);
+                final double cone = Math.pow(Math.max(0, 1 - r), 1.15);
+                return cone * (0.6 + 0.4 * arms * smoothStep(0.0, 0.25, r) + 0.4 * smoothStep(0.25, 0.0, r)) * (0.85 + 0.25 * ridged(noise, u * 4, v * 4, 4)) * edge;
+            }
+            case TWIN_PEAKS: {
+                final double first = Math.pow(Math.max(0, 1 - Math.hypot(u + 0.32, v - 0.05) / 0.58), 1.3);
+                final double second = 0.85 * Math.pow(Math.max(0, 1 - Math.hypot(u - 0.34, v + 0.08) / 0.52), 1.3);
+                final double saddle = 0.35 * Math.exp(-Math.pow(v + 0.015 * u, 2) / 0.03) * smoothStep(0.75, 0.2, Math.abs(u));
+                return Math.max(Math.max(first, second), saddle) * (0.8 + 0.3 * ridged(noise, u * 3.5, v * 3.5, 4)) * edge;
+            }
+            case CRAG: {
+                // A steep, jagged spire on a scree apron
+                final double warpedR = r + 0.1 * fbm(noise, u * 3, v * 3, 3);
+                final double spire = Math.pow(Math.max(0, 1 - warpedR / 0.5), 0.75) * (0.75 + 0.35 * ridged(noise, u * 6, v * 6, 4));
+                final double apron = 0.22 * Math.pow(Math.max(0, 1 - r), 2);
+                return Math.max(spire, apron) * edge;
+            }
+            case MOUNTAIN_CHAIN: {
+                // A line of peaks of different heights joined by a lower ridge
+                final double centre = 0.15 * Math.sin(u * 2.0 + 0.6) + 0.06 * fbm(noise, u * 2.5, 5.3, 2);
+                final double across = Math.abs(v - centre);
+                double h = 0.45 * Math.pow(Math.max(0, 1 - across / 0.3), 1.4) * smoothStep(1.0, 0.6, Math.abs(u));
+                final double[][] peaks = {{-0.62, 0.55}, {-0.3, 0.9}, {0.02, 0.7}, {0.32, 1.0}, {0.62, 0.6}};
+                for (double[] peak: peaks) {
+                    final double peakV = 0.15 * Math.sin(peak[0] * 2.0 + 0.6);
+                    final double d = Math.hypot(u - peak[0], v - peakV) / 0.3;
+                    h = Math.max(h, peak[1] * Math.pow(Math.max(0, 1 - d), 1.3));
+                }
+                return h * (0.75 + 0.35 * ridged(noise, u * 4, v * 4, 4)) * edge;
+            }
+            case ERODED_RIDGE: {
+                final double centre = 0.12 * Math.sin(u * 2.8) + 0.06 * fbm(noise, u * 2, 1.3, 2);
+                final double across = Math.abs(v - centre);
+                final double profile = Math.pow(Math.max(0, 1 - across / 0.5), 1.2) * smoothStep(1.0, 0.5, Math.abs(u));
+                final double channels = 1 - Math.pow(1 - ridged(noise, u * 4, v * 4, 5), 3);
+                return profile * (0.45 + 0.55 * channels) * edge;
+            }
+            case CIRQUE: {
+                // A horseshoe of steep walls around a glacial basin, open towards the bottom of the brush
+                final double ring = Math.exp(-Math.pow((r - 0.55) / 0.17, 2));
+                final double opening = smoothStep(0.55, -0.1, v);
+                final double backWall = 0.4 * smoothStep(0.2, -0.6, v) * smoothStep(0.85, 0.5, r);
+                final double basin = 0.12 * smoothStep(0.5, 0.0, r);
+                return (ring * (0.4 + 0.6 * opening) + backWall + basin) * (0.8 + 0.3 * ridged(noise, u * 4, v * 4, 4)) * edge;
+            }
+            case PLATEAU: {
+                final double warpedR = r + 0.18 * fbm(noise, u * 2, v * 2, 4);
+                final double top = smoothStep(0.82, 0.66, warpedR);
+                return (0.88 * top + 0.04 * fbm(noise, u * 5, v * 5, 3) * top + 0.12 * Math.pow(Math.max(0, 1 - r), 2)) * edge;
+            }
+            case BUTTE: {
+                final double warpedR = r + 0.1 * fbm(noise, u * 3, v * 3, 3);
+                final double top = smoothStep(0.46, 0.36, warpedR);
+                final double talus = 0.3 * Math.pow(Math.max(0, 1 - r / 0.8), 1.5);
+                return Math.max(top * (0.95 + 0.05 * fbm(noise, u * 6, v * 6, 2)), talus) * edge;
+            }
+            case ESCARPMENT: {
+                // High ground on one side of a steep, irregular cliff
+                final double cliffLine = u + 0.18 * fbm(noise, v * 2.2, 3.1, 4);
+                final double high = smoothStep(-0.06, 0.06, cliffLine);
+                return (0.25 + 0.7 * high + 0.05 * fbm(noise, u * 4, v * 4, 3)) * smoothStep(1.0, 0.7, r);
+            }
+            case KARST_TOWERS: {
+                // Steep limestone towers scattered over low ground
+                double h = 0.08 * (0.5 + 0.5 * fbm(noise, u * 3, v * 3, 2));
+                final double[][] towers = {{-0.45, -0.3, 0.17, 0.85}, {-0.1, -0.5, 0.13, 0.6}, {0.3, -0.35, 0.16, 1.0}, {-0.5, 0.2, 0.14, 0.7},
+                        {-0.05, 0.05, 0.2, 0.95}, {0.42, 0.12, 0.13, 0.65}, {-0.22, 0.48, 0.15, 0.8}, {0.2, 0.5, 0.12, 0.55}};
+                for (double[] tower: towers) {
+                    final double d = Math.hypot(u - tower[0], v - tower[1]) + 0.04 * fbm(noise, u * 7 + tower[0] * 9, v * 7, 2);
+                    h = Math.max(h, tower[3] * smoothStep(tower[2], tower[2] * 0.6, d) * (0.92 + 0.08 * fbm(noise, u * 9, v * 9, 2)));
+                }
+                return h * edge;
+            }
+            case SHIELD_VOLCANO: {
+                // A broad, gentle dome with a small caldera
+                final double dome = Math.pow(Math.max(0, 1 - r * r), 1.6) * (0.95 + 0.05 * fbm(noise, u * 5, v * 5, 3));
+                final double caldera = 0.1 * smoothStep(0.14, 0.05, r);
+                return Math.max(0, dome - caldera) * edge;
+            }
+            case VALLEY: {
+                // A winding V shaped valley with side gullies; use it with the Lower tool to carve
+                final double centre = 0.28 * Math.sin(u * 2.2 + 0.4) + 0.08 * fbm(noise, u * 2, 7.7, 2);
+                final double across = Math.abs(v - centre);
+                final double profile = Math.pow(Math.max(0, 1 - across / 0.32), 1.4) * smoothStep(1.0, 0.65, Math.abs(u));
+                final double gullies = 0.3 * Math.pow(ridged(noise, u * 5, v * 5, 3), 4) * smoothStep(0.55, 0.2, across);
+                return (profile + gullies * profile) * smoothStep(1.0, 0.85, r);
+            }
+            case TERRACES: {
+                // A hill cut into terraced fields
+                final double hill = Math.pow(Math.max(0, 1 - (r + 0.08 * fbm(noise, u * 2, v * 2, 3))), 1.1);
+                final double steps = 7;
+                final double level = Math.floor(hill * steps), fraction = hill * steps - level;
+                return ((level + smoothStep(0.8, 1.0, fraction)) / steps) * edge;
+            }
             default:
                 throw new InternalError();
         }
@@ -145,11 +256,33 @@ public final class TerrainStamps {
 
     private static final int SIZE = 256;
 
+    /**
+     * The stamps. New ones must be added at the end, since the noise of each stamp depends on its position.
+     */
     enum Stamp {
-        PEAK("Peak"), RANGE("Mountain range"), MASSIF("Massif"), VOLCANO("Volcano"), CRATER("Crater rim"), MESA("Mesa"),
-        DUNES("Dunes"), HILLS("Hills"), GULLIES("Eroded dome");
+        PEAK("Peak", Family.MOUNTAINS), RANGE("Mountain range", Family.MOUNTAINS), MASSIF("Massif", Family.MOUNTAINS),
+        VOLCANO("Volcano", Family.VOLCANOES), CRATER("Crater rim", Family.VOLCANOES), MESA("Mesa", Family.HILLS),
+        DUNES("Dunes", Family.HILLS), HILLS("Hills", Family.HILLS), GULLIES("Eroded dome", Family.HILLS),
+        ALPINE_PEAK("Alpine peak", Family.MOUNTAINS), TWIN_PEAKS("Twin peaks", Family.MOUNTAINS), CRAG("Crag", Family.MOUNTAINS),
+        MOUNTAIN_CHAIN("Mountain chain", Family.MOUNTAINS), ERODED_RIDGE("Eroded ridge", Family.MOUNTAINS),
+        CIRQUE("Glacial cirque", Family.MOUNTAINS), PLATEAU("Plateau", Family.HILLS), BUTTE("Butte", Family.HILLS),
+        ESCARPMENT("Escarpment", Family.HILLS), KARST_TOWERS("Karst towers", Family.HILLS),
+        SHIELD_VOLCANO("Shield volcano", Family.VOLCANOES), VALLEY("Valley (use with Lower)", Family.VALLEYS),
+        TERRACES("Terraced hill", Family.HILLS);
 
-        Stamp(String displayName) {
+        Stamp(String displayName, Family family) {
+            this.displayName = displayName;
+            this.family = family;
+        }
+
+        final String displayName;
+        final Family family;
+    }
+
+    enum Family {
+        MOUNTAINS("Mountains"), HILLS("Hills & plateaus"), VOLCANOES("Volcanoes & craters"), VALLEYS("Valleys");
+
+        Family(String displayName) {
             this.displayName = displayName;
         }
 

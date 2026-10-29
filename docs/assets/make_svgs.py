@@ -11,8 +11,8 @@ import os
 OUT = os.path.dirname(os.path.abspath(__file__))
 
 THEMES = {
-    "light": {"fg": "#18181b", "muted": "#71717a", "faint": "#d4d4d8", "accent": "#f97316", "fill": "#18181b", "chip": "#f4f4f5"},
-    "dark": {"fg": "#fafafa", "muted": "#a1a1aa", "faint": "#3f3f46", "accent": "#fb923c", "fill": "#fafafa", "chip": "#18181b"},
+    "light": {"fg": "#18181b", "muted": "#71717a", "faint": "#d4d4d8", "accent": "#f97316", "fill": "#18181b", "chip": "#f4f4f5", "face": "#ffffff"},
+    "dark": {"fg": "#fafafa", "muted": "#a1a1aa", "faint": "#3f3f46", "accent": "#fb923c", "fill": "#fafafa", "chip": "#18181b", "face": "#0d0d0f"},
 }
 
 SANS = "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
@@ -44,10 +44,19 @@ def terrain_height(x, y):
     return max(0.25, round(h * 2) / 2)
 
 
-def blocky_terrain(t, n, s, ox, oy, height=terrain_height):
-    """Isometric blocky terrain drawn with hairlines: top faces and the visible side faces."""
+def mix(a, b, f):
+    """Mix two colours given as #rrggbb."""
+    ca = [int(a[i:i + 2], 16) for i in (1, 3, 5)]
+    cb = [int(b[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#%02x%02x%02x" % tuple(round(x + (y - x) * f) for x, y in zip(ca, cb))
+
+
+def blocky_terrain(t, n, s, ox, oy, height=terrain_height, extra=None):
+    """Isometric blocky terrain drawn with hairlines: top faces and the visible side faces. The faces are opaque and
+    drawn from the back to the front, so that the blocks in front hide the lines of those behind them. extra(x, y, h),
+    if given, returns more elements to draw on the top of a block, in the same order."""
     parts = []
-    # Draw back to front
+    base = t["face"]
     for d in range(2 * n - 1):
         for x in range(n):
             y = d - x
@@ -58,11 +67,12 @@ def blocky_terrain(t, n, s, ox, oy, height=terrain_height):
             right = [iso(x + 1, y, h, s, ox, oy), iso(x + 1, y + 1, h, s, ox, oy), iso(x + 1, y + 1, 0, s, ox, oy), iso(x + 1, y, 0, s, ox, oy)]
             left = [iso(x, y + 1, h, s, ox, oy), iso(x + 1, y + 1, h, s, ox, oy), iso(x + 1, y + 1, 0, s, ox, oy), iso(x, y + 1, 0, s, ox, oy)]
             shade = min(1.0, h / 3.5)
-            parts.append(f'<polygon points="{pts(right)}" fill="{t["fill"]}" fill-opacity="{0.05 + 0.05 * shade:.3f}" stroke="{t["fg"]}" stroke-opacity="0.55" stroke-width="1"/>')
-            parts.append(f'<polygon points="{pts(left)}" fill="{t["fill"]}" fill-opacity="{0.02 + 0.03 * shade:.3f}" stroke="{t["fg"]}" stroke-opacity="0.55" stroke-width="1"/>')
-            top_fill = t["accent"] if h >= 3 else t["fill"]
-            top_opacity = 0.22 if h >= 3 else 0.015
-            parts.append(f'<polygon points="{pts(top)}" fill="{top_fill}" fill-opacity="{top_opacity}" stroke="{t["fg"]}" stroke-opacity="0.85" stroke-width="1"/>')
+            parts.append(f'<polygon points="{pts(right)}" fill="{mix(base, t["fill"], 0.05 + 0.05 * shade)}" stroke="{t["fg"]}" stroke-opacity="0.55" stroke-width="1" stroke-linejoin="round"/>')
+            parts.append(f'<polygon points="{pts(left)}" fill="{mix(base, t["fill"], 0.10 + 0.05 * shade)}" stroke="{t["fg"]}" stroke-opacity="0.55" stroke-width="1" stroke-linejoin="round"/>')
+            top_fill = mix(base, t["accent"], 0.22) if h >= 3 else mix(base, t["fill"], 0.015)
+            parts.append(f'<polygon points="{pts(top)}" fill="{top_fill}" stroke="{t["fg"]}" stroke-opacity="0.85" stroke-width="1" stroke-linejoin="round"/>')
+            if extra is not None:
+                parts.extend(extra(x, y, h))
     return "\n".join(parts)
 
 
@@ -320,42 +330,29 @@ def view3d(theme):
 
     n, s, ox, oy = 8, 26, 250, 150
     body.append(dotted_plane(t, n, s, ox, oy, margin=1))
-    body.append(blocky_terrain(t, n, s, ox, oy))
 
     def top_face(x, y):
         hgt = terrain_height(x, y)
         return [iso(x, y, hgt, s, ox, oy), iso(x + 1, y, hgt, s, ox, oy), iso(x + 1, y + 1, hgt, s, ox, oy), iso(x, y + 1, hgt, s, ox, oy)]
 
-    def order():
-        for d in range(2 * n - 1):
-            for x in range(n):
-                y = d - x
-                if 0 <= y < n:
-                    yield x, y
-
-    # Height mode: tint the top faces by height
-    layer = []
-    for x, y in order():
-        f = min(1.0, terrain_height(x, y) / 3.5)
-        layer.append(f'<polygon points="{pts(top_face(x, y))}" fill="{t["accent"]}" fill-opacity="{0.08 + 0.6 * f:.2f}"/>')
-    body.append('<g class="heightmode">' + "\n".join(layer) + '</g>')
-    # Slope mode: colour the top faces by steepness
-    layer = []
-    for x, y in order():
-        hgt = terrain_height(x, y)
+    def modes_on_top(x, y, hgt):
+        """The tints of the view modes on the top of a block, drawn with the block so that blocks in front hide them."""
+        elements = []
+        # Height mode: tint by height
+        f = min(1.0, hgt / 3.5)
+        elements.append(f'<polygon class="heightmode" points="{pts(top_face(x, y))}" fill="{t["accent"]}" fill-opacity="{0.08 + 0.6 * f:.2f}"/>')
+        # Slope mode: colour by steepness
         dx = terrain_height(min(n - 1, x + 1), y) - terrain_height(max(0, x - 1), y)
         dy = terrain_height(x, min(n - 1, y + 1)) - terrain_height(x, max(0, y - 1))
         degrees = math.degrees(math.atan(math.hypot(dx, dy) / 2 * 1.4))
-        layer.append(f'<polygon points="{pts(top_face(x, y))}" fill="{slope_colour(degrees)}" fill-opacity="0.75"/>')
-    body.append('<g class="slopemode">' + "\n".join(layer) + '</g>')
-    # Relief mode: contour hairlines on the top faces
-    layer = []
-    for x, y in order():
-        hgt = terrain_height(x, y)
+        elements.append(f'<polygon class="slopemode" points="{pts(top_face(x, y))}" fill="{slope_colour(degrees)}" fill-opacity="0.75"/>')
+        # Relief mode: a contour hairline across the top
         if hgt >= 1:
             a, b = iso(x + 0.15, y + 0.5, hgt, s, ox, oy), iso(x + 0.85, y + 0.5, hgt, s, ox, oy)
-            layer.append(f'<path d="M {a[0]:.1f} {a[1]:.1f} L {b[0]:.1f} {b[1]:.1f}" stroke="{t["fg"]}" stroke-width="1.2"/>')
-    body.append('<g class="reliefmode">' + "\n".join(layer) + '</g>')
+            elements.append(f'<path class="reliefmode" d="M {a[0]:.1f} {a[1]:.1f} L {b[0]:.1f} {b[1]:.1f}" stroke="{t["fg"]}" stroke-width="1.2"/>')
+        return elements
+
+    body.append(blocky_terrain(t, n, s, ox, oy, extra=modes_on_top))
 
     # Probe on a block, with a leader to the info card
     hgt = terrain_height(4, 3)

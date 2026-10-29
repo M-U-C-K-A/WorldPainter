@@ -44,6 +44,10 @@ The toolbar also turns the water and the contour lines (one every 8 blocks) on a
 
 ![The Slope mode: steep slopes in red, flat land in blue](assets/images/view3d-slope.jpg)
 
+## The sides
+
+The sides of the model show a cross section of the ground, as it is in Minecraft: the surface, a few blocks of soil (dirt, or sand under sand), rock in faint strata, deepslate below zero and bedrock at the bottom of the world, with the water above the ground where there is water.
+
 ## Block by block
 
 The **Blocks** button shows the land around the camera as Minecraft will: every block a one metre cube, at its exact height, with the edges of the blocks drawn as you zoom in. The menu next to it sets how far around the camera this goes (256 to 1536 blocks); beyond it the rest of the map is shown as a smooth surface. The area follows the camera when you move.

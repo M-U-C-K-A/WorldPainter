@@ -11,7 +11,7 @@ These features are in the **Surroundings** panel (on the right, next to Brush Se
 
 ## See what lies beyond the map
 
-Tick **Show what lies beyond the map**: the biomes Minecraft will generate around the map are drawn faintly around it, with their borders outlined, up to the distance set by **Margin** (64 to 1024 blocks; 300 by default). The status bar names the biome under the mouse: *Minecraft will generate: River*.
+Tick **Show what lies beyond the map**: the land Minecraft will generate around the map is drawn around it like the map itself, with the same terrain colours, relief shading and contour lines, fading out up to the distance set by **Margin** (64 to 1024 blocks; 300 by default). The status bar names the biome under the mouse: *Minecraft will generate: River*.
 
 The biomes are computed with a Java port of [Cubiomes](https://github.com/Cubitect/cubiomes), checked to give exactly the same biomes as Minecraft on thousands of locations.
 
@@ -33,6 +33,6 @@ Type a number, or any text (as in Minecraft), in the **World seed** field and pr
 
 ## Blend the edges into the seed
 
-**Blend edges into this seed…** (or the option at the bottom of the seed search) adds a band of land around the map, 100 blocks wide by default, which goes over smoothly into the land Minecraft generates for the seed: its approximate height, its biomes and a matching surface (sand on beaches, gravel under the sea, podzol in taiga…). Minecraft then blends the last few blocks itself when it generates the chunks around the map.
+**Blend edges into this seed…** (or the option at the bottom of the seed search) adds a band of land around the map, 100 blocks wide by default, which goes over smoothly into the land Minecraft generates for the seed: its approximate height, its biomes and a matching surface (sand on beaches, gravel under the sea, podzol in taiga…). The terrain of the map and that of the seed mix block by block across the band, more and more towards the seed, rather than meeting along a line, and trees like those of the seed's forests thin out towards the map. Minecraft then blends the last few blocks itself when it generates the chunks around the map.
 
 > [!NOTE] The height of the land beyond the map is an estimate from the same climate and terrain spline Minecraft uses, without its fine noise: the large shapes (oceans, coasts, plains, mountains) match, the block by block relief does not.

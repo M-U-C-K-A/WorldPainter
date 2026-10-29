@@ -738,11 +738,17 @@ class Terrain3DView extends JComponent {
         return mesh;
     }
 
+    /**
+     * Add a wall from an edge of the surface down to the base of the model. Its colour is a cross section of the
+     * ground, worked out per pixel (see {@link #wallColour(float, float, float)}); the colours of its vertices only
+     * carry the light, which is a little darker towards the base.
+     */
     private int addWall(Mesh mesh, int v, int t, int top1, int top2, float light) {
+        mesh.kinds[t] = KIND_WALL;
+        mesh.kinds[t + 1] = KIND_WALL;
         for (int i = 0; i < 2; i++) {
             final int top = (i == 0) ? top1 : top2;
-            final int surface = mesh.colour[top];
-            final int wallTop = shade(blend(surface, EARTH, 0.35f), 0.85f * light), wallBottom = shade(EARTH, 0.55f * light);
+            final int wallTop = shade(0xffffff, light), wallBottom = shade(0xffffff, 0.7f * light);
             mesh.x[v + i * 2] = mesh.x[top];
             mesh.y[v + i * 2] = mesh.y[top];
             mesh.h[v + i * 2] = mesh.h[top];
@@ -1086,6 +1092,8 @@ class Terrain3DView extends JComponent {
         });
         final int wallStart = mesh.wallTriangleStart;
         final float blockScale = model.step;
+        // The base of the model, in the units of the heights of the mesh, for the cross sections on the walls
+        final float wallBase = floor / vertical;
         IntStream.range(0, bandCount).parallel().forEach(band -> {
             final int y0 = band * bandHeight, y1 = Math.min(h, y0 + bandHeight);
             final Rasteriser rasteriser = new Rasteriser(pixels, w, y0, y1);
@@ -1096,15 +1104,15 @@ class Terrain3DView extends JComponent {
                     final int a = mesh.triangles[t * 3], b = mesh.triangles[t * 3 + 1], c = mesh.triangles[t * 3 + 2];
                     final boolean wall = t >= wallStart;
                     rasteriser.triangle(faceOffset + t / 2 + 1, (mesh.kinds != null) ? mesh.kinds[t] : KIND_TOP,
-                            sx[a], sy[a], depth[a], q[a], colour[a], wall ? Float.NaN : mesh.h[a], mesh.x[a] * blockScale, mesh.y[a] * blockScale,
-                            sx[b], sy[b], depth[b], q[b], colour[b], wall ? Float.NaN : mesh.h[b], mesh.x[b] * blockScale, mesh.y[b] * blockScale,
-                            sx[c], sy[c], depth[c], q[c], colour[c], wall ? Float.NaN : mesh.h[c], mesh.x[c] * blockScale, mesh.y[c] * blockScale);
+                            sx[a], sy[a], depth[a], q[a], colour[a], wall ? wallHeight(mesh.h[a], wallBase) : mesh.h[a], mesh.x[a] * blockScale, mesh.y[a] * blockScale,
+                            sx[b], sy[b], depth[b], q[b], colour[b], wall ? wallHeight(mesh.h[b], wallBase) : mesh.h[b], mesh.x[b] * blockScale, mesh.y[b] * blockScale,
+                            sx[c], sy[c], depth[c], q[c], colour[c], wall ? wallHeight(mesh.h[c], wallBase) : mesh.h[c], mesh.x[c] * blockScale, mesh.y[c] * blockScale);
                 }
                 // Triangles crossing the near plane: clip them, then draw the resulting polygon
                 final IntList list2 = clipped[chunk];
                 for (int i = 0; i < list2.size; i++) {
                     final int t = list2.values[i];
-                    rasteriser.clippedTriangle(mesh, t, faceOffset, t >= wallStart, cx, cy, cz, colour, camera, blockScale);
+                    rasteriser.clippedTriangle(mesh, t, faceOffset, t >= wallStart, wallBase, cx, cy, cz, colour, camera, blockScale);
                 }
             }
         });
@@ -1302,7 +1310,7 @@ class Terrain3DView extends JComponent {
     static final int[] HEIGHT_RAMP = {0x2e6b3f, 0x5f9e4a, 0xa9c56b, 0xe6d79a, 0xc39a68, 0x8b6a52, 0xf5f5f4};
     static final int[] SLOPE_RAMP = {0x3b82f6, 0x22c55e, 0xeab308, 0xf97316, 0xdc2626};
     static final int CONTOUR_INTERVAL = 8;
-    private static final int EARTH = 0x6b5442;
+    private static final int EARTH = 0x6b5442, DIRT = 0x7a5638, SAND_SOIL = 0xcdb98a, STONE = 0x7f7f7f, DEEPSLATE = 0x4d4d55, BEDROCK = 0x3a3a3a, PLINTH = 0x2b2622;
     private static final int CELL_BUDGET = 1_100_000;
     /**
      * The kinds of faces of the block mesh: tops, sides facing east or west (constant x), and sides facing north or
@@ -1312,7 +1320,7 @@ class Terrain3DView extends JComponent {
      * The face numbers of the block mesh start here, to tell them apart from those of the smooth surface.
      */
     private static final int BLOCK_FACES = 1 << 30;
-    private static final byte KIND_TOP = 0, KIND_SIDE_X = 1, KIND_SIDE_Y = 2, KIND_WATER = 3;
+    private static final byte KIND_TOP = 0, KIND_SIDE_X = 1, KIND_SIDE_Y = 2, KIND_WATER = 3, KIND_WALL = 4;
     private static final int MAX_SHADOW_STEPS = 600;
     private static final float[] FIXED_SIDE_LIGHTS = {0.82f, 0.62f, 0.55f, 0.75f};
     private static final double MIN_PITCH = Math.toRadians(-45), MAX_PITCH = Math.toRadians(89.5), MIN_DISTANCE = 4;
@@ -1451,6 +1459,69 @@ class Terrain3DView extends JComponent {
      * Rasterises triangles into one horizontal band of the image, with a depth test. Colours are interpolated linearly
      * on the screen; heights (for the contour lines) with perspective correction.
      */
+    /**
+     * The height of a vertex of a wall, in the units of the heights of the mesh: its own, or the base of the model.
+     */
+    private static float wallHeight(float height, float base) {
+        return Float.isNaN(height) ? base : height;
+    }
+
+    /**
+     * The colour of a point on a wall: a cross section of the ground below the edge of the land, as it is in
+     * Minecraft. From the top: the water (if any), the surface, a few blocks of soil (dirt, or sand under sand), rock
+     * in faint strata, deepslate below zero, bedrock at the bottom of the world, and the plinth of the model below that.
+     *
+     * @param blockX         The location along the wall, in blocks from the corner of the model.
+     * @param blockY         The location along the wall, in blocks from the corner of the model.
+     * @param relativeHeight The height, relative to the lowest point of the model.
+     */
+    private int wallColour(float blockX, float blockY, float relativeHeight) {
+        final TerrainModel m = model;
+        final int sx = Math.max(0, Math.min(m.width - 1, (int) Math.floor(blockX / m.step))), sy = Math.max(0, Math.min(m.height - 1, (int) Math.floor(blockY / m.step)));
+        final int s = sy * m.width + sx;
+        final float height = relativeHeight + m.lowestHeight, terrain = m.heights[s];
+        if (height > terrain + 0.05f) {
+            // Above the ground: water
+            return blend(0x3f7fdc, 0x1d3f8f, Math.min(1, (m.waterLevels[s] - height) / 24));
+        }
+        final float depth = terrain - height;
+        final int surface = m.colours[s];
+        if (depth < 1) {
+            return surface;
+        } else if (depth < 6) {
+            return shade(soilColour(surface), 0.97f - 0.04f * depth);
+        } else if (height < m.minHeight) {
+            return PLINTH;
+        } else if (height < m.minHeight + 3) {
+            return shade(BEDROCK, 0.8f + 0.4f * hash((int) Math.floor(blockX + blockY), (int) Math.floor(height)));
+        }
+        // Faint, slightly wavy strata in the rock
+        final double band = Math.floor(height / 3.0 + 0.8 * Math.sin((blockX + blockY) * 0.035));
+        final float variation = 0.9f + 0.16f * hash((int) band, 7) + 0.05f * hash((int) Math.floor(blockX + blockY), (int) Math.floor(height));
+        return shade((height < 0) ? DEEPSLATE : STONE, variation);
+    }
+
+    /**
+     * The soil under a surface colour: sand under sand, rock under rock and snow, dirt elsewhere.
+     */
+    private static int soilColour(int surface) {
+        final int r = (surface >> 16) & 0xff, g = (surface >> 8) & 0xff, b = surface & 0xff;
+        if ((r > 165) && (g > 145) && (b < 170) && (r >= g) && (r - b > 40)) {
+            return SAND_SOIL;
+        } else if (((Math.abs(r - g) < 14) && (Math.abs(g - b) < 14)) || ((r > 210) && (g > 210) && (b > 210))) {
+            return STONE;
+        } else {
+            return DIRT;
+        }
+    }
+
+    private static float hash(int x, int y) {
+        long h = (x * 0x9E3779B97F4A7C15L) ^ (y * 0xC2B2AE3D27D4EB4FL);
+        h = (h ^ (h >>> 30)) * 0xBF58476D1CE4E5B9L;
+        h ^= h >>> 27;
+        return (h >>> 40) / (float) (1L << 24);
+    }
+
     private final class Rasteriser {
         Rasteriser(int[] pixels, int width, int y0, int y1) {
             this.pixels = pixels;
@@ -1477,7 +1548,8 @@ class Terrain3DView extends JComponent {
             final float r0 = (c0 >> 16) & 0xff, g0 = (c0 >> 8) & 0xff, b0 = c0 & 0xff;
             final float r1 = (c1 >> 16) & 0xff, g1 = (c1 >> 8) & 0xff, b1 = c1 & 0xff;
             final float r2 = (c2 >> 16) & 0xff, g2 = (c2 >> 8) & 0xff, b2 = c2 & 0xff;
-            final boolean heights = ! Float.isNaN(h0);
+            final boolean wall = kind == KIND_WALL;
+            final boolean heights = (! wall) && (! Float.isNaN(h0));
             final float hq0 = h0 * q0, hq1 = h1 * q1, hq2 = h2 * q2;
             final float uq0 = u0 * q0, uq1 = u1 * q1, uq2 = u2 * q2, vq0 = v0 * q0, vq1 = v1 * q1, vq2 = v2 * q2;
             final float epsilon = -1e-5f;
@@ -1497,11 +1569,20 @@ class Terrain3DView extends JComponent {
                         continue;
                     }
                     depthBuffer[i] = d;
-                    pixels[i] = (((int) (l0 * r0 + l1 * r1 + l2 * r2)) << 16) | (((int) (l0 * g0 + l1 * g1 + l2 * g2)) << 8) | ((int) (l0 * b0 + l1 * b1 + l2 * b2));
                     final float weight = 1 / (l0 * q0 + l1 * q1 + l2 * q2);
+                    final float bu = (l0 * uq0 + l1 * uq1 + l2 * uq2) * weight, bv = (l0 * vq0 + l1 * vq1 + l2 * vq2) * weight;
+                    if (wall) {
+                        // A cross section of the ground, lit by the light carried by the colour of the vertices
+                        final int section = wallColour(bu, bv, (l0 * hq0 + l1 * hq1 + l2 * hq2) * weight);
+                        pixels[i] = ((int) (((section >> 16) & 0xff) * (l0 * r0 + l1 * r1 + l2 * r2) / 255) << 16)
+                                | ((int) (((section >> 8) & 0xff) * (l0 * g0 + l1 * g1 + l2 * g2) / 255) << 8)
+                                | (int) ((section & 0xff) * (l0 * b0 + l1 * b1 + l2 * b2) / 255);
+                    } else {
+                        pixels[i] = (((int) (l0 * r0 + l1 * r1 + l2 * r2)) << 16) | (((int) (l0 * g0 + l1 * g1 + l2 * g2)) << 8) | ((int) (l0 * b0 + l1 * b1 + l2 * b2));
+                    }
                     heightBuffer[i] = heights ? (l0 * hq0 + l1 * hq1 + l2 * hq2) * weight : Float.NaN;
-                    blockXBuffer[i] = (l0 * uq0 + l1 * uq1 + l2 * uq2) * weight;
-                    blockYBuffer[i] = (l0 * vq0 + l1 * vq1 + l2 * vq2) * weight;
+                    blockXBuffer[i] = bu;
+                    blockYBuffer[i] = bv;
                     faceBuffer[i] = face;
                     kindBuffer[i] = kind;
                 }
@@ -1511,14 +1592,14 @@ class Terrain3DView extends JComponent {
         /**
          * Draw a triangle which crosses the near plane of the camera, by clipping it against that plane.
          */
-        void clippedTriangle(Mesh mesh, int t, int faceOffset, boolean wall, float[] cx, float[] cy, float[] cz, int[] colour, Camera camera, float blockScale) {
+        void clippedTriangle(Mesh mesh, int t, int faceOffset, boolean wall, float wallBase, float[] cx, float[] cy, float[] cz, int[] colour, Camera camera, float blockScale) {
             final float[] px = new float[4], py = new float[4], pz = new float[4], ph = new float[4], pu = new float[4], pv = new float[4];
             final int[] pc = new int[4];
             int count = 0;
             for (int k = 0; k < 3; k++) {
                 final int a = mesh.triangles[t * 3 + k], b = mesh.triangles[t * 3 + (k + 1) % 3];
                 final boolean inA = cz[a] > NEAR, inB = cz[b] > NEAR;
-                final float ha = wall ? Float.NaN : mesh.h[a], hb = wall ? Float.NaN : mesh.h[b];
+                final float ha = wall ? wallHeight(mesh.h[a], wallBase) : mesh.h[a], hb = wall ? wallHeight(mesh.h[b], wallBase) : mesh.h[b];
                 if (inA) {
                     px[count] = cx[a];
                     py[count] = cy[a];

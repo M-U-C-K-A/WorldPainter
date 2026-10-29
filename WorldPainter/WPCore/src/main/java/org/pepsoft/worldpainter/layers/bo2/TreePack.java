@@ -30,7 +30,12 @@ public final class TreePack {
         CHERRY("Cherry trees", 0xf0a3c8, 6, 4),
         DEAD("Dead trees", 0x6b5a48, 5, 4),
         BUSH("Bushes", 0x4d7a35, 2, 2),
-        PALM("Palm trees", 0x5c9a3a, 5, 4);
+        PALM("Palm trees", 0x5c9a3a, 5, 4),
+        ACACIA("Acacias", 0x8a9a3a, 7, 3),
+        WILLOW("Willows", 0x5d8a3a, 7, 3),
+        AZALEA("Azalea bushes", 0x7fa04a, 3, 3),
+        PALE_OAK("Pale oaks", 0x9a9a8a, 6, 4),
+        REDWOOD("Giant redwoods", 0x6b3a2a, 7, 3);
 
         Kind(String displayName, int colour, int grid, int density) {
             this.displayName = displayName;
@@ -97,6 +102,16 @@ public final class TreePack {
                 return bush(variant, random);
             case PALM:
                 return palm(variant, random);
+            case ACACIA:
+                return acacia(variant, random);
+            case WILLOW:
+                return willow(variant, random);
+            case AZALEA:
+                return azalea(variant, random);
+            case PALE_OAK:
+                return paleOak(variant, random);
+            case REDWOOD:
+                return redwood(variant, random);
             default:
                 throw new InternalError();
         }
@@ -273,6 +288,102 @@ public final class TreePack {
         return b.build();
     }
 
+    /**
+     * A savanna acacia: a short trunk which forks into slanting limbs, each carrying a flat umbrella of leaves.
+     */
+    private static WPObject acacia(int variant, Random random) {
+        final int height = 6 + random.nextInt(4);
+        final Builder b = new Builder("Acacia " + (variant + 1), 17, height + 5);
+        final Material log = log("acacia"), leaves = leaves("acacia");
+        b.trunk(log, height - 2, 1);
+        final int forks = 2 + random.nextInt(2);
+        for (int i = 0; i < forks; i++) {
+            final double angle = i * Math.PI * 2 / forks + random.nextDouble() * 0.8, reach = 2 + random.nextDouble() * 2;
+            final double x = 0.5 + Math.cos(angle) * reach, y = 0.5 + Math.sin(angle) * reach;
+            final int z = height + random.nextInt(2);
+            b.line(log, 0.5, 0.5, height - 3, x, y, z);
+            b.blob(leaves, x, y, z + 1, 3.2 + random.nextDouble(), 0.8, 0.85, random);
+            b.blob(leaves, x, y, z + 2, 2.0, 0.8, 0.85, random);
+        }
+        return b.build();
+    }
+
+    /**
+     * A weeping willow: a broad crown with curtains of leaves hanging down from its rim.
+     */
+    private static WPObject willow(int variant, Random random) {
+        final int height = 7 + random.nextInt(4);
+        final Builder b = new Builder("Willow " + (variant + 1), 15, height + 4);
+        final Material log = log("oak"), leaves = leaves("mangrove");
+        b.trunk(log, height, 1);
+        for (int i = 0; i < 3; i++) {
+            b.branch(log, height - 2 - i, random.nextInt(4), 2 + random.nextInt(2));
+        }
+        b.blob(leaves, 0.5, 0.5, height, 4.2, 2.2, 0.85, random);
+        for (int i = 0; i < 28; i++) {
+            final double angle = i * Math.PI * 2 / 28 + random.nextDouble() * 0.2, reach = 3.3 + random.nextDouble() * 1.4;
+            final int x = (int) Math.floor(0.5 + Math.cos(angle) * reach), y = (int) Math.floor(0.5 + Math.sin(angle) * reach);
+            final int length = 2 + random.nextInt(Math.max(2, height - 4));
+            for (int z = height - 1; z >= Math.max(1, height - 1 - length); z--) {
+                b.set(x, y, z, leaves);
+            }
+        }
+        return b.build();
+    }
+
+    /**
+     * A low, round azalea bush with flowering patches.
+     */
+    private static WPObject azalea(int variant, Random random) {
+        final int height = 2 + random.nextInt(2);
+        final Builder b = new Builder("Azalea " + (variant + 1), 7, height + 4);
+        final Material log = log("oak"), leaves = leaves("azalea"), flowering = leaves("flowering_azalea");
+        b.trunk(log, height, 1);
+        b.blob(leaves, 0.5, 0.5, height + 1, 2.4 + random.nextDouble() * 0.6, 1.6, 0.85, random);
+        for (int i = 0; i < 10; i++) {
+            final double angle = random.nextDouble() * Math.PI * 2, reach = random.nextDouble() * 2.5;
+            b.recolour(leaves, flowering, (int) Math.floor(0.5 + Math.cos(angle) * reach), (int) Math.floor(0.5 + Math.sin(angle) * reach), height + random.nextInt(3));
+        }
+        return b.build();
+    }
+
+    /**
+     * A pale oak: a thick trunk under a broad, dark grey-green crown.
+     */
+    private static WPObject paleOak(int variant, Random random) {
+        final int height = 8 + random.nextInt(5);
+        final Builder b = new Builder("Pale oak " + (variant + 1), 17, height + 6);
+        final Material log = log("pale_oak"), leaves = leaves("pale_oak");
+        b.trunk(log, height, 2);
+        b.blob(leaves, 1, 1, height + 1, 4.2, 2.6, 0.9, random);
+        final int clumps = 3 + random.nextInt(3);
+        for (int i = 0; i < clumps; i++) {
+            final double angle = random.nextDouble() * Math.PI * 2, reach = 3 + random.nextDouble() * 2;
+            final int z = height - 2 + random.nextInt(2);
+            final double x = 1 + Math.cos(angle) * reach, y = 1 + Math.sin(angle) * reach;
+            b.line(log, 1, 1, z - 2, x, y, z);
+            b.blob(leaves, x, y, z + 1, 2.5, 1.8, 0.9, random);
+        }
+        return b.build();
+    }
+
+    /**
+     * A giant redwood: a thick, very tall trunk with a narrow crown in its upper half.
+     */
+    private static WPObject redwood(int variant, Random random) {
+        final int height = 30 + random.nextInt(14);
+        final Builder b = new Builder("Giant redwood " + (variant + 1), 11, height + 3);
+        final Material log = log("spruce"), leaves = leaves("spruce");
+        b.trunk(log, height, 2);
+        final int firstTier = (int) (height * (0.5 + random.nextDouble() * 0.1));
+        for (int z = firstTier; z < height; z += 2) {
+            final double t = (double) (z - firstTier) / (height - firstTier);
+            b.blob(leaves, 1, 1, z, 1.8 + (1 - t) * 2.2, 0.8, 0.8, random);
+        }
+        b.blob(leaves, 1, 1, height, 1.6, 1.5, 0.9, random);
+        return b.build();
+    }
+
     private static Material log(String wood) {
         return Material.get("minecraft:" + wood + "_log", "axis", "y");
     }
@@ -376,6 +487,24 @@ public final class TreePack {
                         if ((d <= 1) && ((d < 0.6) || (random.nextDouble() < fill))) {
                             set(x, y, z, leaves);
                         }
+                    }
+                }
+            }
+        }
+
+        /**
+         * Replace one kind of block with another at a location and its direct neighbours, for patches of colour.
+         */
+        void recolour(Material from, Material to, int x, int y, int z) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    final int bx = x + dx + centre, by = y + dy + centre;
+                    if ((bx < 0) || (by < 0) || (z < 0) || (bx >= width) || (by >= width) || (z >= height)) {
+                        continue;
+                    }
+                    final int i = bx + by * width + z * width * width;
+                    if (from.equals(data[i])) {
+                        data[i] = to;
                     }
                 }
             }

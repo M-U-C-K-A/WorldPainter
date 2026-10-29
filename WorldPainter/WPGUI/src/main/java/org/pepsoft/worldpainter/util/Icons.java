@@ -43,6 +43,13 @@ public final class Icons {
         return create(name, size, ACCENT);
     }
 
+    /**
+     * An icon in a fixed colour, for instance to draw on a coloured swatch.
+     */
+    public static Icon tinted(String name, int size, Color colour) {
+        return create(name, size, new FlatSVGIcon.ColorFilter(original -> withAlpha(colour, original)));
+    }
+
     public static boolean exists(String name) {
         return Icons.class.getClassLoader().getResource(PATH + name + ".svg") != null;
     }

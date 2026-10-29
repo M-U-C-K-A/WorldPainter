@@ -5,6 +5,7 @@ import org.pepsoft.util.DesktopUtils;
 import org.pepsoft.util.IconUtils;
 import org.pepsoft.util.swing.BetterJPopupMenu;
 import org.pepsoft.worldpainter.App;
+import org.pepsoft.worldpainter.util.ResponsiveGridLayout;
 import org.pepsoft.worldpainter.ColourScheme;
 import org.pepsoft.worldpainter.Platform;
 import org.pepsoft.worldpainter.World2;
@@ -228,9 +229,8 @@ public class BiomesPanel extends JPanel implements CustomBiomeManager.CustomBiom
                         }
                     });
                     grid.add(button, index++);
-                } else {
-                    grid.add(Box.createGlue(), index++);
                 }
+                // The gaps in the order are not needed, since the grid adapts to the width of the panel
             }
         }
         resetOptions();
@@ -487,7 +487,7 @@ public class BiomesPanel extends JPanel implements CustomBiomeManager.CustomBiom
                 .forEach(c -> consumer.accept((JCheckBox) c));
     }
 
-    private final JPanel grid = new JPanel(new GridLayout(0, 5)), optionsPanel = new JPanel();
+    private final JPanel grid = new JPanel(new ResponsiveGridLayout(2, 6)), optionsPanel = new JPanel();
     private final ButtonGroup buttonGroup;
     private final JLabel label1 = new JLabel("Selected biome: 1"), label2 = new JLabel("Plains");
 

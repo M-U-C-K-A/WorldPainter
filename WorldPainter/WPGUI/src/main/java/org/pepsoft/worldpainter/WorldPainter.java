@@ -382,7 +382,7 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
             }
             if ((surroundingsSource != null) && (anchor.equals(NORMAL_DETAIL)) && (dimension.getTileCount() > 0)) {
                 // Show the terrain Minecraft will generate around the map
-                surroundings = new org.pepsoft.worldpainter.vanilla.SurroundingsTileProvider(surroundingsSource, dimension, surroundingsMargin);
+                surroundings = new org.pepsoft.worldpainter.vanilla.SurroundingsTileProvider(surroundingsSource, dimension, surroundingsMargin, colourScheme, drawContours, contourSeparation, lightOrigin);
                 setTileProvider(LAYER_BIOMES, surroundings);
             } else if (biomeAlgorithm != -1) {
                 surroundings = null;

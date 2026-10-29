@@ -2826,7 +2826,7 @@ public final class App extends JFrame implements BrushControl,
         // (the layer panel must be created first, since the terrain panel mirrors its terrain solo check box)
         final JPanel layerPanel = createLayerPanel();
         dockingManager.addFrame(new DockableFrameBuilder(createTerrainPanel(), "Terrain", Side.WEST, 3).withIcon(Icons.get("mountain-snow"))
-                .withDescription("The block type of the ground surface: grass, sand, stone, snow\u2026").build());
+                .withDescription("The block type of the ground surface: grass, sand, stone, snow\u2026").scrollable().build());
 
         dockingManager.addFrame(new DockableFrameBuilder(layerPanel, "Layers", Side.WEST, 3).withIcon(Icons.get("layers"))
                 .withDescription("Features added on top of or under the terrain: trees, caves, ores, frost\u2026 Toggle their visibility with the eye.").scrollable().build());
@@ -2835,8 +2835,11 @@ public final class App extends JFrame implements BrushControl,
                 .withDescription("The Minecraft biome of each area (grass colour, weather, mobs). Chosen automatically from the terrain unless you paint one.").scrollable().build();
         dockingManager.addFrame(biomesPanelFrame);
 
+        dockingManager.addFrame(new DockableFrameBuilder(new PacksPanel(this::useTreeKind, this::usePlantPreset, this::useMaterialGroup, selectedColourScheme), "Packs", Side.WEST, 3).withIcon(Icons.get("package"))
+                .withDescription("Ready made trees, flowers, plants and mixes of blocks: click one to add it to the world and paint with it.").scrollable().build());
+
         dockingManager.addFrame(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", Side.WEST, 3).withIcon(Icons.get("message-square-text"))
-                .withDescription("Coloured markings for planning the map. They are not exported, unless you enable that in the export settings.").build());
+                .withDescription("Coloured markings for planning the map. They are not exported, unless you enable that in the export settings.").scrollable().build());
 
         dockingManager.addFrame(new DockableFrameBuilder(createBrushPanel(), "Brushes", Side.EAST, 1).withIcon(Icons.get("brush")).scrollable().build());
 
@@ -3174,8 +3177,8 @@ public final class App extends JFrame implements BrushControl,
     private JPanel createToolPanel() {
         // The tools are grouped by what they do: shape the land, paint on it (terrain, layers, biomes), water and lava,
         // and selection and other tools
-        final JPanel sculptPanel = new JPanel(new GridLayout(0, 4, 2, 2)), paintPanel = new JPanel(new GridLayout(0, 4, 2, 2));
-        final JPanel waterPanel = new JPanel(new GridLayout(0, 4, 2, 2)), otherPanel = new JPanel(new GridLayout(0, 4, 2, 2));
+        final JPanel sculptPanel = new JPanel(new ResponsiveGridLayout(2, 4)), paintPanel = new JPanel(new ResponsiveGridLayout(2, 4));
+        final JPanel waterPanel = new JPanel(new ResponsiveGridLayout(2, 4)), otherPanel = new JPanel(new ResponsiveGridLayout(2, 4));
         // TODO: use function keys as accelerators?
         sculptPanel.add(createButtonForOperation(new Height(view), 'h'));
         sculptPanel.add(createButtonForOperation(new Flatten(view), 'a'));
@@ -3192,7 +3195,8 @@ public final class App extends JFrame implements BrushControl,
         waterPanel.add(createButtonForOperation(new Flood(view, false), 'f'));
         waterPanel.add(createButtonForOperation(new Flood(view, true)));
         waterPanel.add(createButtonForOperation(new Sponge(view)));
-        eyedropperToggleButton = new JToggleButton(Icons.get("pipette", 18));
+        eyedropperToggleButton = org.pepsoft.worldpainter.help.ToolCard.toggleButton();
+        eyedropperToggleButton.setIcon(Icons.get("pipette", 18));
         eyedropperToggleButton.setMnemonic('y');
         styleToolButton(eyedropperToggleButton);
         eyedropperToggleButton.addActionListener(e -> {
@@ -3228,14 +3232,17 @@ public final class App extends JFrame implements BrushControl,
             });
         });
         eyedropperToggleButton.setToolTipText(richToolTip("Eyedropper", "Pick a terrain or layer from the map to paint with", "Alt+Y"));
+        org.pepsoft.worldpainter.help.ToolCard.install(eyedropperToggleButton, new org.pepsoft.worldpainter.help.ToolCard("Eyedropper", "Click on the map to pick the terrain or layer there, and paint with it.", "Alt+Y", org.pepsoft.worldpainter.help.ToolDemo.EYEDROPPER));
         eyedropperToggleButton.putClientProperty(KEY_HELP_KEY, "Operation/Eyedropper");
         paintPanel.add(eyedropperToggleButton);
 
 //        toolPanel.add(createButtonForOperation(new Erode(view, this, mapDragControl), 'm'));
-        final JButton button = new JButton(Icons.get("globe", 18));
+        final JButton button = org.pepsoft.worldpainter.help.ToolCard.button();
+        button.setIcon(Icons.get("globe", 18));
         styleToolButton(button);
         button.addActionListener(e -> showGlobalOperations());
         button.setToolTipText(richToolTip("Global operations", "Fill or clear the whole world (or the selection) with a terrain, biome or layer", null));
+        org.pepsoft.worldpainter.help.ToolCard.install(button, new org.pepsoft.worldpainter.help.ToolCard("Global operations", "Fill or clear the whole world, or only the selection, with a terrain, a biome or a layer, in one go.", null, org.pepsoft.worldpainter.help.ToolDemo.GLOBAL));
         button.putClientProperty(KEY_HELP_KEY, "Operation/GlobalOperations");
         paintPanel.add(button);
         paintPanel.add(createButtonForOperation(new Text(view), 'x'));
@@ -3244,7 +3251,8 @@ public final class App extends JFrame implements BrushControl,
         copySelectionButton.setEnabled(selectionState.getValue());
         otherPanel.add(createButtonForOperation(new EditSelectionOperation(view, selectionState)));
         otherPanel.add(copySelectionButton);
-        final JButton clearSelectionButton = new JButton(Icons.get("square-x", 18));
+        final JButton clearSelectionButton = org.pepsoft.worldpainter.help.ToolCard.button();
+        clearSelectionButton.setIcon(Icons.get("square-x", 18));
         clearSelectionButton.setEnabled(selectionState.getValue());
         styleToolButton(clearSelectionButton);
         clearSelectionButton.addActionListener(e -> {
@@ -3270,6 +3278,7 @@ public final class App extends JFrame implements BrushControl,
 //            selectionState.setValue(false);
         });
         clearSelectionButton.setToolTipText(richToolTip("Clear selection", "Remove the current selection", null));
+        org.pepsoft.worldpainter.help.ToolCard.install(clearSelectionButton, new org.pepsoft.worldpainter.help.ToolCard("Clear selection", "Remove the current selection, so that the tools work on the whole map again.", null, org.pepsoft.worldpainter.help.ToolDemo.CLEAR_SELECTION));
         selectionState.addObserver((o, selectionMayBePresent) -> {
             copySelectionButton.setEnabled((boolean) selectionMayBePresent);
             clearSelectionButton.setEnabled((boolean) selectionMayBePresent);
@@ -3574,7 +3583,7 @@ public final class App extends JFrame implements BrushControl,
             layerPanel.add(soloCheckBox, constraints);
         }
 
-        JPanel colourGrid = new JPanel(new GridLayout(0, 4));
+        JPanel colourGrid = new JPanel(new ResponsiveGridLayout(2, 6));
         for (int i = 1; i < 16; i++) {
             final int layerValue = i;
             JToggleButton button = new JToggleButton(createScaledColourIcon(Annotations.getColour(layerValue, selectedColourScheme)));
@@ -3596,6 +3605,9 @@ public final class App extends JFrame implements BrushControl,
             button.putClientProperty(KEY_PAINT_ID, createDiscreteLayerPaintId(Annotations.INSTANCE, layerValue));
             colourGrid.add(button);
         }
+        constraints.gridwidth = GridBagConstraints.REMAINDER;
+        constraints.fill = HORIZONTAL;
+        constraints.weightx = 1.0;
         layerPanel.add(colourGrid, constraints);
 
         layerControls.put(Annotations.INSTANCE, new LayerControls(Annotations.INSTANCE, checkBox, soloCheckBox));
@@ -3634,112 +3646,89 @@ public final class App extends JFrame implements BrushControl,
             terrainPanel.add(checkBoxSoloTerrain, constraints);
         }
 
-        JPanel buttonPanel = new JPanel(new GridLayout(0, 5));
-        // Surface
-        buttonPanel.add(createTerrainButton(GRASS));
-        buttonPanel.add(createTerrainButton(PERMADIRT));
-        buttonPanel.add(createTerrainButton(SAND));
-        buttonPanel.add(createTerrainButton(GRASS_PATH));
-        buttonPanel.add(createTerrainButton(PODZOL));
+        // Search field, filtering the terrain types by name
+        final JTextField searchField = new JTextField();
+        searchField.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, "Search terrain");
+        searchField.putClientProperty(FlatClientProperties.TEXT_FIELD_LEADING_ICON, Icons.muted("search", 14));
+        searchField.putClientProperty(FlatClientProperties.TEXT_FIELD_SHOW_CLEAR_BUTTON, true);
+        constraints.fill = HORIZONTAL;
+        constraints.weightx = 1.0;
+        constraints.insets = new Insets(4, 2, 4, 2);
+        terrainPanel.add(searchField, constraints);
 
-        buttonPanel.add(createTerrainButton(BARE_GRASS));
-        buttonPanel.add(createTerrainButton(MOSS));
-        buttonPanel.add(createTerrainButton(MUD));
-        buttonPanel.add(createTerrainButton(GRAVEL));
-        buttonPanel.add(createTerrainButton(CLAY));
-
-        buttonPanel.add(createTerrainButton(STONE_MIX));
-        buttonPanel.add(createTerrainButton(GRANITE));
-        buttonPanel.add(createTerrainButton(DIORITE));
-        buttonPanel.add(createTerrainButton(ANDESITE));
-        buttonPanel.add(createTerrainButton(CALCITE));
-
-        buttonPanel.add(createTerrainButton(COBBLESTONE));
-        buttonPanel.add(createTerrainButton(MOSSY_COBBLESTONE));
-        buttonPanel.add(createTerrainButton(STONE));
-        buttonPanel.add(createTerrainButton(DEEPSLATE));
-        buttonPanel.add(createTerrainButton(ROCK));
-
-        buttonPanel.add(createTerrainButton(TUFF));
-        buttonPanel.add(createTerrainButton(BEDROCK));
-        buttonPanel.add(createTerrainButton(MYCELIUM));
-        buttonPanel.add(createTerrainButton(PALE_MOSS));
-        buttonPanel.add(Box.createGlue());
-
-        buttonPanel.add(createTerrainButton(OBSIDIAN));
-        buttonPanel.add(createTerrainButton(MAGMA));
-        buttonPanel.add(createTerrainButton(LAVA));
-        buttonPanel.add(Box.createGlue());
-        buttonPanel.add(Box.createGlue());
-
-        buttonPanel.add(createTerrainButton(DESERT));
-        buttonPanel.add(createTerrainButton(SANDSTONE));
-        buttonPanel.add(createTerrainButton(RED_SAND));
-        buttonPanel.add(createTerrainButton(RED_SANDSTONE));
-        buttonPanel.add(createTerrainButton(RED_DESERT));
-
-        buttonPanel.add(createTerrainButton(WHITE_STAINED_CLAY));
-        buttonPanel.add(createTerrainButton(ORANGE_STAINED_CLAY));
-        buttonPanel.add(createTerrainButton(MAGENTA_STAINED_CLAY));
-        buttonPanel.add(createTerrainButton(LIGHT_BLUE_STAINED_CLAY));
-        buttonPanel.add(createTerrainButton(YELLOW_STAINED_CLAY));
-
-        buttonPanel.add(createTerrainButton(LIME_STAINED_CLAY));
-        buttonPanel.add(createTerrainButton(PINK_STAINED_CLAY));
-        buttonPanel.add(createTerrainButton(GREY_STAINED_CLAY));
-        buttonPanel.add(createTerrainButton(LIGHT_GREY_STAINED_CLAY));
-        buttonPanel.add(createTerrainButton(CYAN_STAINED_CLAY));
-
-        buttonPanel.add(createTerrainButton(PURPLE_STAINED_CLAY));
-        buttonPanel.add(createTerrainButton(BLUE_STAINED_CLAY));
-        buttonPanel.add(createTerrainButton(BROWN_STAINED_CLAY));
-        buttonPanel.add(createTerrainButton(GREEN_STAINED_CLAY));
-        buttonPanel.add(createTerrainButton(RED_STAINED_CLAY));
-
-        buttonPanel.add(createTerrainButton(BLACK_STAINED_CLAY));
-        buttonPanel.add(createTerrainButton(HARDENED_CLAY));
-        buttonPanel.add(createTerrainButton(MESA));
-        buttonPanel.add(Box.createGlue());
-        buttonPanel.add(Box.createGlue());
-
-        buttonPanel.add(createTerrainButton(BEACHES));
-        buttonPanel.add(createTerrainButton(WATER));
-        buttonPanel.add(createTerrainButton(DEEP_SNOW));
-        buttonPanel.add(Box.createGlue());
-        buttonPanel.add(Box.createGlue());
-
-        // Nether
-        buttonPanel.add(createTerrainButton(NETHERRACK));
-        buttonPanel.add(createTerrainButton(BASALT));
-        buttonPanel.add(createTerrainButton(BLACKSTONE));
-        buttonPanel.add(createTerrainButton(NETHERLIKE));
-        buttonPanel.add(Box.createGlue());
-
-        buttonPanel.add(createTerrainButton(SOUL_SAND));
-        buttonPanel.add(createTerrainButton(SOUL_SOIL));
-        buttonPanel.add(createTerrainButton(WARPED_NYLIUM));
-        buttonPanel.add(createTerrainButton(CRIMSON_NYLIUM));
-        buttonPanel.add(Box.createGlue());
-
-        // End
-        buttonPanel.add(createTerrainButton(END_STONE));
-        buttonPanel.add(Box.createGlue());
-        buttonPanel.add(Box.createGlue());
-        buttonPanel.add(Box.createGlue());
-        buttonPanel.add(Box.createGlue());
+        // The terrain types in families, each a grid which uses the whole width of the panel
+        final Map<JLabel, List<AbstractButton>> sections = new LinkedHashMap<>();
+        addTerrainSection(terrainPanel, constraints, sections, "Grass & soil", GRASS, BARE_GRASS, PERMADIRT, PODZOL, GRASS_PATH, MOSS, PALE_MOSS, MUD, MYCELIUM, CLAY, GRAVEL);
+        addTerrainSection(terrainPanel, constraints, sections, "Stone", STONE_MIX, STONE, ROCK, GRANITE, DIORITE, ANDESITE, CALCITE, TUFF, DEEPSLATE, COBBLESTONE, MOSSY_COBBLESTONE, BEDROCK);
+        addTerrainSection(terrainPanel, constraints, sections, "Sand & desert", SAND, BEACHES, DESERT, SANDSTONE, RED_SAND, RED_SANDSTONE, RED_DESERT, MESA, HARDENED_CLAY);
+        addTerrainSection(terrainPanel, constraints, sections, "Snow, water & lava", DEEP_SNOW, WATER, OBSIDIAN, MAGMA, LAVA);
+        addTerrainSection(terrainPanel, constraints, sections, "Terracotta", WHITE_STAINED_CLAY, LIGHT_GREY_STAINED_CLAY, GREY_STAINED_CLAY, BLACK_STAINED_CLAY, BROWN_STAINED_CLAY, RED_STAINED_CLAY, ORANGE_STAINED_CLAY, YELLOW_STAINED_CLAY, LIME_STAINED_CLAY, GREEN_STAINED_CLAY, CYAN_STAINED_CLAY, LIGHT_BLUE_STAINED_CLAY, BLUE_STAINED_CLAY, PURPLE_STAINED_CLAY, MAGENTA_STAINED_CLAY, PINK_STAINED_CLAY);
+        addTerrainSection(terrainPanel, constraints, sections, "Nether & End", NETHERRACK, BASALT, BLACKSTONE, NETHERLIKE, SOUL_SAND, SOUL_SOIL, WARPED_NYLIUM, CRIMSON_NYLIUM, END_STONE);
 
         // Custom terrains
+        final JLabel customLabel = createSectionLabel("Custom");
+        constraints.insets = new Insets(8, 4, 3, 4);
+        terrainPanel.add(customLabel, constraints);
+        final JPanel customPanel = new JPanel(new ResponsiveGridLayout(2, 6));
         JButton addCustomTerrainButton = new JButton(ACTION_SHOW_CUSTOM_TERRAIN_POPUP);
         addCustomTerrainButton.setMargin(App.BUTTON_INSETS);
-        buttonPanel.add(addCustomTerrainButton);
-        terrainPanel.add(buttonPanel, constraints);
+        customPanel.add(addCustomTerrainButton);
+        constraints.insets = new Insets(0, 2, 0, 2);
+        terrainPanel.add(customPanel, constraints);
+
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+
+            private void filter() {
+                final String text = searchField.getText().trim().toLowerCase();
+                sections.forEach((label, buttons) -> {
+                    boolean anyVisible = false;
+                    for (AbstractButton button: buttons) {
+                        final boolean visible = text.isEmpty() || ((String) button.getClientProperty(KEY_SEARCH_TEXT)).contains(text);
+                        button.setVisible(visible);
+                        anyVisible |= visible;
+                    }
+                    label.setVisible(anyVisible);
+                    buttons.get(0).getParent().setVisible(anyVisible);
+                });
+                terrainPanel.revalidate();
+                terrainPanel.repaint();
+            }
+        });
+
+        // Keep the sections at the top
+        constraints.weighty = 1.0;
+        terrainPanel.add(Box.createGlue(), constraints);
 
         return terrainPanel;
     }
     
+    /**
+     * Add a family of terrain types to the terrain panel: a heading, and a grid of buttons which uses the whole width of
+     * the panel.
+     */
+    private void addTerrainSection(JPanel terrainPanel, GridBagConstraints constraints, Map<JLabel, List<AbstractButton>> sections, String title, Terrain... terrains) {
+        final JLabel label = createSectionLabel(title);
+        constraints.insets = new Insets(sections.isEmpty() ? 2 : 8, 4, 3, 4);
+        terrainPanel.add(label, constraints);
+        final JPanel grid = new JPanel(new ResponsiveGridLayout(2, 6));
+        final List<AbstractButton> buttons = new ArrayList<>();
+        for (Terrain terrain: terrains) {
+            final JToggleButton button = createTerrainButton(terrain);
+            button.putClientProperty(KEY_SEARCH_TEXT, (terrain.getName() + " " + title).toLowerCase());
+            grid.add(button);
+            buttons.add(button);
+        }
+        constraints.insets = new Insets(0, 2, 0, 2);
+        terrainPanel.add(grid, constraints);
+        sections.put(label, buttons);
+    }
+
     private JPanel createCustomTerrainPanel() {
         customTerrainPanel = new JPanel();
-        customTerrainPanel.setLayout(new GridLayout(0, 4));
+        customTerrainPanel.setLayout(new ResponsiveGridLayout(2, 6));
 
         JButton addCustomTerrainButton = new JButton(ACTION_SHOW_CUSTOM_TERRAIN_POPUP);
         addCustomTerrainButton.setMargin(App.BUTTON_INSETS);
@@ -3981,20 +3970,26 @@ public final class App extends JFrame implements BrushControl,
         constraints.insets = new Insets(2, 4, 2, 4);
 
         optionsPanel.add(createSectionLabel("Basic"), constraints);
-        final JPanel basicPanel = new JPanel(new GridLayout(0, 3, 2, 2));
+        final JPanel basicPanel = new JPanel(new ResponsiveGridLayout(2, 3));
         basicPanel.add(createBrushButton(SymmetricBrush.COSINE_CIRCLE));
         basicPanel.add(createBrushButton(SymmetricBrush.PLATEAU_CIRCLE));
         basicPanel.add(createBrushButton(SymmetricBrush.CONSTANT_SQUARE));
+        basicPanel.add(createBrushButton(SymmetricBrush.LINEAR_CIRCLE));
+        basicPanel.add(createBrushButton(SymmetricBrush.SPIKE_CIRCLE));
+        basicPanel.add(createBrushButton(SymmetricBrush.DOME_CIRCLE));
         optionsPanel.add(basicPanel, constraints);
 
-        constraints.insets = new Insets(10, 4, 2, 4);
-        optionsPanel.add(createSectionLabel("Terrain stamps"), constraints);
-        constraints.insets = new Insets(2, 4, 2, 4);
-        final JPanel stampsPanel = new JPanel(new GridLayout(0, 3, 2, 2));
-        for (Brush stamp: TerrainStamps.createBrushes()) {
-            stampsPanel.add(createBrushButton(stamp));
+        // Terrain stamps, for sculpting recognisable landforms in one stroke with the height tools
+        for (Map.Entry<String, List<Brush>> family: TerrainStamps.createBrushesByFamily().entrySet()) {
+            constraints.insets = new Insets(10, 4, 2, 4);
+            optionsPanel.add(createSectionLabel(family.getKey()), constraints);
+            constraints.insets = new Insets(2, 4, 2, 4);
+            final JPanel stampsPanel = new JPanel(new ResponsiveGridLayout(2, 3));
+            for (Brush stamp: family.getValue()) {
+                stampsPanel.add(createBrushButton(stamp));
+            }
+            optionsPanel.add(stampsPanel, constraints);
         }
-        optionsPanel.add(stampsPanel, constraints);
 
         optionsPanel.putClientProperty(KEY_ICON, createBrushThumbnail(SymmetricBrush.COSINE_CIRCLE, Math.round(16 * getUIScale())));
         return optionsPanel;
@@ -4012,7 +4007,7 @@ public final class App extends JFrame implements BrushControl,
     private JPanel createCustomBrushPanel(String title, BrushGroup brushGroup) {
         JPanel customBrushesPanel = new JPanel();
         customBrushesPanel.setLayout(new GridBagLayout());
-        JPanel customBrushPanel = new JPanel(new GridLayout(0, 3, 2, 2));
+        JPanel customBrushPanel = new JPanel(new ResponsiveGridLayout(2, 3));
         for (Brush customBrush: brushGroup.brushes) {
             customBrushPanel.add(createBrushButton(customBrush));
         }
@@ -4687,6 +4682,66 @@ public final class App extends JFrame implements BrushControl,
         if ((! dialog.isCancelled()) && (threeDeeFrame != null)) {
             threeDeeFrame.refresh(true);
         }
+    }
+
+    /**
+     * Add a kind of tree from the tree pack to the world as a layer, unless it already is, and select it for painting.
+     */
+    private void useTreeKind(org.pepsoft.worldpainter.layers.bo2.TreePack.Kind kind) {
+        usePackLayer(kind.getLayerName(), Bo2Layer.class, () -> org.pepsoft.worldpainter.layers.bo2.TreePack.createLayer(kind));
+    }
+
+    /**
+     * Add a preset of plants to the world as a plant layer, unless it already is, and select it for painting.
+     */
+    private void usePlantPreset(org.pepsoft.worldpainter.layers.plants.PlantLayerPresets.Preset preset) {
+        usePackLayer(preset.getLayerName(), org.pepsoft.worldpainter.layers.plants.PlantLayer.class, () -> org.pepsoft.worldpainter.layers.plants.PlantLayerPresets.create(preset));
+    }
+
+    private void usePackLayer(String name, Class<? extends CustomLayer> type, java.util.function.Supplier<CustomLayer> factory) {
+        if (dimension == null) {
+            DesktopUtils.beep();
+            return;
+        }
+        CustomLayer layer = null;
+        for (CustomLayer existing: getCustomLayers()) {
+            if (type.isInstance(existing) && existing.getName().equals(name)) {
+                layer = existing;
+                break;
+            }
+        }
+        if (layer == null) {
+            layer = factory.get();
+            layer.setPalette(PacksPanel.PALETTE);
+            customLayerController.registerCustomLayer(layer, true);
+        }
+        selectPaint(createLayerPaintId(layer));
+    }
+
+    /**
+     * Add a mix of blocks as a custom terrain type, unless it already is one, and select it for painting.
+     */
+    private void useMaterialGroup(MaterialGroup group) {
+        if (dimension == null) {
+            DesktopUtils.beep();
+            return;
+        }
+        for (int i = 0; i < CUSTOM_TERRAIN_COUNT; i++) {
+            if (Terrain.isCustomMaterialConfigured(i) && group.toString().equals(Terrain.getCustomMaterial(i).getName())) {
+                if (customMaterialButtons[i] != null) {
+                    selectPaint(createTerrainPaintId(Terrain.getCustomTerrain(i)));
+                } else {
+                    addButtonForNewCustomTerrain(i, Terrain.getCustomMaterial(i), true);
+                }
+                return;
+            }
+        }
+        final int index = findNextCustomTerrainIndex();
+        if (index < 0) {
+            beepAndShowWarning(this, "All " + CUSTOM_TERRAIN_COUNT + " custom terrain types are in use.", "No Free Custom Terrain");
+            return;
+        }
+        addButtonForNewCustomTerrain(index, MixedMaterialManager.getInstance().register(group.newMaterial()), true);
     }
 
     /**
@@ -5510,6 +5565,58 @@ public final class App extends JFrame implements BrushControl,
     /**
      * The name of the modern icon to use for a built-in operation, or {@code null} to use the operation's own icon.
      */
+    /**
+     * The animation which shows what a tool does, for its tooltip card, or {@code null} if there is none.
+     */
+    private static org.pepsoft.worldpainter.help.ToolDemo toolDemoFor(Operation operation) {
+        switch (operation.getClass().getSimpleName()) {
+            case "SprayPaint": return org.pepsoft.worldpainter.help.ToolDemo.SPRAY;
+            case "Pencil": return org.pepsoft.worldpainter.help.ToolDemo.PENCIL;
+            case "Fill": return org.pepsoft.worldpainter.help.ToolDemo.FILL;
+            case "Text": return org.pepsoft.worldpainter.help.ToolDemo.TEXT;
+            case "Flood": return operation.getName().toLowerCase().contains("lava") ? org.pepsoft.worldpainter.help.ToolDemo.FLOOD_LAVA : org.pepsoft.worldpainter.help.ToolDemo.FLOOD_WATER;
+            case "Sponge": return org.pepsoft.worldpainter.help.ToolDemo.SPONGE;
+            case "Height": return org.pepsoft.worldpainter.help.ToolDemo.RAISE;
+            case "Flatten": return org.pepsoft.worldpainter.help.ToolDemo.FLATTEN;
+            case "Smooth": return org.pepsoft.worldpainter.help.ToolDemo.SMOOTH;
+            case "RaiseMountain": return org.pepsoft.worldpainter.help.ToolDemo.MOUNTAIN;
+            case "SetSpawnPoint": return org.pepsoft.worldpainter.help.ToolDemo.SPAWN;
+            case "RaiseRotatedPyramid": return org.pepsoft.worldpainter.help.ToolDemo.ROTATED_PYRAMID;
+            case "RaisePyramid": return org.pepsoft.worldpainter.help.ToolDemo.PYRAMID;
+            case "CopySelectionOperation": return org.pepsoft.worldpainter.help.ToolDemo.COPY;
+            case "EditSelectionOperation": return org.pepsoft.worldpainter.help.ToolDemo.SELECT;
+            case "PathTool": return org.pepsoft.worldpainter.help.ToolDemo.PATH;
+            default: return null;
+        }
+    }
+
+    /**
+     * A fuller explanation of a tool than its own description, for its tooltip card.
+     */
+    private static String toolCardDescription(Operation operation) {
+        switch (operation.getClass().getSimpleName()) {
+            case "Height": return "Drag to raise the land under the brush; hold Ctrl (Cmd on a Mac) to lower it. The brush and its intensity set the shape and the speed.";
+            case "Flatten": return "Drag to level the land to the height where you started the stroke, for building sites, fields and roads.";
+            case "Smooth": return "Drag to soften rough or jagged land, without changing its overall shape.";
+            case "RaiseMountain": return "Click and hold to grow a mountain with ridges under the brush; the larger the brush, the larger the mountain.";
+            case "RaisePyramid": return "Click and hold to raise a square pyramid, for sharp peaks and man made shapes.";
+            case "RaiseRotatedPyramid": return "Click and hold to raise a pyramid turned by 45 degrees, with its ridges along the axes.";
+            case "PathTool": return "Click the points the path should pass through one by one, then press Enter to choose how it is built: natural, with bridges or with tunnels.";
+            case "Pencil": return "Drag to paint the selected terrain, layer or biome with a hard edge.";
+            case "SprayPaint": return "Drag to spray the selected terrain, layer or biome; it builds up gradually, for natural transitions.";
+            case "Fill": return "Click to fill a connected area which has the same terrain, layer or height with what is selected.";
+            case "Flood": return operation.getName().toLowerCase().contains("lava")
+                    ? "Click on low ground to fill it with lava up to the height where you clicked, as far as it is enclosed."
+                    : "Click on low ground to flood it with water up to the height where you clicked, as far as it is enclosed: lakes, seas and rivers.";
+            case "Sponge": return "Drag to remove water or lava under the brush.";
+            case "EditSelectionOperation": return "Drag to select an area; the other tools then only work inside it. Hold Ctrl to remove from the selection.";
+            case "CopySelectionOperation": return "Copy the selected area, with its terrain and layers, and place it elsewhere on the map.";
+            case "SetSpawnPoint": return "Click to set where players appear when they first join the world.";
+            case "Text": return "Click to write text on the map, as an annotation or with a layer.";
+            default: return operation.getDescription();
+        }
+    }
+
     private static String modernIconFor(Operation operation) {
         switch (operation.getClass().getSimpleName()) {
             case "SprayPaint": return "spray-can";
@@ -5583,7 +5690,7 @@ public final class App extends JFrame implements BrushControl,
 
     private AbstractButton createButtonForOperation(final Operation operation, char mnemonic) {
         BufferedImage icon = operation.getIcon();
-        AbstractButton button = (operation instanceof GlobalOperation) ? new JButton() : new JToggleButton();
+        AbstractButton button = (operation instanceof GlobalOperation) ? org.pepsoft.worldpainter.help.ToolCard.button() : org.pepsoft.worldpainter.help.ToolCard.toggleButton();
         if (operation instanceof SetSpawnPoint) {
             setSpawnPointToggleButton = (JToggleButton) button;
         }
@@ -5599,6 +5706,7 @@ public final class App extends JFrame implements BrushControl,
             button.setMnemonic(mnemonic);
         }
         button.setToolTipText(richToolTip(operation.getName(), operation.getDescription(), (mnemonic != 0) ? ("Alt+" + Character.toUpperCase(mnemonic)) : null));
+        org.pepsoft.worldpainter.help.ToolCard.install(button, new org.pepsoft.worldpainter.help.ToolCard(operation.getName(), toolCardDescription(operation), (mnemonic != 0) ? ("Alt+" + Character.toUpperCase(mnemonic)) : null, toolDemoFor(operation)));
         if (operation instanceof GlobalOperation) {
             button.addActionListener(event ->  {
                 cancelPaintSelection();
@@ -5868,8 +5976,8 @@ public final class App extends JFrame implements BrushControl,
         final JToggleButton button = new JToggleButton();
         button.putClientProperty(KEY_PAINT_ID, createTerrainPaintId(terrain));
         button.setMargin(App.SMALLER_BUTTON_INSETS);
-        button.setIcon(new ImageIcon(terrain.getScaledIcon(18, selectedColourScheme)));
-        button.setToolTipText(terrain.getName() + ": " + terrain.getDescription());
+        button.setIcon(new ImageIcon(terrain.getScaledIcon(22, selectedColourScheme)));
+        button.setToolTipText(richToolTip(terrain.getName(), terrain.getDescription(), null));
         button.addItemListener(event -> {
             if (event.getStateChange() == ItemEvent.SELECTED) {
                 if (terrain.isConfigured()) {
@@ -7603,6 +7711,7 @@ public final class App extends JFrame implements BrushControl,
     public static final String KEY_ICON = "org.pepsoft.worldpainter.icon";
     public static final String KEY_THUMBNAIL = "org.pepsoft.worldpainter.thumbnail";
     public static final String KEY_PAINT_ID = "org.pepsoft.worldpainter.paint.id";
+    private static final String KEY_SEARCH_TEXT = "org.pepsoft.worldpainter.searchText";
 
     public static final Insets BUTTON_INSETS = new Insets(3, 5, 3, 5) {
         @Override

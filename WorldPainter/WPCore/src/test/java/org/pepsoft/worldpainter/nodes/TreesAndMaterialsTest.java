@@ -48,6 +48,15 @@ public class TreesAndMaterialsTest {
     }
 
     @Test
+    public void testPlantPresetsHavePlants() {
+        for (org.pepsoft.worldpainter.layers.plants.PlantLayerPresets.Preset preset: org.pepsoft.worldpainter.layers.plants.PlantLayerPresets.Preset.values()) {
+            final org.pepsoft.worldpainter.layers.plants.PlantLayer layer = org.pepsoft.worldpainter.layers.plants.PlantLayerPresets.create(preset);
+            assertEquals(preset.getLayerName(), layer.getName());
+            assertFalse(preset + " has no plants", layer.getConfiguredPlants().isEmpty());
+        }
+    }
+
+    @Test
     public void testMaterialGroupsInstall() {
         for (MaterialGroup group: MaterialGroup.values()) {
             assertNotNull(group.newMaterial().getMaterial(0, 1, 2, 64));
