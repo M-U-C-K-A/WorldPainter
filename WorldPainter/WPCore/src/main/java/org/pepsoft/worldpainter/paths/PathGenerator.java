@@ -5,6 +5,8 @@ import org.pepsoft.util.ProgressReceiver.OperationCancelled;
 
 import org.pepsoft.worldpainter.Dimension;
 import org.pepsoft.worldpainter.Dimension.Anchor;
+import org.pepsoft.worldpainter.MaterialGroup;
+import org.pepsoft.worldpainter.nodes.SurfaceRules;
 import org.pepsoft.worldpainter.Platform;
 import org.pepsoft.worldpainter.Terrain;
 import org.pepsoft.worldpainter.TileFactoryFactory;
@@ -226,7 +228,7 @@ public final class PathGenerator {
                     case PathPlan.GROUND:
                         if (d <= half) {
                             dimension.setHeightAt(wx, wy, target);
-                            dimension.setTerrainAt(wx, wy, borderAt(settings, d, half) ? settings.getBorderMaterial() : settings.getMaterial());
+                            dimension.setTerrainAt(wx, wy, surfaceAt(settings, dimension.getTerrainAt(wx, wy), wx, wy, d, half));
                             if (dimension.getWaterLevelAt(wx, wy) > target) {
                                 dimension.setWaterLevelAt(wx, wy, (int) Math.floor(target));
                             }
@@ -257,14 +259,23 @@ public final class PathGenerator {
 
         // The floor dimensions of the bridges and tunnels, which hold the height and material of the deck or floor
         if (bridgeLayer != null) {
-            final Dimension floor = createFloorDimension(dimension, bridgeLayer, FLOATING_FLOOR, settings.getMaterial(), averageProfile(plan, PathPlan.BRIDGE));
+            // Loose materials such as gravel or sand cannot hang in the air: such paths get a wooden deck on wooden
+            // piers, others a deck of their own material on stone piers
+            final boolean wooden = settings.isAdaptiveSurface() || isLoose(settings.getMaterial());
+            final Terrain deck = wooden ? installOr(MaterialGroup.WOODEN_DECK, Terrain.COBBLESTONE) : settings.getMaterial();
+            final Dimension floor = createFloorDimension(dimension, bridgeLayer, FLOATING_FLOOR, deck, averageProfile(plan, PathPlan.BRIDGE));
             bridgeLayer.updateFloorDimension(dimension, bridgeLayer.getName() + " Deck");
-            shapeFloor(floor, plan, PathPlan.BRIDGE, settings, distances, nearest, x0, y0, width, height, maxHalf, true);
+            shapeFloor(floor, plan, PathPlan.BRIDGE, settings, distances, nearest, x0, y0, width, height, maxHalf, true, wooden ? deck : null);
+            final TunnelLayer piers = createPiers(dimension, plan, layerNumber, distances, nearest, halves, x0, y0, width, height,
+                    wooden ? installOr(MaterialGroup.WOODEN_PIERS, Terrain.COBBLESTONE) : installOr(MaterialGroup.STONE_BRICKS, Terrain.COBBLESTONE));
+            if (piers != null) {
+                createdLayers.add(piers);
+            }
         }
         if (tunnelLayer != null) {
             final Dimension floor = createFloorDimension(dimension, tunnelLayer, CAVE_FLOOR, settings.getMaterial(), averageProfile(plan, PathPlan.TUNNEL));
             tunnelLayer.updateFloorDimension(dimension, tunnelLayer.getName() + " Floor");
-            shapeFloor(floor, plan, PathPlan.TUNNEL, settings, distances, nearest, x0, y0, width, height, maxHalf, false);
+            shapeFloor(floor, plan, PathPlan.TUNNEL, settings, distances, nearest, x0, y0, width, height, maxHalf, false, null);
         }
         if (progressReceiver != null) {
             progressReceiver.setProgress(1.0f);
@@ -763,6 +774,145 @@ public final class PathGenerator {
 
     // Applying
 
+    /**
+     * The surface of the path at a block: the chosen material with the border material scattered through it (more of
+     * it towards the edges) in small clumps, or, for an adaptive surface, a mix which suits the land it crosses, with
+     * some of that land showing through along the edges.
+     *
+     * @param surrounding The terrain at the block before the path was laid out.
+     */
+    static Terrain surfaceAt(PathSettings settings, Terrain surrounding, int x, int y, float distance, float half) {
+        final float pick = 0.55f * SurfaceRules.random(x, y, 0x2f1b873) + 0.45f * SurfaceRules.random(x >> 1, y >> 1, 0x51ed270b);
+        if (settings.isAdaptiveSurface()) {
+            if ((surrounding != null) && (distance > half - 1) && (pick < 0.3f)) {
+                return surrounding;
+            }
+            final Object[] palette = adaptivePalette(surrounding);
+            float total = 0;
+            for (int i = 1; i < palette.length; i += 2) {
+                total += (Integer) palette[i];
+            }
+            float cumulative = 0;
+            for (int i = 0; i < palette.length; i += 2) {
+                cumulative += (Integer) palette[i + 1] / total;
+                if (pick < cumulative) {
+                    return (Terrain) palette[i];
+                }
+            }
+            return (Terrain) palette[0];
+        } else if (settings.isBorders() && (settings.getWidth() >= 3)) {
+            final float borderShare = (distance > half - 1) ? 0.55f : 0.2f;
+            return (pick < borderShare) ? settings.getBorderMaterial() : settings.getMaterial();
+        } else {
+            return settings.getMaterial();
+        }
+    }
+
+    /**
+     * The blocks of a path through some kind of land, with their weights.
+     */
+    private static Object[] adaptivePalette(Terrain surrounding) {
+        if (surrounding == null) {
+            return new Object[] {Terrain.GRASS_PATH, 45, Terrain.PERMADIRT, 30, Terrain.GRAVEL, 15, Terrain.COBBLESTONE, 10};
+        }
+        switch (surrounding) {
+            case SAND: case DESERT: case BEACHES: case BARE_BEACHES: case SANDSTONE:
+                return new Object[] {Terrain.SANDSTONE, 40, Terrain.SAND, 25, Terrain.PERMADIRT, 20, Terrain.GRAVEL, 15};
+            case RED_SAND: case RED_DESERT: case MESA: case RED_SANDSTONE: case HARDENED_CLAY:
+                return new Object[] {Terrain.RED_SANDSTONE, 40, Terrain.RED_SAND, 25, Terrain.PERMADIRT, 20, Terrain.GRAVEL, 15};
+            case STONE: case ROCK: case STONE_MIX: case GRANITE: case DIORITE: case ANDESITE: case COBBLESTONE:
+            case MOSSY_COBBLESTONE: case TUFF: case DEEPSLATE: case CALCITE: case GRAVEL:
+                return new Object[] {Terrain.ANDESITE, 35, Terrain.COBBLESTONE, 25, Terrain.GRAVEL, 25, Terrain.STONE, 15};
+            case SNOW: case DEEP_SNOW:
+                return new Object[] {Terrain.GRAVEL, 40, Terrain.STONE, 30, Terrain.COBBLESTONE, 30};
+            case MUD: case CLAY:
+                return new Object[] {Terrain.MUD, 35, Terrain.PERMADIRT, 35, Terrain.GRASS_PATH, 30};
+            case NETHERRACK: case NETHERLIKE: case SOUL_SAND: case SOUL_SOIL: case BASALT: case BLACKSTONE:
+                return new Object[] {Terrain.BLACKSTONE, 50, Terrain.BASALT, 50};
+            default:
+                // Grass, dirt, podzol, moss and the like: a trodden earth path
+                return new Object[] {Terrain.GRASS_PATH, 45, Terrain.PERMADIRT, 30, Terrain.GRAVEL, 15, Terrain.COBBLESTONE, 10};
+        }
+    }
+
+    /**
+     * Whether a material falls or washes away, so that it cannot form a bridge deck.
+     */
+    private static boolean isLoose(Terrain terrain) {
+        switch (terrain) {
+            case GRAVEL: case SAND: case DESERT: case BEACHES: case BARE_BEACHES: case RED_SAND: case RED_DESERT:
+            case PERMADIRT: case GRASS_PATH: case DIRT: case MUD: case CLAY: case GRASS: case BARE_GRASS: case PODZOL:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * The custom terrain type for a mix of blocks, or another terrain type if all custom terrain types are in use.
+     */
+    private static Terrain installOr(MaterialGroup group, Terrain fallback) {
+        final Terrain terrain = group.install();
+        return (terrain != null) ? terrain : fallback;
+    }
+
+    /**
+     * Piers under a bridge: pairs of short pillars every dozen blocks, from just under the deck down into the ground
+     * or the water bed, as a floating layer of their own.
+     */
+    private static TunnelLayer createPiers(Dimension dimension, PathPlan plan, int layerNumber, float[] distances, int[] nearest, float[] halves, int x0, int y0, int width, int height, Terrain material) {
+        final byte[] types = plan.getTypes();
+        final float[] profile = plan.getProfile();
+        // Where the piers stand, and the lowest ground under them
+        final List<int[]> blocks = new ArrayList<>();
+        int lowest = Integer.MAX_VALUE;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                final int j = y * width + x;
+                final int i = nearest[j];
+                if ((types[i] != PathPlan.BRIDGE) || ((i % 12) < 5) || ((i % 12) > 6)) {
+                    continue;
+                }
+                final float d = distances[j], half = halves[i];
+                final boolean leg = (half >= 2.5f) ? ((d >= half - 2.0f) && (d < half - 0.5f)) : (d < 1.0f);
+                if (! leg) {
+                    continue;
+                }
+                final int wx = x0 + x, wy = y0 + y;
+                if (! dimension.isTilePresent(wx >> TILE_SIZE_BITS, wy >> TILE_SIZE_BITS)) {
+                    continue;
+                }
+                blocks.add(new int[] {wx, wy, i});
+                lowest = Math.min(lowest, dimension.getIntHeightAt(wx, wy));
+            }
+        }
+        if (blocks.isEmpty()) {
+            return null;
+        }
+        final World2 world = dimension.getWorld();
+        final TunnelLayer piers = new TunnelLayer("Bridge " + layerNumber + " piers", FLOATING, new Color(0x6b5a48), world.getPlatform());
+        piers.setFloorMode(CUSTOM_DIMENSION);
+        piers.setRoofMode(TunnelLayer.Mode.FIXED_HEIGHT);
+        piers.setRoofLevel(Math.max(dimension.getMinHeight() + 1, lowest - 3));
+        piers.setBottomEdgeShape(SHEER);
+        piers.setFloorWallDepth(1);
+        piers.setRoofWallDepth(1);
+        final Dimension floor = createFloorDimension(dimension, piers, FLOATING_FLOOR, material, averageProfile(plan, PathPlan.BRIDGE) - 2);
+        piers.updateFloorDimension(dimension, piers.getName() + " Tops");
+        floor.setEventsInhibited(true);
+        try {
+            for (int[] block: blocks) {
+                dimension.setBitLayerValueAt(piers, block[0], block[1], true);
+                // The top of a pier is just under the deck
+                floor.setHeightAt(block[0], block[1], profile[block[2]] - 2);
+                floor.setTerrainAt(block[0], block[1], material);
+            }
+        } finally {
+            floor.setEventsInhibited(false);
+        }
+        return piers;
+    }
+
     private static boolean borderAt(PathSettings settings, float distance, float half) {
         return settings.isBorders() && (settings.getWidth() >= 3) && (distance > half - 1);
     }
@@ -814,7 +964,7 @@ public final class PathGenerator {
      * Set the height and material of the floor dimension of a bridge or tunnel along the path: the profile of the path,
      * with (for bridges with borders) a parapet one block higher along the edges.
      */
-    private static void shapeFloor(Dimension floor, PathPlan plan, byte type, PathSettings settings, float[] distances, int[] nearest, int x0, int y0, int width, int height, float half, boolean parapets) {
+    private static void shapeFloor(Dimension floor, PathPlan plan, byte type, PathSettings settings, float[] distances, int[] nearest, int x0, int y0, int width, int height, float half, boolean parapets, Terrain material) {
         floor.setEventsInhibited(true);
         try {
             for (int y = 0; y < height; y++) {
@@ -830,7 +980,7 @@ public final class PathGenerator {
                     final int wx = x0 + x, wy = y0 + y;
                     final boolean border = borderAt(settings, distances[j], half);
                     floor.setHeightAt(wx, wy, plan.getProfile()[i] + ((parapets && border) ? 1 : 0));
-                    floor.setTerrainAt(wx, wy, border ? settings.getBorderMaterial() : settings.getMaterial());
+                    floor.setTerrainAt(wx, wy, (material != null) ? material : (settings.isAdaptiveSurface() ? Terrain.COBBLESTONE : (border ? settings.getBorderMaterial() : settings.getMaterial())));
                 }
             }
         } finally {

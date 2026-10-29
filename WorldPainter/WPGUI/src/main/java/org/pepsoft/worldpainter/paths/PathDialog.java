@@ -129,10 +129,21 @@ public class PathDialog extends WorldPainterDialog {
         borderComboBox.setRenderer(new TerrainListCellRenderer(colourScheme));
         borderComboBox.setSelectedItem(last.getBorderMaterial());
         borderComboBox.setEnabled(last.isBorders());
-        bordersCheckBox.addActionListener(e -> borderComboBox.setEnabled(bordersCheckBox.isSelected()));
+        bordersCheckBox.addActionListener(e -> updateSurfaceControls());
         materials.add(borderComboBox);
         form.add(materials, c);
+
+        // Adaptive surface
+        c.gridy++;
+        final JPanel adaptive = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
+        adaptiveSurfaceCheckBox = new JCheckBox("Adapt to the land", last.isAdaptiveSurface());
+        adaptiveSurfaceCheckBox.setToolTipText("<html>Mix blocks which suit the land the path crosses instead of the materials above:<br>sandstone and coarse dirt through sand, andesite and cobblestone in the mountains,<br>gravel and stone in the snow, trodden earth through grass. Bridges get a wooden deck.</html>");
+        adaptive.add(adaptiveSurfaceCheckBox);
+        adaptive.add(betaTag());
+        adaptiveSurfaceCheckBox.addActionListener(e -> updateSurfaceControls());
+        form.add(adaptive, c);
         c.gridwidth = 1;
+        updateSurfaceControls();
 
         // Sides and vegetation
         c.gridy++;
@@ -210,7 +221,29 @@ public class PathDialog extends WorldPainterDialog {
         settings.setMaterial((Terrain) materialComboBox.getSelectedItem());
         settings.setBorders(bordersCheckBox.isSelected());
         settings.setBorderMaterial((Terrain) borderComboBox.getSelectedItem());
+        settings.setAdaptiveSurface(adaptiveSurfaceCheckBox.isSelected());
         return settings;
+    }
+
+    private void updateSurfaceControls() {
+        final boolean manual = ! adaptiveSurfaceCheckBox.isSelected();
+        materialComboBox.setEnabled(manual);
+        bordersCheckBox.setEnabled(manual);
+        borderComboBox.setEnabled(manual && bordersCheckBox.isSelected());
+    }
+
+    /**
+     * A small tag marking a feature which is still experimental.
+     */
+    private static JLabel betaTag() {
+        final JLabel tag = new JLabel("BETA");
+        tag.setFont(tag.getFont().deriveFont(Font.BOLD, tag.getFont().getSize2D() - 3f));
+        tag.setOpaque(true);
+        tag.setBackground(new Color(0xd9822b));
+        tag.setForeground(Color.WHITE);
+        tag.setBorder(BorderFactory.createEmptyBorder(1, 4, 1, 4));
+        tag.setToolTipText("This feature is new and may change");
+        return tag;
     }
 
     private void schedulePlan() {
@@ -320,7 +353,7 @@ public class PathDialog extends WorldPainterDialog {
     private final JSpinner slopeSpinner, spanSpinner;
     private final JComboBox<PathSettings.Size> sizeComboBox;
     private final JComboBox<PathSettings.Sides> sidesComboBox;
-    private final JCheckBox dynamicWidthCheckBox, clearVegetationCheckBox;
+    private final JCheckBox dynamicWidthCheckBox, clearVegetationCheckBox, adaptiveSurfaceCheckBox;
     private final JComboBox<Terrain> materialComboBox, borderComboBox;
     private final JCheckBox bordersCheckBox;
     private final JButton applyButton;

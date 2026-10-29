@@ -8,6 +8,8 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,15 +43,25 @@ public class SeedSearchDialog extends WorldPainterDialog {
         resultList.setCellRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                super.getListCellRendererComponent(list, value, index, false, false);
                 final Result result = (Result) value;
-                setText(String.format("<html><b>%d%%</b> match &nbsp; <font color=\"#a1a1aa\">seed %d%s</font></html>", Math.round(result.score * 100), result.seed, result.current ? " \u00b7 current" : ""));
-                setBorder(new EmptyBorder(6, 8, 6, 8));
+                // The selected seed stands out clearly: an accent bar, a tinted background and a check mark
+                final Color accent = UIManager.getColor("WorldPainter.accent") != null ? UIManager.getColor("WorldPainter.accent") : new Color(0xf97316);
+                setText(String.format("<html>%s<b>%d%%</b> match &nbsp; <font color=\"#a1a1aa\">seed %d%s</font></html>",
+                        isSelected ? "<font color=\"#" + String.format("%06x", accent.getRGB() & 0xffffff) + "\">\u2713</font>&nbsp; " : "",
+                        Math.round(result.score * 100), result.seed, result.current ? " \u00b7 current" : ""));
+                if (isSelected) {
+                    setOpaque(true);
+                    setBackground(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 56));
+                    setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 3, 0, 0, accent), new EmptyBorder(6, 5, 6, 8)));
+                } else {
+                    setBorder(new EmptyBorder(6, 8, 6, 8));
+                }
                 return this;
             }
         });
         resultList.addListSelectionListener(e -> {
-            if (! e.getValueIsAdjusting()) {
+            if ((! e.getValueIsAdjusting()) && (! updatingList)) {
                 updatePreview();
             }
         });
@@ -158,6 +170,13 @@ public class SeedSearchDialog extends WorldPainterDialog {
         stopButton.setEnabled(false);
     }
 
+    @Override
+    public void dispose() {
+        stopped.set(true);
+        previewExecutor.shutdownNow();
+        super.dispose();
+    }
+
     /**
      * The score a new candidate must beat to make it into the list.
      */
@@ -202,15 +221,26 @@ public class SeedSearchDialog extends WorldPainterDialog {
                 best.remove(best.size() - 1);
             }
         }
+        // Rebuild the list without letting the rebuild itself change the preview, which is only redrawn when the
+        // selected seed actually changes
         final Result selected = resultList.getSelectedValue();
-        listModel.clear();
-        synchronized (best) {
-            best.forEach(listModel::addElement);
+        updatingList = true;
+        try {
+            listModel.clear();
+            synchronized (best) {
+                best.forEach(listModel::addElement);
+            }
+            if (selected != null) {
+                resultList.setSelectedValue(selected, false);
+            } else if (! listModel.isEmpty()) {
+                resultList.setSelectedIndex(0);
+            }
+        } finally {
+            updatingList = false;
         }
-        if (selected != null) {
-            resultList.setSelectedValue(selected, false);
-        } else if (! listModel.isEmpty()) {
-            resultList.setSelectedIndex(0);
+        final Result nowSelected = resultList.getSelectedValue();
+        if ((nowSelected == null) || (previewSeed == null) || (nowSelected.seed != previewSeed)) {
+            updatePreview();
         }
     }
 
@@ -218,10 +248,37 @@ public class SeedSearchDialog extends WorldPainterDialog {
         final Result result = resultList.getSelectedValue();
         useButton.setEnabled((result != null) && (! result.current));
         if (result == null) {
+            previewSeed = null;
             preview.setIcon(null);
             return;
         }
-        preview.setIcon(new ImageIcon(renderPreview(result.seed)));
+        if ((previewSeed != null) && (previewSeed == result.seed)) {
+            return;
+        }
+        previewSeed = result.seed;
+        final BufferedImage cached = previews.get(result.seed);
+        if (cached != null) {
+            preview.setIcon(new ImageIcon(cached));
+            return;
+        }
+        // Render it in the background (it samples tens of thousands of biomes), so that the dialog stays responsive;
+        // only the latest request is shown
+        preview.setText("Rendering…");
+        preview.setIcon(null);
+        final long seed = result.seed;
+        previewExecutor.submit(() -> {
+            if ((previewSeed == null) || (previewSeed != seed)) {
+                return;
+            }
+            final BufferedImage image = renderPreview(seed);
+            SwingUtilities.invokeLater(() -> {
+                previews.put(seed, image);
+                if ((previewSeed != null) && (previewSeed == seed)) {
+                    preview.setText(null);
+                    preview.setIcon(new ImageIcon(image));
+                }
+            });
+        });
     }
 
     /**
@@ -271,6 +328,14 @@ public class SeedSearchDialog extends WorldPainterDialog {
     private final AtomicLong tested = new AtomicLong();
     private ExecutorService executor;
     private long selectedSeed;
+    private boolean updatingList;
+    private volatile Long previewSeed;
+    private final Map<Long, BufferedImage> previews = new HashMap<>();
+    private final ExecutorService previewExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        final Thread thread = new Thread(runnable, "Seed preview");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private static final int MAX_RESULTS = 8;
     private long rate, rateCount, rateTime = System.nanoTime();

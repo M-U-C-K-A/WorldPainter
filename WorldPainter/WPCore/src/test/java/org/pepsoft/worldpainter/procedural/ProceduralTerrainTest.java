@@ -119,8 +119,13 @@ public class ProceduralTerrainTest {
         for (int x = 0; x < 4 * TILE_SIZE; x++) {
             for (int y = 0; y < 4 * TILE_SIZE; y++) {
                 if (Math.hypot(x + 0.5 - 256, y + 0.5 - 256) > 256) {
-                    // (The way the editor marks the blocks outside the circle of a round map)
-                    dimension.setBitLayerValueAt(org.pepsoft.worldpainter.layers.NotPresentBlock.INSTANCE, x, y, true);
+                    // (The way the new world dialog marks the blocks outside the circle of a round map; whole chunks
+                    // outside it are also marked as not present)
+                    dimension.setBitLayerValueAt(org.pepsoft.worldpainter.layers.Void.INSTANCE, x, y, true);
+                }
+                if ((x % 16 == 0) && (y % 16 == 0) && (Math.hypot(Math.max(Math.abs(x - 256), Math.abs(x + 15 - 256)), Math.max(Math.abs(y - 256), Math.abs(y + 15 - 256))) > 256)
+                        && (Math.hypot(Math.min(Math.abs(x - 256), Math.abs(x + 15 - 256)), Math.min(Math.abs(y - 256), Math.abs(y + 15 - 256))) > 257)) {
+                    dimension.setBitLayerValueAt(org.pepsoft.worldpainter.layers.NotPresent.INSTANCE, x, y, true);
                 }
             }
         }
@@ -135,7 +140,9 @@ public class ProceduralTerrainTest {
         assertEquals(150, dimension.getHeightAt(256, 256), 0.01f);
         assertEquals(150, dimension.getHeightAt(256 - 175, 256 - 175), 0.01f);
         // The corners of the tiles, outside the circle, are filled in and present now
-        assertFalse(dimension.getBitLayerValueAt(org.pepsoft.worldpainter.layers.NotPresentBlock.INSTANCE, 5, 5));
+        assertFalse(dimension.getBitLayerValueAt(org.pepsoft.worldpainter.layers.NotPresent.INSTANCE, 5, 5));
+        assertFalse(dimension.getBitLayerValueAt(org.pepsoft.worldpainter.layers.Void.INSTANCE, 5, 5));
+        assertFalse(dimension.getBitLayerValueAt(org.pepsoft.worldpainter.layers.Void.INSTANCE, 256 - 184, 256 - 184));
         // Going out from the circle along the diagonal, the land goes down towards the target without a cliff
         float previous = Float.MAX_VALUE;
         for (int d = 182; d < 256; d++) {

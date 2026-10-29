@@ -147,6 +147,18 @@ public class PathSettings implements Cloneable {
         this.sides = (sides != null) ? sides : Sides.NONE;
     }
 
+    /**
+     * Whether the surface is a mix of blocks which suits the land the path crosses (sandstone and coarse dirt through
+     * sand, andesite and cobblestone through rock, ...) rather than the chosen materials. In beta.
+     */
+    public boolean isAdaptiveSurface() {
+        return adaptiveSurface;
+    }
+
+    public void setAdaptiveSurface(boolean adaptiveSurface) {
+        this.adaptiveSurface = adaptiveSurface;
+    }
+
     @Override
     public PathSettings clone() {
         try {
@@ -157,7 +169,7 @@ public class PathSettings implements Cloneable {
     }
 
     private int width = Size.MEDIUM.width, curvature = 60, maxSpan = 96, tunnelHeight = 5;
-    private boolean bridges = true, tunnels, borders = true, dynamicWidth = true, clearVegetation = true;
+    private boolean bridges = true, tunnels, borders = true, dynamicWidth = true, clearVegetation = true, adaptiveSurface;
     private Sides sides = Sides.NONE;
     private double maxGrade = 0.25;
     private Terrain material = Terrain.GRAVEL, borderMaterial = Terrain.STONE;

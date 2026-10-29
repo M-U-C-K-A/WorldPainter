@@ -46,8 +46,8 @@ public class PathApplyTest {
         assertTrue("tunnel length " + plan.count(PathPlan.TUNNEL), plan.count(PathPlan.TUNNEL) >= 30);
 
         final List<CustomLayer> layers = PathGenerator.apply(dimension, plan, settings, 1);
-        assertEquals(2, layers.size());
-        final TunnelLayer bridge = (TunnelLayer) layers.get(0), tunnel = (TunnelLayer) layers.get(1);
+        assertEquals(3, layers.size());
+        final TunnelLayer bridge = (TunnelLayer) layers.get(0), tunnel = (TunnelLayer) layers.get(1), piers = (TunnelLayer) layers.get(2);
         assertTrue(dimension.getBitLayerValueAt(bridge, 215, 128));
         assertTrue(dimension.getBitLayerValueAt(tunnel, 400, 128));
         final Dimension deck = world.getDimension(new Dimension.Anchor(0, FLOATING_FLOOR, false, bridge.getFloorDimensionId()));
@@ -58,8 +58,29 @@ public class PathApplyTest {
         // on either side of the hill rather than on top of it
         assertTrue("deck " + deck.getHeightAt(215, 128), deck.getHeightAt(215, 128) > 60);
         assertTrue("tunnel floor " + floor.getHeightAt(400, 128), floor.getHeightAt(400, 128) < 90);
-        // The ground part of the path is painted
-        assertEquals(Terrain.GRAVEL, dimension.getTerrainAt(100, 128));
+        // The bridge stands on piers, and has a wooden deck since gravel would fall
+        assertEquals(TunnelLayer.LayerMode.FLOATING, piers.getLayerMode());
+        boolean anyPier = false;
+        for (int x = 200; x < 230; x++) {
+            for (int y = 120; y < 137; y++) {
+                anyPier |= dimension.getBitLayerValueAt(piers, x, y);
+            }
+        }
+        assertTrue(anyPier);
+        assertTrue(deck.getTerrainAt(215, 128).isCustom());
+        // The ground part of the path is painted with a mix of the material and the border material
+        int gravel = 0, stone = 0;
+        for (int x = 60; x < 160; x++) {
+            for (int y = 127; y <= 129; y++) {
+                final Terrain terrain = dimension.getTerrainAt(x, y);
+                if (terrain == Terrain.GRAVEL) {
+                    gravel++;
+                } else if (terrain == Terrain.STONE) {
+                    stone++;
+                }
+            }
+        }
+        assertTrue("gravel " + gravel + " stone " + stone, (gravel > stone) && (stone > 10));
     }
 
     @Test
@@ -130,5 +151,31 @@ public class PathApplyTest {
         for (int i = 1; i < n; i++) {
             assertTrue(Math.abs(halves[i] - halves[i - 1]) < 0.2f);
         }
+    }
+
+    @Test
+    public void testAdaptiveSurfaceSuitsTheLand() {
+        final long seed = 1;
+        final World2 world = new World2(JAVA_ANVIL_1_20_5, -64, 320);
+        final TileFactory tileFactory = TileFactoryFactory.createFlatTileFactory(seed, Terrain.DESERT, -64, 320, 70, 62, false, false);
+        final Dimension dimension = new Dimension(world, "Surface", seed, tileFactory, NORMAL_DETAIL);
+        world.addDimension(dimension);
+        for (int x = 0; x < 3; x++) {
+            dimension.addTile(tileFactory.createTile(x, 0));
+        }
+        final PathSettings settings = new PathSettings();
+        settings.setCurvature(0);
+        settings.setDynamicWidth(false);
+        settings.setAdaptiveSurface(true);
+        final PathPlan plan = PathGenerator.plan(dimension, new Point(20, 64), new Point(360, 64), settings);
+        PathGenerator.apply(dimension, plan, settings, 1);
+        int sandstone = 0;
+        for (int x = 60; x < 300; x++) {
+            if (dimension.getTerrainAt(x, 64) == Terrain.SANDSTONE) {
+                sandstone++;
+            }
+            assertNotEquals(Terrain.GRASS_PATH, dimension.getTerrainAt(x, 64));
+        }
+        assertTrue("sandstone " + sandstone, sandstone > 40);
     }
 }

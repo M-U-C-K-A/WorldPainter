@@ -191,20 +191,29 @@ public class EdgeBlendOperation {
             newTiles.add(dimension.getTileForEditing(coords));
         }
 
-        // Tiles of the map which are only partly present (such as those along the edge of a circular map) have their
-        // missing blocks filled in like new tiles. Remember which blocks were missing, before they are filled in
+        // Tiles of the map which are only partly present (such as those along the edge of a round map) have their
+        // missing blocks filled in like new tiles. Round maps mark the blocks outside the circle as void, and whole
+        // chunks outside it as not present; void blocks only count as missing in tiles at the edge of the map, so that
+        // voids painted inside the map are left alone. Remember which blocks were missing, before they are filled in
         final Map<Point, boolean[]> notPresent = new HashMap<>();
         for (Point coords: original) {
             final Tile tile = dimension.getTile(coords);
-            // (Round maps mark the blocks outside the circle with either layer)
-            if (tile.hasLayer(NotPresent.INSTANCE) || tile.hasLayer(NotPresentBlock.INSTANCE)) {
+            final boolean notPresentLayers = tile.hasLayer(NotPresent.INSTANCE) || tile.hasLayer(NotPresentBlock.INSTANCE);
+            final boolean voids = tile.hasLayer(org.pepsoft.worldpainter.layers.Void.INSTANCE) && (notPresentLayers || hasMissingNeighbour(coords, original, 1));
+            if (notPresentLayers || voids) {
                 final boolean[] mask = new boolean[TILE_SIZE * TILE_SIZE];
+                boolean any = false;
                 for (int x = 0; x < TILE_SIZE; x++) {
                     for (int y = 0; y < TILE_SIZE; y++) {
-                        mask[x | (y << TILE_SIZE_BITS)] = tile.getBitLayerValue(NotPresent.INSTANCE, x, y) || tile.getBitLayerValue(NotPresentBlock.INSTANCE, x, y);
+                        final boolean missing = tile.getBitLayerValue(NotPresent.INSTANCE, x, y) || tile.getBitLayerValue(NotPresentBlock.INSTANCE, x, y)
+                                || (voids && tile.getBitLayerValue(org.pepsoft.worldpainter.layers.Void.INSTANCE, x, y));
+                        mask[x | (y << TILE_SIZE_BITS)] = missing;
+                        any |= missing;
                     }
                 }
-                notPresent.put(coords, mask);
+                if (any) {
+                    notPresent.put(coords, mask);
+                }
             }
         }
         for (Point coords: notPresent.keySet()) {
@@ -314,6 +323,7 @@ public class EdgeBlendOperation {
                 if (missing != null) {
                     tile.setBitLayerValue(NotPresent.INSTANCE, x, y, false);
                     tile.setBitLayerValue(NotPresentBlock.INSTANCE, x, y, false);
+                    tile.setBitLayerValue(org.pepsoft.worldpainter.layers.Void.INSTANCE, x, y, false);
                 }
             }
         }

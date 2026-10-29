@@ -4846,6 +4846,12 @@ public final class App extends JFrame implements BrushControl,
         }
         // Undoing the operation which created them takes them out again
         generatedLayers.addAll(layers);
+        // And the material mixes it painted, which were set up as custom terrain types
+        for (int i = 0; i < CUSTOM_TERRAIN_COUNT; i++) {
+            if (Terrain.isCustomMaterialConfigured(i) && (customMaterialButtons[i] == null)) {
+                addButtonForNewCustomTerrain(i, Terrain.getCustomMaterial(i), false);
+            }
+        }
     }
 
     private void showNodeGraph() {
@@ -4861,12 +4867,6 @@ public final class App extends JFrame implements BrushControl,
         if (! dialog.isCancelled()) {
             // Make plant layers created by the graph available for painting by hand too
             registerGeneratedLayers(dialog.getCreatedLayers());
-            // And the material mixes it painted, which were set up as custom terrain types
-            for (int i = 0; i < CUSTOM_TERRAIN_COUNT; i++) {
-                if (Terrain.isCustomMaterialConfigured(i) && (customMaterialButtons[i] == null)) {
-                    addButtonForNewCustomTerrain(i, Terrain.getCustomMaterial(i), false);
-                }
-            }
             if (threeDeeFrame != null) {
                 threeDeeFrame.refresh(true);
             }
@@ -5244,6 +5244,12 @@ public final class App extends JFrame implements BrushControl,
         setActionIcon(ACTION_ROTATE_LIGHT_RIGHT, "sunset");
 
         final JToolBar toolBar = createHeaderToolBar();
+        // Buttons to fold the panels on either side away, to make room for the map
+        westPanelsButton = new JToggleButton(Icons.get("panel-left", 18), true);
+        westPanelsButton.setToolTipText(richToolTip("Left panels", "Show or hide the panels on the left, to make room for the map", null));
+        westPanelsButton.addActionListener(e -> dockingManager.setCollapsed(Side.WEST, ! westPanelsButton.isSelected()));
+        toolBar.add(westPanelsButton);
+        toolBar.addSeparator();
         toolBar.add(ACTION_NEW_WORLD);
         toolBar.add(ACTION_OPEN_WORLD);
         toolBar.add(ACTION_SAVE_WORLD);
@@ -5311,6 +5317,13 @@ public final class App extends JFrame implements BrushControl,
         });
         rightToolBar.add(headerZoomLabel);
         rightToolBar.add(ACTION_ZOOM_IN);
+        eastPanelsButton = new JToggleButton(Icons.get("panel-right", 18), true);
+        eastPanelsButton.setToolTipText(richToolTip("Right panels", "Show or hide the panels on the right, to make room for the map", null));
+        eastPanelsButton.addActionListener(e -> dockingManager.setCollapsed(Side.EAST, ! eastPanelsButton.isSelected()));
+        dockingManager.setCollapseListener(() -> {
+            westPanelsButton.setSelected(! dockingManager.isCollapsed(Side.WEST));
+            eastPanelsButton.setSelected(! dockingManager.isCollapsed(Side.EAST));
+        });
         if (ThemeUtils.isModernTheme()) {
             rightToolBar.addSeparator();
             themeToggleButton = new JButton();
@@ -5318,6 +5331,8 @@ public final class App extends JFrame implements BrushControl,
             updateThemeToggleButton();
             rightToolBar.add(themeToggleButton);
         }
+        rightToolBar.addSeparator();
+        rightToolBar.add(eastPanelsButton);
 
         headerTitleLabel = new JLabel("WorldPainter", SwingConstants.CENTER);
         headerTitleLabel.putClientProperty("FlatLaf.styleClass", "semibold");
@@ -7810,7 +7825,7 @@ public final class App extends JFrame implements BrushControl,
     private JLabel headerTitleLabel, headerZoomLabel, surroundingsNoteLabel;
     private JPanel workspaceCards;
     private Terrain3DPanel terrain3DPanel;
-    private JToggleButton threeDeeButton;
+    private JToggleButton threeDeeButton, westPanelsButton, eastPanelsButton;
     private boolean detached3D;
     private static final String FRAME_3D = "view3d";
     private JToggleButton mapViewButton;

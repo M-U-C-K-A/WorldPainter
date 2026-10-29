@@ -186,6 +186,21 @@ public enum MaterialGroup {
             return blobs(this, 0.5f, row("mud", 40), row("clay", 30), row("packed_mud", 15), row("coarse_dirt", 15));
         }
     },
+    WOODEN_DECK("Wooden deck", 0x8a6a42, Family.BUILT) {
+        @Override MixedMaterial createMaterial() {
+            return noise(this, row("spruce_planks", 70), row("oak_planks", 30));
+        }
+    },
+    WOODEN_PIERS("Wooden piers", 0x5a4630, Family.BUILT) {
+        @Override MixedMaterial createMaterial() {
+            return noise(this, row("spruce_log", 80), row("stripped_spruce_log", 20));
+        }
+    },
+    STONE_BRICKS("Stone bricks", 0x7a7a76, Family.BUILT) {
+        @Override MixedMaterial createMaterial() {
+            return noise(this, row("stone_bricks", 70), row("mossy_stone_bricks", 15), row("cracked_stone_bricks", 15));
+        }
+    },
     BADLANDS("Badlands strata", 0xc8743a, Family.CLIFFS) {
         @Override MixedMaterial createMaterial() {
             return strata(this, row("orange_terracotta", 3), row("terracotta", 2), row("yellow_terracotta", 1), row("white_terracotta", 1),
@@ -197,7 +212,7 @@ public enum MaterialGroup {
      * The families the mixes are grouped in for the user.
      */
     public enum Family {
-        GRASS("Grass mixes"), SOIL("Dirt & soil mixes"), STONE("Stone mixes"), SAND("Sand & shore mixes"), CLIFFS("Cliff & strata mixes"), SPECIAL("Snow, ice & volcanic mixes");
+        GRASS("Grass mixes"), SOIL("Dirt & soil mixes"), STONE("Stone mixes"), SAND("Sand & shore mixes"), CLIFFS("Cliff & strata mixes"), SPECIAL("Snow, ice & volcanic mixes"), BUILT("Built surfaces");
 
         Family(String displayName) {
             this.displayName = displayName;

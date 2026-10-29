@@ -5,7 +5,7 @@ description: The integrated 3D view of the map, with colour modes, a block by bl
 
 # 3D view
 
-The **Map** and **3D** buttons at the top right of the window switch the workspace between the map and a 3D view of it. The 3D view is built from the map when you open it, and rebuilt when you click **Refresh** after changing the map.
+The **Map** and **3D** buttons at the top right of the window switch the workspace between the map and a 3D view of it. The 3D view is built from the map when you open it, and rebuilt by itself a moment after you stop changing the map; **Refresh** rebuilds it straight away.
 
 ![The 3D view in Terrain mode](assets/images/view3d-light.jpg)
 

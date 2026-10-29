@@ -29,6 +29,8 @@ Hover over a mix of blocks or a plant layer to see what it is made of: each bloc
 
 Panels can be resized, grouped in tabs, detached into a window of their own, and shown again with **View › Panels**.
 
+To make room for the map, the buttons at either end of the toolbar (two panel icons) fold away all the panels on the left or on the right, and bring them back. Showing a panel from **View › Panels** unfolds its side again.
+
 ## Tools
 
 The tools are grouped by what they do: **Sculpt terrain** (raise, lower, flatten, smooth, mountains, pyramids, paths), **Paint** (pencil, spray, fill, eyedropper, global operations, text), **Water** (flood with water or lava, sponge) and **Selection & more**. Hover over any tool to see a card with a short looping animation of what it does, its shortcut and how to use it.

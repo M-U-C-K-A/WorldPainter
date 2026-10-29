@@ -181,7 +181,8 @@ public class SurroundingsTileProvider implements TileProvider {
         }
         // Outside the tiles of the map, or on a block of a tile which is not part of the map (round maps)
         return (! dimension.isTilePresent(x >> TILE_SIZE_BITS, y >> TILE_SIZE_BITS))
-                || dimension.getBitLayerValueAt(NotPresentBlock.INSTANCE, x, y) || dimension.getBitLayerValueAt(NotPresent.INSTANCE, x, y);
+                || dimension.getBitLayerValueAt(NotPresentBlock.INSTANCE, x, y) || dimension.getBitLayerValueAt(NotPresent.INSTANCE, x, y)
+                || dimension.getBitLayerValueAt(org.pepsoft.worldpainter.layers.Void.INSTANCE, x, y);
     }
 
     /**

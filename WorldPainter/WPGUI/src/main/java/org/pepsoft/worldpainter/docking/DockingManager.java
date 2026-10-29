@@ -107,6 +107,10 @@ public class DockingManager {
      */
     public void showFrame(String key) {
         final FrameInfo info = getInfo(key);
+        // A panel which is asked for brings its side back if it was collapsed
+        if ((info.placement.state != State.FLOATING) && isCollapsed(info.placement.side)) {
+            setCollapsed(info.placement.side, false);
+        }
         switch (info.placement.state) {
             case HIDDEN:
                 info.placement = info.placement.withState(State.DOCKED);
@@ -168,6 +172,29 @@ public class DockingManager {
         info.placement.floatingBounds = new Rectangle(bounds);
         rebuild();
         openFloatingWindow(info);
+    }
+
+    /**
+     * Collapse (hide) or expand the column of panels on one side, to make room for the map.
+     */
+    public void setCollapsed(Side side, boolean collapsed) {
+        if (collapsed ? collapsedSides.add(side) : collapsedSides.remove(side)) {
+            rebuild();
+            if (collapseListener != null) {
+                collapseListener.run();
+            }
+        }
+    }
+
+    public boolean isCollapsed(Side side) {
+        return collapsedSides.contains(side);
+    }
+
+    /**
+     * Set something to run when a side is collapsed or expanded, for instance to update the buttons which do it.
+     */
+    public void setCollapseListener(Runnable collapseListener) {
+        this.collapseListener = collapseListener;
     }
 
     public boolean isFrameVisible(String key) {
@@ -446,6 +473,8 @@ public class DockingManager {
     private final Map<String, String> selectedKeys = new HashMap<>();
     private final Map<String, Integer> groupHeights = new HashMap<>();
     private final Map<Side, Integer> columnWidths = new EnumMap<>(Side.class);
+    private final Set<Side> collapsedSides = EnumSet.noneOf(Side.class);
+    private Runnable collapseListener;
     private final PropertyChangeListener frameListener = this::frameChanged;
 
     /**
@@ -557,7 +586,7 @@ public class DockingManager {
                 add(group);
             }
             add(edgeHandle);
-            setVisible(! groups.isEmpty());
+            setVisible((! groups.isEmpty()) && (! collapsedSides.contains(side)));
             revalidate();
             repaint();
         }

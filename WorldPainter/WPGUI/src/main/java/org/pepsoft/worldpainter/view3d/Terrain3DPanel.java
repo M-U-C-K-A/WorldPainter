@@ -145,6 +145,7 @@ public class Terrain3DPanel extends JPanel {
         });
         toolBar.add(popOutButton);
         add(toolBar, BorderLayout.NORTH);
+        autoRefreshTimer.start();
 
         // The view with the info card, the legend and the help text on top of it
         final JLayeredPane layers = new JLayeredPane() {
@@ -201,6 +202,7 @@ public class Terrain3DPanel extends JPanel {
         }
         final Dimension dimension = this.dimension;
         final long changeNo = dimension.getChangeNo();
+        building = true;
         statusLabel.setText("Building 3D view…");
         statusLabel.setVisible(true);
         revalidate();
@@ -212,6 +214,7 @@ public class Terrain3DPanel extends JPanel {
 
             @Override
             protected void done() {
+                building = false;
                 try {
                     final TerrainModel model = get();
                     if (dimension == Terrain3DPanel.this.dimension) {
@@ -400,6 +403,27 @@ public class Terrain3DPanel extends JPanel {
     private final InfoCard infoCard;
     private final Legend legend;
     private final JLabel helpLabel, statusLabel;
+    /**
+     * Brings the view up to date by itself after the map has been edited, once the edits have stopped for a moment (so
+     * not in the middle of a brush stroke).
+     */
+    private void autoRefresh() {
+        if ((! isShowing()) || (dimension == null) || (builtFor != dimension) || building) {
+            return;
+        }
+        final long changeNo = dimension.getChangeNo();
+        if (changeNo == builtAtChange) {
+            lastSeenChange = changeNo;
+        } else if (changeNo == lastSeenChange) {
+            refresh(false);
+        } else {
+            lastSeenChange = changeNo;
+        }
+    }
+
+    private final Timer autoRefreshTimer = new Timer(1200, e -> autoRefresh());
+    private volatile boolean building;
+    private long lastSeenChange = -1;
     private Dimension dimension, builtFor;
     private ColourScheme colourScheme;
     private long builtAtChange = -1;

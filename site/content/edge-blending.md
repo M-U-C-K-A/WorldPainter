@@ -17,6 +17,8 @@ A map of 200 × 200 blocks used to end in a sheer cliff where Minecraft's own la
 | **Irregularity** | Makes the transition wander instead of running exactly parallel to the edge |
 | **Blend into** | A procedural terrain (*Minecraft-like* by default, close to what Minecraft generates beyond the map) or a flat level |
 
+Round maps are blended too: the land outside the circle, which WorldPainter marks as void block by block and as not present chunk by chunk, is filled in with the blend, so no gaps are left in the corners of the chunks along the edge.
+
 Minecraft then blends the last few blocks itself, with its *chunk blending*, when it generates the chunks around the map.
 
 > [!TIP] To blend into the land Minecraft will actually generate for your seed, with its biomes, use **Blend edges into this seed…** in the [Surroundings](surroundings-and-seeds.html#blend-the-edges-into-the-seed) panel instead.
