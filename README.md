@@ -198,9 +198,9 @@ Un seul panneau **Brushes**, sans menu caché :
 
 ## Installer
 
-Les applications natives (Java intégré, rien d'autre à installer) sont produites par l'intégration continue : ouvrir le dernier build réussi dans l'onglet [Actions](https://github.com/M-U-C-K-A/WorldPainter/actions/workflows/build.yml) et télécharger l'artefact de sa plateforme (macOS Apple Silicon ou Intel, Windows, Linux).
+Télécharger la dernière version sur la page [Releases](https://github.com/M-U-C-K-A/WorldPainter/releases) : une application native par plateforme (macOS Apple Silicon ou Intel, Windows, Linux), Java intégré, rien d'autre à installer. Le build non testé de chaque modification reste disponible dans l'onglet [Actions](https://github.com/M-U-C-K-A/WorldPainter/actions/workflows/build.yml).
 
-L'application n'est pas signée : sur macOS, l'ouvrir la première fois avec clic droit › Ouvrir.
+L'application n'est pas signée : sur macOS, l'ouvrir la première fois avec clic droit › Ouvrir. Elle garde ses réglages à part de ceux du WorldPainter d'origine, les deux peuvent donc être installés côte à côte.
 
 L'application peut utiliser **jusqu'à 75 % de la mémoire** de la machine (contre 25 % par défaut pour Java), ce qui permet de travailler sur des cartes environ trois fois plus grandes.
 

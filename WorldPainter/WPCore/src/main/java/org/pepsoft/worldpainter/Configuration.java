@@ -1174,9 +1174,11 @@ public final class Configuration implements Serializable, EventLogger, Minecraft
     public static synchronized Configuration load() throws IOException, ClassNotFoundException {
         File configFile = getConfigFile();
         if (! configFile.isFile()) {
-            File oldConfigFile = new File(System.getProperty("user.home"), ".worldpainter/config");
-            if (oldConfigFile.isFile()) {
-                migrateConfiguration();
+            // Before it had a version of its own the modernised fork ran as a snapshot, so bring its settings along.
+            // The settings of the original WorldPainter are left alone, since it may still be installed and in use
+            final File snapshotConfigDir = getConfigDir("snapshot");
+            if (new File(snapshotConfigDir, "config").isFile() && (! snapshotConfigDir.equals(configFile.getParentFile()))) {
+                copyConfiguration(snapshotConfigDir, configFile.getParentFile());
             }
         }
         if (configFile.isFile()) {
@@ -1209,9 +1211,15 @@ public final class Configuration implements Serializable, EventLogger, Minecraft
                 classifier = null;
             }
         }
-        if ((classifier == null) && Version.isSnapshot()) {
-            classifier = "snapshot";
+        if (classifier == null) {
+            // The modernised fork keeps its settings apart from those of the original WorldPainter, which may be
+            // installed alongside it
+            classifier = DEFAULT_CLASSIFIER;
         }
+        return getConfigDir(classifier);
+    }
+
+    private static File getConfigDir(String classifier) {
         if (SystemUtils.isMac()) {
             return new File(System.getProperty("user.home"), "Library/Application Support/WorldPainter" + ((classifier != null) ? (" [" + classifier.toUpperCase() + "]") : ""));
         } else if (SystemUtils.isWindows()) {
@@ -1232,16 +1240,17 @@ public final class Configuration implements Serializable, EventLogger, Minecraft
         return new File(getConfigDir(), "config");
     }
     
-    private static void migrateConfiguration() throws IOException {
-        File newConfigDir = getConfigDir();
-        File oldConfigDir = new File(System.getProperty("user.home"), ".worldpainter");
-        logger.info("Configuration found in old location (" + oldConfigDir + "); migrating it to new location (" + newConfigDir + ")");
+    private static void copyConfiguration(File oldConfigDir, File newConfigDir) throws IOException {
+        logger.info("Configuration found in " + oldConfigDir + "; copying it to " + newConfigDir);
+        newConfigDir.mkdirs();
         File[] oldContents = oldConfigDir.listFiles((dir, name) -> {
-            // Skip log files, since the new log file is already open in the
-            // new location
-            return ! name.startsWith("logfile");
+            // Skip log files, since the new log file is already open in the new location, and the autosaves and the
+            // session lock of the old installation
+            return ! (name.startsWith("logfile") || name.startsWith("autosave") || name.equals("wpsession.lock"));
         });
-        //noinspection ConstantConditions // This method is only invoked when oldContents in fact exists
+        if (oldContents == null) {
+            return;
+        }
         for (File oldFile: oldContents) {
             if (oldFile.isDirectory()) {
                 FileUtils.copyDir(oldFile, new File(newConfigDir, oldFile.getName()));
@@ -1251,7 +1260,6 @@ public final class Configuration implements Serializable, EventLogger, Minecraft
                 logger.warn("Directory entry encountered which was neither file nor directory: " + oldFile);
             }
         }
-        FileUtils.deleteDir(oldConfigDir);
     }
 
     private Rectangle windowBounds;
@@ -1348,6 +1356,7 @@ public final class Configuration implements Serializable, EventLogger, Minecraft
     private static final long serialVersionUID = 2011041801L;
     private static final int CIRCULAR_WORLD = -1;
     private static final int CURRENT_VERSION = 27;
+    private static final String DEFAULT_CLASSIFIER = "modernised";
 
     public static final String ADVANCED_SETTING_PREFIX = "org.pepsoft.worldpainter";
     public static final Platform DEFAULT_PLATFORM = JAVA_ANVIL_26_1;

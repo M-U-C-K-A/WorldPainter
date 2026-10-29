@@ -534,6 +534,8 @@ public final class App extends JFrame implements BrushControl,
                 }
             }
             layersWithNoButton.clear();
+            generatedLayers.clear();
+            undoneLayers.clear();
 
             saveCustomBiomes();
 
@@ -1985,8 +1987,20 @@ public final class App extends JFrame implements BrushControl,
     }
 
     boolean performUndo() {
-        if ((currentUndoManager != null) && currentUndoManager.undo()) {
+        if (currentUndoManager == null) {
+            return false;
+        }
+        final Set<CustomLayer> generatedLayersBefore = getGeneratedLayersOnMap();
+        if (currentUndoManager.undo()) {
             currentUndoManager.armSavePoint();
+            // Layers which a tool created and which this undo took off the map go out of the layer panels too
+            if (! generatedLayersBefore.isEmpty()) {
+                generatedLayersBefore.removeAll(getGeneratedLayersOnMap());
+                for (CustomLayer layer: generatedLayersBefore) {
+                    generatedLayers.remove(layer);
+                    undoneLayers.put(layer, customLayerController.withdrawLayer(layer));
+                }
+            }
             return true;
         } else {
             return false;
@@ -1996,10 +2010,35 @@ public final class App extends JFrame implements BrushControl,
     boolean performRedo() {
         if ((currentUndoManager != null) && currentUndoManager.redo()) {
             currentUndoManager.armSavePoint();
+            // Bring back the layers which a tool created if this redo put them back on the map
+            if (! undoneLayers.isEmpty()) {
+                final Set<Layer> layersOnMap = dimension.getAllLayers(false);
+                for (Iterator<Map.Entry<CustomLayer, Dimension>> i = undoneLayers.entrySet().iterator(); i.hasNext(); ) {
+                    final Map.Entry<CustomLayer, Dimension> entry = i.next();
+                    if (layersOnMap.contains(entry.getKey())) {
+                        customLayerController.reinstateLayer(entry.getKey(), entry.getValue());
+                        generatedLayers.add(entry.getKey());
+                        i.remove();
+                    }
+                }
+            }
             return true;
         } else {
             return false;
         }
+    }
+
+    /**
+     * The layers created by tools which are on the map of the current dimension.
+     */
+    private Set<CustomLayer> getGeneratedLayersOnMap() {
+        final Set<CustomLayer> layers = new HashSet<>(generatedLayers);
+        if ((! layers.isEmpty()) && (dimension != null)) {
+            layers.retainAll(dimension.getAllLayers(false));
+        } else {
+            layers.clear();
+        }
+        return layers;
     }
 
     /**
@@ -4679,6 +4718,8 @@ public final class App extends JFrame implements BrushControl,
         for (CustomLayer layer: layers) {
             customLayerController.registerCustomLayer(layer, false);
         }
+        // Undoing the operation which created them takes them out again
+        generatedLayers.addAll(layers);
     }
 
     private void showNodeGraph() {
@@ -4693,9 +4734,7 @@ public final class App extends JFrame implements BrushControl,
         dialog.setVisible(true);
         if (! dialog.isCancelled()) {
             // Make plant layers created by the graph available for painting by hand too
-            for (CustomLayer layer: dialog.getCreatedLayers()) {
-                customLayerController.registerCustomLayer(layer, false);
-            }
+            registerGeneratedLayers(dialog.getCreatedLayers());
             // And the material mixes it painted, which were set up as custom terrain types
             for (int i = 0; i < CUSTOM_TERRAIN_COUNT; i++) {
                 if (Terrain.isCustomMaterialConfigured(i) && (customMaterialButtons[i] == null)) {
@@ -7462,6 +7501,16 @@ public final class App extends JFrame implements BrushControl,
     final Map<Layer, LayerControls> layerControls = new HashMap<>();
     final Map<Layer, JCheckBox> layerSoloCheckBoxes = new HashMap<>();
     final Set<CustomLayer> layersWithNoButton = new HashSet<>();
+    /**
+     * The layers which tools created (the bridges and tunnels of paths, the plants and floating islands of node graphs)
+     * and which are in the layer panels.
+     */
+    private final Set<CustomLayer> generatedLayers = new HashSet<>();
+    /**
+     * The layers which tools created and which undo took out of the layer panels, with their floor dimensions (or
+     * {@code null}), so that redo can bring them back.
+     */
+    private final Map<CustomLayer, Dimension> undoneLayers = new HashMap<>();
     final JToggleButton[] customMaterialButtons = new JToggleButton[CUSTOM_TERRAIN_COUNT];
 
     WorldPainter view;

@@ -35,4 +35,4 @@ The preview shows the route over the land (orange on the ground, purple on bridg
 
 Bridges and tunnels are created as WorldPainter layers, named *Bridge 1*, *Tunnel 1* and so on: a floating layer for the deck of a bridge, a cave layer for a tunnel. They appear in the Layers panel, export to Minecraft like any other layer, and can be edited afterwards (right-click the layer).
 
-> [!WARNING] Undo removes the path from the land, but not the bridge and tunnel layers it created: delete those by hand if you need to.
+> [!TIP] Undo removes the whole path: the land, and the bridge and tunnel layers it created, which leave the layer panels too. Redo brings them back.

@@ -39,7 +39,7 @@ Both of these maps were generated entirely by a node graph, without painting a s
   <figure><img src="assets/images/continent-seed-4242.jpg" alt="A continent with a snowy mountain range, rivers, badlands, cherry groves and a volcanic island" class="rounded-xl border"><figcaption class="mt-2 text-sm text-muted-foreground">Continent and islands · 5000 × 5000 · 86 nodes</figcaption></figure>
 </div>
 
-> [!NOTE] This is a preview. The editor is stable enough to make real maps (the coral archipelago above exports to Minecraft 26.1 in about two minutes), but it has not been released yet and some features are still in development: see the [roadmap](roadmap.html).
+> [!NOTE] This is a preview, available from [GitHub Releases](https://github.com/M-U-C-K-A/WorldPainter/releases). The editor is stable enough to make real maps (the coral archipelago above exports to Minecraft 26.1 in about two minutes), but some features are still in development: see the [roadmap](roadmap.html).
 
 ## Where to start
 

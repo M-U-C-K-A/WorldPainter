@@ -623,7 +623,50 @@ public class CustomLayerController implements PropertyChangeListener {
             dimension.setEventsInhibited(false);
         }
         unregisterCustomLayer(layer);
+        forgetLayer(layer);
+    }
 
+    /**
+     * Take a layer which a tool created out of the layer panels, and its floor dimension (if any) out of the world,
+     * because undo took it off the map. Unlike {@link #deleteCustomLayer(CustomLayer)} this leaves the map and the undo
+     * history alone, so that redo can bring the layer back with {@link #reinstateLayer(CustomLayer, Dimension)}.
+     *
+     * @return The floor dimension of the layer which was taken out of the world, or {@code null} if it has none.
+     */
+    Dimension withdrawLayer(CustomLayer layer) {
+        if ((app.paint instanceof LayerPaint) && (((LayerPaint) app.paint).getLayer() == layer)) {
+            app.deselectPaint();
+        }
+        Dimension floorDimension = null;
+        if ((layer instanceof TunnelLayer) && (((TunnelLayer) layer).getFloorDimensionId() != null)) {
+            final Dimension.Anchor anchor = app.getDimension().getAnchor();
+            final Dimension.Anchor floorAnchor = new Dimension.Anchor(anchor.dim, (((TunnelLayer) layer).getLayerMode() == CAVE) ? CAVE_FLOOR : FLOATING_FLOOR, anchor.invert, ((TunnelLayer) layer).getFloorDimensionId());
+            if (app.getWorld().getDimension(floorAnchor) != null) {
+                floorDimension = app.getWorld().removeDimension(floorAnchor);
+            }
+        }
+        if (paletteManager.getLayers().contains(layer)) {
+            unregisterCustomLayer(layer);
+        }
+        forgetLayer(layer);
+        return floorDimension;
+    }
+
+    /**
+     * Put a layer which {@link #withdrawLayer(CustomLayer)} took out back in the layer panels, and its floor
+     * dimension back in the world, because redo put it back on the map.
+     */
+    void reinstateLayer(CustomLayer layer, Dimension floorDimension) {
+        if ((floorDimension != null) && (app.getWorld().getDimension(floorDimension.getAnchor()) == null)) {
+            app.getWorld().addDimension(floorDimension);
+        }
+        registerCustomLayer(layer, false);
+    }
+
+    /**
+     * Stop hiding or soloing a layer which has been taken out of the layer panels.
+     */
+    private void forgetLayer(CustomLayer layer) {
         boolean visibleLayersChanged = false;
         if (app.getHiddenLayers().contains(layer)) {
             app.hiddenLayers.remove(layer);

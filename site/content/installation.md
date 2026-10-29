@@ -9,16 +9,22 @@ WorldPainter Modernised is a desktop application. The downloads include their ow
 
 ## Download
 
-The application is built automatically for every change to the code:
+Download the latest version from the [Releases page](https://github.com/M-U-C-K-A/WorldPainter/releases) on GitHub. Under **Assets**, pick the file for your system:
 
-1. Open the latest successful run of the [Build workflow](https://github.com/M-U-C-K-A/WorldPainter/actions/workflows/build.yml) on GitHub.
-2. Under **Artifacts**, download the one for your system:
-   - **macOS Apple Silicon** or **macOS Intel**: a `.dmg` disk image
-   - **Windows**: a `.zip` with the application folder
-   - **Linux**: a `.deb` package
-3. Install it as usual for your system.
+| System | File |
+|---|---|
+| macOS, Apple Silicon | `WorldPainter-Modernised-…-macos-arm64.dmg` |
+| macOS, Intel | `WorldPainter-Modernised-…-macos-x64.dmg` |
+| Windows (x64) | `WorldPainter-Modernised-…-windows-x64.zip`: unzip it and run `WorldPainter.exe` |
+| Linux (x64, Debian and Ubuntu) | `WorldPainter-Modernised-…-linux-amd64.deb` |
 
-> [!WARNING] The application is not signed yet. On macOS, open it the first time with right-click › **Open**, then confirm. On Windows, SmartScreen may ask you to confirm with **More info** › **Run anyway**.
+On macOS, open the disk image and drag **WorldPainter** to **Applications**. On Linux, install the package with `sudo apt install ./WorldPainter-Modernised-…-linux-amd64.deb`.
+
+> [!WARNING] The application is not signed yet. On macOS, open it the first time with right-click › **Open**, then confirm; if macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/WorldPainter.app` in Terminal. On Windows, SmartScreen may ask you to confirm with **More info** › **Run anyway**.
+
+> [!NOTE] WorldPainter Modernised keeps its settings apart from the original WorldPainter, so both can be installed side by side. Worlds saved with it may not open in the original WorldPainter: keep backups of the worlds you care about.
+
+The latest, untested build of every change is also available from the [Build workflow](https://github.com/M-U-C-K-A/WorldPainter/actions/workflows/build.yml): open its latest successful run and download the file for your system under **Artifacts**.
 
 ## Requirements
 

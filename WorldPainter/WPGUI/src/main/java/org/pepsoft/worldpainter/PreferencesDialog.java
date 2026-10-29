@@ -55,7 +55,6 @@ import static org.pepsoft.worldpainter.HeightTransform.IDENTITY;
 import static org.pepsoft.worldpainter.Platform.Capability.BLOCK_BASED;
 import static org.pepsoft.worldpainter.Platform.Capability.NAME_BASED;
 import static org.pepsoft.worldpainter.Terrain.GRASS;
-import static org.pepsoft.worldpainter.Version.isSnapshot;
 import static org.pepsoft.worldpainter.World2.DEFAULT_OCEAN_SEED;
 import static org.pepsoft.worldpainter.util.WorldUtils.resizeDimension;
 
@@ -369,10 +368,10 @@ public class PreferencesDialog extends WorldPainterDialog {
             // Store the acceleration type and manual GUI scale separately, because we need them before we can
             // load the config:
             Preferences prefs = Preferences.userNodeForPackage(Main.class);
-            prefs.put((isSnapshot() ? "snapshot." : "") + "accelerationType", config.getAccelerationType().name());
+            prefs.put(Main.PREFS_PREFIX + "accelerationType", config.getAccelerationType().name());
             prefs.flush();
             prefs = Preferences.userNodeForPackage(GUIUtils.class);
-            prefs.putFloat((isSnapshot() ? "snapshot." : "") + "manualUIScale", config.getUiScale());
+            prefs.putFloat(Main.PREFS_PREFIX + "manualUIScale", config.getUiScale());
             prefs.flush();
         } catch (IOException | BackingStoreException e) {
             handleException(e, this);

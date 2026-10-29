@@ -2,6 +2,9 @@ name: Build
 
 on:
   push:
+    # Tags are built by the release workflow
+    branches:
+      - '**'
   pull_request:
   workflow_dispatch:
 

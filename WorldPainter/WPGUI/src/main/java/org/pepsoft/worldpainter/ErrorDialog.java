@@ -11,6 +11,7 @@
 
 package org.pepsoft.worldpainter;
 
+import org.pepsoft.util.DesktopUtils;
 import org.pepsoft.util.mdc.MDCWrappingException;
 import org.pepsoft.util.mdc.MDCWrappingRuntimeException;
 import org.pepsoft.worldpainter.layers.Layer;
@@ -27,12 +28,14 @@ import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.image.ImagingOpException;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.util.*;
 
 import static java.awt.Dialog.ModalityType.APPLICATION_MODAL;
 import static java.lang.Boolean.TRUE;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singletonList;
 import static org.pepsoft.util.AwtUtils.doOnEventThread;
 import static org.pepsoft.util.GUIUtils.scaleToUI;
@@ -126,17 +129,13 @@ public class ErrorDialog extends javax.swing.JDialog {
                     }
                 }
             } else {
-                jButton1.setText("Email Details...");
-                if ((! Desktop.isDesktopSupported()) || (! Desktop.getDesktop().isSupported(Desktop.Action.MAIL))) {
-                    jButton1.setToolTipText("Emailing not supported on this system; please use the \"copy to clipboard\" button and mail the details to worldpainter@pepsoft.org.");
-                } else {
-                    jButton1.setEnabled(true);
-                }
+                jButton1.setText("Report on GitHub...");
+                jButton1.setEnabled(true);
                 mode = Mode.REPORTING_DISABLED;
                 if (ioException) {
-                    requestedActionLine = "If you think this is a bug then please use the button below to email the details of this error to the creator of this program.";
+                    requestedActionLine = "If you think this is a bug then please use the button below to report it on GitHub.";
                 } else {
-                    requestedActionLine = "Please help debug the problem by using the button below to email the details of this error to the creator of this program.";
+                    requestedActionLine = "Please help debug the problem by using the button below to report it on GitHub.";
                 }
             }
             final String text;
@@ -288,18 +287,17 @@ public class ErrorDialog extends javax.swing.JDialog {
         dispose();
     }
 
-    private void email() {
+    private void reportOnGitHub() {
+        Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+        StringSelection data = new StringSelection(body);
+        clipboard.setContents(data, data);
+        final String title = "Error report (" + Version.VERSION + ")";
+        final String issueBody = "Paste the error details here (they have been copied to the clipboard).\n\nWhat were you doing when the error happened?\n";
         try {
-            URI uri = new URI("mailto", "worldpainter@pepsoft.org?subject=WorldPainter error report&body=" + body, null);
-            Desktop desktop = Desktop.getDesktop();
-            desktop.mail(uri);
-            showInfo(this, "A new email message should have been opened now for you to send.\nIf it did not work, please use the \"copy to clipboard\" button\nand manually mail the information to worldpainter@pepsoft.org.", "Email Created");
-        } catch (URISyntaxException e) {
-            logger.error("URI syntax error while trying to send email", e);
-            JOptionPane.showMessageDialog(this, "Could not create email message with error details!\nPlease use the \"copy to clipboard\" button and mail\nthe information to worldpainter@pepsoft.org.", "Could Not Create Email", JOptionPane.ERROR_MESSAGE);
-        } catch (IOException e) {
-            logger.error("I/O error while trying to send email", e);
-            JOptionPane.showMessageDialog(this, "Could not create email message with error details!\nPlease use the \"copy to clipboard\" button and mail\nthe information to worldpainter@pepsoft.org.", "Could Not Create Email", JOptionPane.ERROR_MESSAGE);
+            DesktopUtils.open(new URL(ISSUES_URL + "?title=" + URLEncoder.encode(title, UTF_8) + "&body=" + URLEncoder.encode(issueBody, UTF_8)));
+            showInfo(this, "The details of the error have been copied to the clipboard.\nPlease paste them into the new GitHub issue which has been opened in your browser.", "Report on GitHub");
+        } catch (MalformedURLException e) {
+            throw new RuntimeException(e);
         }
     }
     
@@ -307,7 +305,7 @@ public class ErrorDialog extends javax.swing.JDialog {
         Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
         StringSelection data = new StringSelection(body);
         clipboard.setContents(data, data);
-        showInfo(this, "The information has been copied to the clipboard. Please paste\nit in a new email and send it to worldpainter@pepsoft.org.", "Information Copied");
+        showInfo(this, "The information has been copied to the clipboard. Please paste\nit in a new issue at " + ISSUES_URL, "Information Copied");
     }
 
     private void submitInBackground() {
@@ -332,13 +330,9 @@ public class ErrorDialog extends javax.swing.JDialog {
                 } catch (RuntimeException e) {
                     logger.error("{} while trying to submit exception report to server (message: {})", e.getClass().getSimpleName(), e.getMessage(), e);
                     doOnEventThread(() -> {
-                        JOptionPane.showMessageDialog(ErrorDialog.this, "Submitting error report failed.\nPlease use the \"Email Details...\" button below\nto email the report.");
-                        jButton1.setText("Email Details...");
-                        if ((! Desktop.isDesktopSupported()) || (! Desktop.getDesktop().isSupported(Desktop.Action.MAIL))) {
-                            jButton1.setToolTipText("Emailing not supported on this system; please use the \"copy to clipboard\" button and mail the details to worldpainter@pepsoft.org.");
-                        } else {
-                            jButton1.setEnabled(true);
-                        }
+                        JOptionPane.showMessageDialog(ErrorDialog.this, "Submitting error report failed.\nPlease use the \"Report on GitHub...\" button below\nto report it.");
+                        jButton1.setText("Report on GitHub...");
+                        jButton1.setEnabled(true);
                         mode = Mode.REPORTING_DISABLED;
                         jButton2.setEnabled(true);
                     });
@@ -437,7 +431,7 @@ public class ErrorDialog extends javax.swing.JDialog {
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
         switch (mode) {
             case REPORTING_DISABLED:
-                email();
+                reportOnGitHub();
                 break;
             case SEND_MANUALLY:
                 submitInBackground();
@@ -463,6 +457,8 @@ public class ErrorDialog extends javax.swing.JDialog {
     // End of variables declaration//GEN-END:variables
 
     private String body;
+
+    private static final String ISSUES_URL = "https://github.com/M-U-C-K-A/WorldPainter/issues/new";
     private EventVO event;
     private Mode mode = Mode.REPORTING_UNNECESSARY;
 

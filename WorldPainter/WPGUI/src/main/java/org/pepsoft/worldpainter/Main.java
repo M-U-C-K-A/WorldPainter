@@ -104,9 +104,9 @@ public class Main {
             System.setProperty("org.pepsoft.worldpainter.safeMode", "true");
             System.setProperty("org.pepsoft.util.GUIUtils.disableScaling", "true");
         }
-        if (Version.isSnapshot()) {
-            System.setProperty("org.pepsoft.snapshotVersion", "true");
-        }
+        // Keep the preferences which are stored outside the configuration apart from those of the original
+        // WorldPainter; the libraries put them under the same prefix as those of a snapshot
+        System.setProperty("org.pepsoft.snapshotVersion", "true");
 
         // Use a file lock to make sure only one instance is running with autosave enabled
         File configDir = Configuration.getConfigDir();
@@ -185,14 +185,13 @@ public class Main {
 
         // If the config file does not exist, also reset the persistent settings that are not stored in that, since the
         // user may be trying to reset the configuration
-        final boolean snapshot = Version.isSnapshot();
         if (! Configuration.getConfigFile().isFile()) {
             try {
                 Preferences prefs = Preferences.userNodeForPackage(Main.class);
-                prefs.remove((snapshot ? "snapshot." : "") + "accelerationType");
+                prefs.remove(PREFS_PREFIX + "accelerationType");
                 prefs.flush();
                 prefs = Preferences.userNodeForPackage(GUIUtils.class);
-                prefs.remove((snapshot ? "snapshot." : "") + "manualUIScale");
+                prefs.remove(PREFS_PREFIX + "manualUIScale");
                 prefs.flush();
             } catch (BackingStoreException e) {
                 logger.error("Error resetting user preferences", e);
@@ -202,7 +201,7 @@ public class Main {
         // Set the acceleration mode. For some reason we don't fully understand, loading the Configuration from disk
         // initialises Java2D, so we have to do this *before* then.
         AccelerationType accelerationType;
-        String accelTypeName = Preferences.userNodeForPackage(Main.class).get((snapshot ? "snapshot." : "") + "accelerationType", null);
+        String accelTypeName = Preferences.userNodeForPackage(Main.class).get(PREFS_PREFIX + "accelerationType", null);
         if (accelTypeName != null) {
             accelerationType = AccelerationType.valueOf(accelTypeName);
         } else {
@@ -378,10 +377,10 @@ public class Main {
                     // Store the acceleration type and manual GUI scale separately, because we need them before we can
                     // load the config:
                     Preferences prefs = Preferences.userNodeForPackage(Main.class);
-                    prefs.put((snapshot ? "snapshot." : "") + "accelerationType", config.getAccelerationType().name());
+                    prefs.put(PREFS_PREFIX + "accelerationType", config.getAccelerationType().name());
                     prefs.flush();
                     prefs = Preferences.userNodeForPackage(GUIUtils.class);
-                    prefs.putFloat((snapshot ? "snapshot." : "") + "manualUIScale", config.getUiScale());
+                    prefs.putFloat(PREFS_PREFIX + "manualUIScale", config.getUiScale());
                     prefs.flush();
                 } catch (IOException e) {
                     logger.error("I/O error saving configuration", e);
@@ -541,6 +540,11 @@ public class Main {
             "<p>Please report bugs on GitHub: https://github.com/Captain-Chaos/WorldPainter" +
             "<p>Type \"I understand\" below to proceed with testing the next release of WorldPainter:</p></html>";
     private static final String SNAPSHOT_MESSAGE_KEY = "org.pepsoft.worldpainter.snapshotWarning";
+
+    /**
+     * The prefix of the keys of the preferences which are stored outside the configuration.
+     */
+    static final String PREFS_PREFIX = "snapshot.";
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(Main.class);
 

@@ -129,7 +129,8 @@ public class AboutDialog extends javax.swing.JDialog implements WindowListener {
                 (donationStatus != null)
                     ? donationStatus.ordinal()
                     : Configuration.DonationStatus.NO_THANK_YOU.ordinal(),
-                style});
+                style,
+                Version.UPSTREAM_VERSION});
         } catch (IOException e) {
             throw new RuntimeException("I/O error reading resource", e);
         }
