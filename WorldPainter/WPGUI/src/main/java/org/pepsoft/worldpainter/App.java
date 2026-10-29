@@ -708,7 +708,7 @@ public final class App extends JFrame implements BrushControl,
             }
 
             updateSurroundingsPanel();
-            if (showing3D) {
+            if (showing3D || detached3D) {
                 terrain3DPanel.setDimension(dimension, selectedColourScheme);
             }
             if (! refreshTerrainMode()) {
@@ -1991,8 +1991,11 @@ public final class App extends JFrame implements BrushControl,
             return false;
         }
         final Set<CustomLayer> generatedLayersBefore = getGeneratedLayersOnMap();
+        final int addedTilesBefore = AddedTiles.getCount(dimension);
         if (currentUndoManager.undo()) {
             currentUndoManager.armSavePoint();
+            // Tiles which the undone operation added go away again
+            AddedTiles.undone(dimension, addedTilesBefore);
             // Layers which a tool created and which this undo took off the map go out of the layer panels too
             if (! generatedLayersBefore.isEmpty()) {
                 generatedLayersBefore.removeAll(getGeneratedLayersOnMap());
@@ -2008,7 +2011,9 @@ public final class App extends JFrame implements BrushControl,
     }
 
     boolean performRedo() {
+        final int addedTilesBefore = AddedTiles.getCount(dimension);
         if ((currentUndoManager != null) && currentUndoManager.redo()) {
+            AddedTiles.redone(dimension, addedTilesBefore);
             currentUndoManager.armSavePoint();
             // Bring back the layers which a tool created if this redo put them back on the map
             if (! undoneLayers.isEmpty()) {
@@ -2806,6 +2811,7 @@ public final class App extends JFrame implements BrushControl,
         workspaceCards = new JPanel(new CardLayout());
         workspaceCards.add(viewContainer, WORKSPACE_MAP);
         terrain3DPanel = new Terrain3DPanel();
+        terrain3DPanel.setPopOutAction(this::detach3D, false);
         workspaceCards.add(terrain3DPanel, WORKSPACE_3D);
         dockingManager.getWorkspace().add(workspaceCards, BorderLayout.CENTER);
 
@@ -3249,6 +3255,7 @@ public final class App extends JFrame implements BrushControl,
 
         final AbstractButton copySelectionButton = createButtonForOperation(new CopySelectionOperation(view));
         copySelectionButton.setEnabled(selectionState.getValue());
+        otherPanel.add(createButtonForOperation(new RectangleSelectionOperation(view)));
         otherPanel.add(createButtonForOperation(new EditSelectionOperation(view, selectionState)));
         otherPanel.add(copySelectionButton);
         final JButton clearSelectionButton = org.pepsoft.worldpainter.help.ToolCard.button();
@@ -3665,6 +3672,33 @@ public final class App extends JFrame implements BrushControl,
         addTerrainSection(terrainPanel, constraints, sections, "Terracotta", WHITE_STAINED_CLAY, LIGHT_GREY_STAINED_CLAY, GREY_STAINED_CLAY, BLACK_STAINED_CLAY, BROWN_STAINED_CLAY, RED_STAINED_CLAY, ORANGE_STAINED_CLAY, YELLOW_STAINED_CLAY, LIME_STAINED_CLAY, GREEN_STAINED_CLAY, CYAN_STAINED_CLAY, LIGHT_BLUE_STAINED_CLAY, BLUE_STAINED_CLAY, PURPLE_STAINED_CLAY, MAGENTA_STAINED_CLAY, PINK_STAINED_CLAY);
         addTerrainSection(terrainPanel, constraints, sections, "Nether & End", NETHERRACK, BASALT, BLACKSTONE, NETHERLIKE, SOUL_SAND, SOUL_SOIL, WARPED_NYLIUM, CRIMSON_NYLIUM, END_STONE);
 
+        // Ready made mixes of blocks: clicking one adds it as a custom terrain type and selects it
+        for (MaterialGroup.Family family: MaterialGroup.Family.values()) {
+            final JLabel label = createSectionLabel(family.toString());
+            constraints.insets = new Insets(8, 4, 3, 4);
+            terrainPanel.add(label, constraints);
+            final JPanel grid = new JPanel(new ResponsiveGridLayout(2, 6));
+            final List<AbstractButton> buttons = new ArrayList<>();
+            for (MaterialGroup group: MaterialGroup.values()) {
+                if (group.getFamily() != family) {
+                    continue;
+                }
+                final MixedMaterial material = group.newMaterial();
+                final JButton button = org.pepsoft.worldpainter.help.ToolCard.button();
+                button.setIcon(new ImageIcon(material.getIcon(selectedColourScheme)));
+                button.setMargin(App.SMALLER_BUTTON_INSETS);
+                button.setToolTipText(group.toString());
+                org.pepsoft.worldpainter.help.ToolCard.install(button, () -> org.pepsoft.worldpainter.help.CompositionCards.forMaterial(group.toString(), "A mix of blocks. Click to add it as a custom terrain type and paint with it.", material, selectedColourScheme));
+                button.putClientProperty(KEY_SEARCH_TEXT, (group + " " + family + " mix").toLowerCase());
+                button.addActionListener(e -> useMaterialGroup(group));
+                grid.add(button);
+                buttons.add(button);
+            }
+            constraints.insets = new Insets(0, 2, 0, 2);
+            terrainPanel.add(grid, constraints);
+            sections.put(label, buttons);
+        }
+
         // Custom terrains
         final JLabel customLabel = createSectionLabel("Custom");
         constraints.insets = new Insets(8, 4, 3, 4);
@@ -3753,7 +3787,7 @@ public final class App extends JFrame implements BrushControl,
         constraints.insets = new Insets(2, 4, 2, 4);
 
         showSurroundingsCheckBox = new JCheckBox("Show what lies beyond the map");
-        showSurroundingsCheckBox.setToolTipText(richToolTip("Surroundings", "Show, in a faded style, the biomes Minecraft will generate around the map for this seed, to anticipate what the edges of the map will border on", null));
+        showSurroundingsCheckBox.setToolTipText(richToolTip("Surroundings", "Show, fading out around the map, the land Minecraft will generate around it for this seed, to anticipate what the edges of the map will border on", null));
         showSurroundingsCheckBox.addActionListener(e -> applySurroundings());
         panel.add(showSurroundingsCheckBox, constraints);
 
@@ -3930,6 +3964,7 @@ public final class App extends JFrame implements BrushControl,
         operation.setWaterLevel(62);
         operation.setSeed(dimension.getMinecraftSeed());
         final Dimension dimension = this.dimension;
+        final Set<Point> tilesBefore = new HashSet<>(dimension.getTileCoords());
         dimension.setEventsInhibited(true);
         dimension.rememberChanges();
         view.setInhibitUpdates(true);
@@ -3950,7 +3985,10 @@ public final class App extends JFrame implements BrushControl,
                 if (dimension.undoChanges()) {
                     dimension.clearRedo();
                 }
+                AddedTiles.remove(dimension, tilesBefore);
             } else {
+                // Undo can take the added tiles away again
+                AddedTiles.record(dimension, tilesBefore);
                 dimension.armSavePoint();
             }
         } finally {
@@ -5221,7 +5259,7 @@ public final class App extends JFrame implements BrushControl,
         mapViewButton.addActionListener(e -> showWorkspace(false));
         workspaceGroup.add(mapViewButton);
         rightToolBar.add(mapViewButton);
-        final JToggleButton threeDeeButton = new JToggleButton("3D", Icons.get("box", 16));
+        threeDeeButton = new JToggleButton("3D", Icons.get("box", 16));
         threeDeeButton.setToolTipText(richToolTip("3D view", "See the map in perspective, with height, slope, biome and relief views and details of every block", null));
         threeDeeButton.addActionListener(e -> showWorkspace(true));
         workspaceGroup.add(threeDeeButton);
@@ -5287,7 +5325,72 @@ public final class App extends JFrame implements BrushControl,
         }
     }
 
+    /**
+     * Move the 3D view out of the workspace into a floating panel of its own, so that it can be seen next to the map,
+     * and docked or floated like the other panels.
+     */
+    private void detach3D() {
+        if (detached3D) {
+            return;
+        }
+        if (dockingManager.getFrame(FRAME_3D) != null) {
+            dockingManager.removeFrame(FRAME_3D);
+        }
+        workspaceCards.remove(terrain3DPanel);
+        final DockableFrame frame = new DockableFrame(FRAME_3D);
+        frame.setTitle("3D View");
+        frame.setFrameIcon(Icons.get("box", 16));
+        frame.setInitSide(Side.EAST);
+        frame.setInitIndex(3);
+        terrain3DPanel.setPreferredSize(new java.awt.Dimension(Math.round(900 * getUIScale()), Math.round(600 * getUIScale())));
+        frame.add(terrain3DPanel, BorderLayout.CENTER);
+        // (The card layout of the workspace may have hidden it)
+        terrain3DPanel.setVisible(true);
+        dockingManager.addFrame(frame);
+        // Float it over the right part of the main window, leaving the tools on the left visible
+        final Rectangle window = getBounds();
+        dockingManager.floatFrame(FRAME_3D, new Rectangle(window.x + window.width * 2 / 5, window.y + window.height / 8, window.width / 2, window.height * 2 / 3));
+        detached3D = true;
+        terrain3DPanel.setPopOutAction(this::attach3D, true);
+        mapViewButton.setSelected(true);
+        showWorkspace(false);
+        if (dimension != null) {
+            terrain3DPanel.setDimension(dimension, selectedColourScheme);
+        }
+    }
+
+    /**
+     * Put the 3D view back in the workspace, in place of the map.
+     */
+    private void attach3D() {
+        if (! detached3D) {
+            return;
+        }
+        dockingManager.removeFrame(FRAME_3D);
+        final Container parent = terrain3DPanel.getParent();
+        if (parent != null) {
+            parent.remove(terrain3DPanel);
+        }
+        terrain3DPanel.setPreferredSize(null);
+        workspaceCards.add(terrain3DPanel, WORKSPACE_3D);
+        detached3D = false;
+        terrain3DPanel.setPopOutAction(this::detach3D, false);
+        threeDeeButton.setSelected(true);
+        showWorkspace(true);
+    }
+
     private void showWorkspace(boolean threeDee) {
+        if (threeDee && detached3D) {
+            // The 3D view is in a panel of its own; show that, and keep the map in the workspace
+            if (dockingManager.getFrame(FRAME_3D) != null) {
+                dockingManager.showFrame(FRAME_3D);
+            }
+            mapViewButton.setSelected(true);
+            if (dimension != null) {
+                terrain3DPanel.setDimension(dimension, selectedColourScheme);
+            }
+            return;
+        }
         showing3D = threeDee;
         ((CardLayout) workspaceCards.getLayout()).show(workspaceCards, threeDee ? WORKSPACE_3D : WORKSPACE_MAP);
         if (threeDee && (dimension != null)) {
@@ -5584,7 +5687,8 @@ public final class App extends JFrame implements BrushControl,
             case "RaiseRotatedPyramid": return org.pepsoft.worldpainter.help.ToolDemo.ROTATED_PYRAMID;
             case "RaisePyramid": return org.pepsoft.worldpainter.help.ToolDemo.PYRAMID;
             case "CopySelectionOperation": return org.pepsoft.worldpainter.help.ToolDemo.COPY;
-            case "EditSelectionOperation": return org.pepsoft.worldpainter.help.ToolDemo.SELECT;
+            case "EditSelectionOperation": return org.pepsoft.worldpainter.help.ToolDemo.SELECT_BRUSH;
+            case "RectangleSelectionOperation": return org.pepsoft.worldpainter.help.ToolDemo.SELECT;
             case "PathTool": return org.pepsoft.worldpainter.help.ToolDemo.PATH;
             default: return null;
         }
@@ -5609,7 +5713,8 @@ public final class App extends JFrame implements BrushControl,
                     ? "Click on low ground to fill it with lava up to the height where you clicked, as far as it is enclosed."
                     : "Click on low ground to flood it with water up to the height where you clicked, as far as it is enclosed: lakes, seas and rivers.";
             case "Sponge": return "Drag to remove water or lava under the brush.";
-            case "EditSelectionOperation": return "Drag to select an area; the other tools then only work inside it. Hold Ctrl to remove from the selection.";
+            case "EditSelectionOperation": return "Paint the selection with the brush: drag to add to it, drag with the right button to remove from it. For a rectangle, use Select Rectangle.";
+            case "RectangleSelectionOperation": return "Drag across the map to select a rectangle; drag with the right button to remove one. Hold Shift for a square, Ctrl for an ellipse. Tick \"inside selection\" in the options of a tool to limit it to the selection.";
             case "CopySelectionOperation": return "Copy the selected area, with its terrain and layers, and place it elsewhere on the map.";
             case "SetSpawnPoint": return "Click to set where players appear when they first join the world.";
             case "Text": return "Click to write text on the map, as an annotation or with a layer.";
@@ -5634,6 +5739,7 @@ public final class App extends JFrame implements BrushControl,
             case "RaisePyramid": return "triangle";
             case "CopySelectionOperation": return "copy";
             case "EditSelectionOperation": return "square-dashed-mouse-pointer";
+            case "RectangleSelectionOperation": return "square-dashed";
             case "Erode": return "wind";
             case "PathTool": return "route";
             default: return null;
@@ -5867,7 +5973,11 @@ public final class App extends JFrame implements BrushControl,
 
     private List<Component> createLayerButton(final Layer layer, final char mnemonic, final boolean createSoloCheckbox, final boolean createButton) {
         if (createButton) {
-            final JToggleButton button = new JToggleButton();
+            final JToggleButton button = org.pepsoft.worldpainter.help.ToolCard.toggleButton();
+            if (layer instanceof org.pepsoft.worldpainter.layers.plants.PlantLayer) {
+                // Show which plants the layer places, and how often
+                org.pepsoft.worldpainter.help.ToolCard.install(button, () -> org.pepsoft.worldpainter.help.CompositionCards.forPlants(layer.getName(), layer.getDescription(), (org.pepsoft.worldpainter.layers.plants.PlantLayer) layer, selectedColourScheme));
+            }
             button.setMargin(new Insets(2, 2, 2, 2));
             final String modernIcon = modernIconFor(layer);
             if (modernIcon != null) {
@@ -5973,7 +6083,13 @@ public final class App extends JFrame implements BrushControl,
     }
 
     private JToggleButton createTerrainButton(final Terrain terrain) {
-        final JToggleButton button = new JToggleButton();
+        final JToggleButton button = org.pepsoft.worldpainter.help.ToolCard.toggleButton();
+        if (terrain.isCustom()) {
+            // Show what the mix is made of
+            org.pepsoft.worldpainter.help.ToolCard.install(button, () -> Terrain.isCustomMaterialConfigured(terrain.getCustomTerrainIndex())
+                    ? org.pepsoft.worldpainter.help.CompositionCards.forMaterial(Terrain.getCustomMaterial(terrain.getCustomTerrainIndex()).getName(), "A custom terrain type. Right-click to change it.", Terrain.getCustomMaterial(terrain.getCustomTerrainIndex()), selectedColourScheme)
+                    : null);
+        }
         button.putClientProperty(KEY_PAINT_ID, createTerrainPaintId(terrain));
         button.setMargin(App.SMALLER_BUTTON_INSETS);
         button.setIcon(new ImageIcon(terrain.getScaledIcon(22, selectedColourScheme)));
@@ -6103,6 +6219,8 @@ public final class App extends JFrame implements BrushControl,
         button.setMargin(new Insets(4, 4, 4, 4));
         button.setFocusable(false);
         button.setToolTipText(richToolTip(brush.getName(), "Brush shape; scroll to change the size, Alt+scroll to rotate", null));
+        // A card with the shape of the brush in 3D
+        org.pepsoft.worldpainter.help.ToolCard.install(button, () -> new org.pepsoft.worldpainter.help.ToolCard(brush.getName(), "The shape the brush raises with the height tools, or the strength with which it paints. Scroll over the map to change its size, Alt+scroll to rotate it.", null, new org.pepsoft.worldpainter.help.BrushPreview(brush), null));
         button.addItemListener(e -> {
             if (! programmaticChange) {
                 updateBrushRotation(brush, button);
@@ -7656,6 +7774,9 @@ public final class App extends JFrame implements BrushControl,
     private JLabel headerTitleLabel, headerZoomLabel, surroundingsNoteLabel;
     private JPanel workspaceCards;
     private Terrain3DPanel terrain3DPanel;
+    private JToggleButton threeDeeButton;
+    private boolean detached3D;
+    private static final String FRAME_3D = "view3d";
     private JToggleButton mapViewButton;
     private boolean showing3D;
     private static final String WORKSPACE_MAP = "map", WORKSPACE_3D = "3d";

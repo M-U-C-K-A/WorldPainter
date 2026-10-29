@@ -178,14 +178,12 @@ public class SurroundingsTileProvider implements TileProvider {
     }
 
     /**
-     * The distance from a location to the rectangular extent of the map. It is measured as a "squircle" with a high
-     * exponent rather than a circle around the corners, so that the shown area has almost square corners.
+     * The distance from a location to the rectangular extent of the map, measured along the axes (the larger of the
+     * horizontal and vertical distances), so that the shown area is a rectangle with square corners.
      */
     private float distanceToMap(int x, int y) {
         final int x1 = bounds.x + margin, y1 = bounds.y + margin, x2 = bounds.x + bounds.width - margin, y2 = bounds.y + bounds.height - margin;
-        final double dx = Math.max(Math.max(x1 - x, 0), x - x2), dy = Math.max(Math.max(y1 - y, 0), y - y2);
-        final double max = Math.max(dx, dy), min = Math.min(dx, dy);
-        return (max > 0) ? (float) (max * Math.pow(1 + Math.pow(min / max, CORNER_EXPONENT), 1.0 / CORNER_EXPONENT)) : 0.0f;
+        return Math.max(Math.max(Math.max(x1 - x, 0), x - x2), Math.max(Math.max(y1 - y, 0), y - y2));
     }
 
     /**
@@ -287,5 +285,4 @@ public class SurroundingsTileProvider implements TileProvider {
      */
     private static final int WATER_LEVEL = EdgeBlendOperation.VANILLA_SEA_LEVEL - 1;
     private static final int CELL_BITS = 4, CELL_SIZE = 1 << CELL_BITS, CELL_MASK = CELL_SIZE - 1;
-    private static final double CORNER_EXPONENT = 24;
 }

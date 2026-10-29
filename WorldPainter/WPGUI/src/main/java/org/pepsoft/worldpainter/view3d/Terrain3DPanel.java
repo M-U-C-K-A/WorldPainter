@@ -102,10 +102,10 @@ public class Terrain3DPanel extends JPanel {
             requestDetail();
         });
         toolBar.add(blocksButton);
-        detailSizeComboBox = new JComboBox<>(new Integer[] {256, 512, 768, 1024, 1536});
+        detailSizeComboBox = new JComboBox<>(new Integer[] {256, 512, 768, 1024, 1536, 2048, 3072, 4096});
         detailSizeComboBox.setSelectedItem(detailSize);
         detailSizeComboBox.setEnabled(false);
-        detailSizeComboBox.setToolTipText(App.richToolTip("Block area", "How far around the camera, in blocks, the land is shown block by block. Larger areas take longer to build and draw", null));
+        detailSizeComboBox.setToolTipText(App.richToolTip("Block area", "How far around the camera, in blocks, the land is shown block by block. Larger areas take longer to build and draw, and use more memory", null));
         detailSizeComboBox.setRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
@@ -132,6 +132,14 @@ public class Terrain3DPanel extends JPanel {
         refreshButton.setToolTipText(App.richToolTip("Refresh", "Update the 3D view with the latest changes to the map", null));
         refreshButton.addActionListener(e -> refresh(true));
         toolBar.add(refreshButton);
+        popOutButton = new JButton(Icons.get("picture-in-picture-2", 18));
+        popOutButton.setToolTipText(App.richToolTip("Detach", "Show the 3D view in a panel of its own, which can float next to the map or be docked like the other panels", null));
+        popOutButton.addActionListener(e -> {
+            if (popOutAction != null) {
+                popOutAction.run();
+            }
+        });
+        toolBar.add(popOutButton);
         add(toolBar, BorderLayout.NORTH);
 
         // The view with the info card, the legend and the help text on top of it
@@ -222,6 +230,17 @@ public class Terrain3DPanel extends JPanel {
      * In block mode, load the blocks around the centre of the view at full resolution (one column per block), unless
      * they are already loaded. The rest of the map is shown as the smooth surface.
      */
+    /**
+     * Set what the detach button does, and whether the view is detached (in a panel of its own) or not, for the tooltip
+     * of the button.
+     */
+    public void setPopOutAction(Runnable popOutAction, boolean detached) {
+        this.popOutAction = popOutAction;
+        popOutButton.setToolTipText(detached
+                ? App.richToolTip("Attach", "Show the 3D view in the main window again, in place of the map", null)
+                : App.richToolTip("Detach", "Show the 3D view in a panel of its own, which can float next to the map or be docked like the other panels", null));
+    }
+
     private void requestDetail() {
         final TerrainModel model = view.getModel();
         if ((! blocksButton.isSelected()) || (dimension == null) || (model == null)) {
@@ -334,6 +353,8 @@ public class Terrain3DPanel extends JPanel {
     private SunControl sunControl;
     private final JToggleButton blocksButton;
     private JComboBox<Integer> detailSizeComboBox;
+    private final JButton popOutButton;
+    private Runnable popOutAction;
     private Rectangle detailArea;
     private boolean detailLoading, detailPending;
     private final InfoCard infoCard;

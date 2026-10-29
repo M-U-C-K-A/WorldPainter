@@ -18,6 +18,7 @@ import java.util.*;
 
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE;
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE_BITS;
+import static org.pepsoft.worldpainter.Constants.TILE_SIZE_MASK;
 
 /**
  * Progressively blends the edges of a map into a target terrain, instead of ending in an abrupt cliff. The transition
@@ -190,18 +191,37 @@ public class EdgeBlendOperation {
             newTiles.add(dimension.getTileForEditing(coords));
         }
 
+        // Tiles of the map which are only partly present (such as those along the edge of a circular map) have their
+        // missing blocks filled in like new tiles. Remember which blocks were missing, before they are filled in
+        final Map<Point, boolean[]> notPresent = new HashMap<>();
+        for (Point coords: original) {
+            final Tile tile = dimension.getTile(coords);
+            if (tile.hasLayer(NotPresent.INSTANCE)) {
+                final boolean[] mask = new boolean[TILE_SIZE * TILE_SIZE];
+                for (int x = 0; x < TILE_SIZE; x++) {
+                    for (int y = 0; y < TILE_SIZE; y++) {
+                        mask[x | (y << TILE_SIZE_BITS)] = tile.getBitLayerValue(NotPresent.INSTANCE, x, y);
+                    }
+                }
+                notPresent.put(coords, mask);
+            }
+        }
+        for (Point coords: notPresent.keySet()) {
+            newTiles.add(dimension.getTileForEditing(coords));
+        }
+
         // Find the existing tiles which are close enough to the edge to be affected
         final List<Tile> edgeTiles = new ArrayList<>();
         if (insideWidth > 0) {
             for (Point coords: original) {
-                if (hasMissingNeighbour(coords, original, insideRange)) {
+                if (hasMissingNeighbour(coords, original, insideRange) || notPresent.containsKey(coords)) {
                     edgeTiles.add(dimension.getTileForEditing(coords));
                 }
             }
         }
 
         // Process the new tiles first, since they need to sample the unmodified edge of the original map
-        final Context context = new Context(dimension, original, targetTerrainGenerator, irregularityNoise);
+        final Context context = new Context(dimension, original, notPresent, targetTerrainGenerator, irregularityNoise);
         if (vanillaTarget != null) {
             context.sampleVanilla(vanillaTarget, newTiles, edgeTiles);
         }
@@ -225,15 +245,8 @@ public class EdgeBlendOperation {
     private void processInsideTile(Context context, Tile tile) {
         final int x0 = tile.getX() << TILE_SIZE_BITS, y0 = tile.getY() << TILE_SIZE_BITS;
         final int minHeight = tile.getMinHeight(), maxHeight = tile.getMaxHeight() - 1;
-        final List<Rectangle> missing = new ArrayList<>();
-        final int range = (width + TILE_SIZE - 1) >> TILE_SIZE_BITS;
-        for (int dx = -range; dx <= range; dx++) {
-            for (int dy = -range; dy <= range; dy++) {
-                if (! context.original.contains(new Point(tile.getX() + dx, tile.getY() + dy))) {
-                    missing.add(new Rectangle((tile.getX() + dx) << TILE_SIZE_BITS, (tile.getY() + dy) << TILE_SIZE_BITS, TILE_SIZE, TILE_SIZE));
-                }
-            }
-        }
+        final boolean[] wasMissing = context.notPresent.get(new Point(tile.getX(), tile.getY()));
+        final NearestBlocks nearestMissing = context.nearest(tile, false, reach());
         final float[] heights = new float[TILE_SIZE * TILE_SIZE];
         final float[] targetWeights = new float[TILE_SIZE * TILE_SIZE];
         for (int y = 0; y < TILE_SIZE; y++) {
@@ -241,10 +254,14 @@ public class EdgeBlendOperation {
                 final int i = x | (y << TILE_SIZE_BITS);
                 final int worldX = x0 + x, worldY = y0 + y;
                 final float current = tile.getHeight(x, y);
-                final float distance = distanceToNearest(worldX, worldY, missing, null);
+                heights[i] = current;
+                if ((wasMissing != null) && wasMissing[i]) {
+                    // Filled in with the new tiles
+                    continue;
+                }
+                final float distance = nearestMissing.distance[i];
                 final float weight = originalWeight(distance + irregularity(context, worldX, worldY));
                 if (weight >= 1.0f) {
-                    heights[i] = current;
                     continue;
                 }
                 final float targetHeight = context.targetHeight(worldX, worldY);
@@ -254,37 +271,38 @@ public class EdgeBlendOperation {
                 tile.setHeight(x, y, height);
             }
         }
-        applyTerrainAndWater(context, tile, heights, targetWeights, null);
+        applyTerrainAndWater(context, tile, heights, targetWeights, null, null);
     }
 
+    /**
+     * Process a tile which was added by this operation, or the blocks which were not present of a tile of the map.
+     */
     private void processOutsideTile(Context context, Tile tile) {
         final int x0 = tile.getX() << TILE_SIZE_BITS, y0 = tile.getY() << TILE_SIZE_BITS;
         final int minHeight = tile.getMinHeight(), maxHeight = tile.getMaxHeight() - 1;
-        final List<Rectangle> originals = new ArrayList<>();
-        final int range = (width + TILE_SIZE - 1) >> TILE_SIZE_BITS;
-        for (int dx = -range; dx <= range; dx++) {
-            for (int dy = -range; dy <= range; dy++) {
-                if (context.original.contains(new Point(tile.getX() + dx, tile.getY() + dy))) {
-                    originals.add(new Rectangle((tile.getX() + dx) << TILE_SIZE_BITS, (tile.getY() + dy) << TILE_SIZE_BITS, TILE_SIZE, TILE_SIZE));
-                }
-            }
-        }
+        final boolean[] missing = context.notPresent.get(new Point(tile.getX(), tile.getY()));
+        final NearestBlocks nearest = context.nearest(tile, true, reach());
         final float[] heights = new float[TILE_SIZE * TILE_SIZE];
         final float[] targetWeights = new float[TILE_SIZE * TILE_SIZE];
         final Terrain[] edgeTerrains = new Terrain[TILE_SIZE * TILE_SIZE];
-        final Rectangle[] nearest = new Rectangle[1];
         for (int y = 0; y < TILE_SIZE; y++) {
             for (int x = 0; x < TILE_SIZE; x++) {
                 final int i = x | (y << TILE_SIZE_BITS);
                 final int worldX = x0 + x, worldY = y0 + y;
-                final float distance = distanceToNearest(worldX, worldY, originals, nearest);
-                final float weight = originalWeight(-distance + irregularity(context, worldX, worldY));
+                if ((missing != null) && (! missing[i])) {
+                    // A block of the map
+                    heights[i] = tile.getHeight(x, y);
+                    continue;
+                }
+                final float distance = nearest.distance[i];
+                final float weight = (distance < Float.MAX_VALUE) ? originalWeight(-distance + irregularity(context, worldX, worldY)) : 0.0f;
                 final float targetHeight = context.targetHeight(worldX, worldY);
                 float height;
-                if ((nearest[0] != null) && (weight > 0)) {
-                    final float edgeHeight = sampleEdgeHeight(context, nearest[0], worldX, worldY, distance);
+                if (weight > 0) {
+                    final int edgeX = nearest.x[i], edgeY = nearest.y[i];
+                    final float edgeHeight = sampleEdgeHeight(context, edgeX, edgeY, distance);
                     height = targetHeight + (edgeHeight - targetHeight) * weight;
-                    edgeTerrains[i] = sampleEdgeTerrain(context, nearest[0], worldX, worldY);
+                    edgeTerrains[i] = sampleEdgeTerrain(context, edgeX, edgeY, worldX, worldY);
                 } else {
                     height = targetHeight;
                 }
@@ -292,9 +310,19 @@ public class EdgeBlendOperation {
                 heights[i] = height;
                 targetWeights[i] = 1 - weight;
                 tile.setHeight(x, y, height);
+                if (missing != null) {
+                    tile.setBitLayerValue(NotPresent.INSTANCE, x, y, false);
+                }
             }
         }
-        applyTerrainAndWater(context, tile, heights, targetWeights, edgeTerrains);
+        applyTerrainAndWater(context, tile, heights, targetWeights, edgeTerrains, missing);
+    }
+
+    /**
+     * How far from the edge of the map the transition can reach, including its irregularity.
+     */
+    private int reach() {
+        return (int) Math.ceil(width * (1 + irregularity * 0.5f)) + 2;
     }
 
     /**
@@ -305,14 +333,18 @@ public class EdgeBlendOperation {
      * @param edgeTerrains For a tile which was added by this operation, the terrain of the map near its edge for each
      *                     block within reach of the map ({@code null} elsewhere); {@code null} for a tile of the map.
      *                     The terrain and water of added tiles are determined everywhere.
+     * @param only         If not {@code null}, only the blocks for which this is {@code true} are changed.
      */
-    private void applyTerrainAndWater(Context context, Tile tile, float[] heights, float[] targetWeights, Terrain[] edgeTerrains) {
+    private void applyTerrainAndWater(Context context, Tile tile, float[] heights, float[] targetWeights, Terrain[] edgeTerrains, boolean[] only) {
         final int x0 = tile.getX() << TILE_SIZE_BITS, y0 = tile.getY() << TILE_SIZE_BITS;
         final int noWater = tile.getMinHeight();
         final boolean newTile = edgeTerrains != null;
         for (int y = 0; y < TILE_SIZE; y++) {
             for (int x = 0; x < TILE_SIZE; x++) {
                 final int i = x | (y << TILE_SIZE_BITS);
+                if ((only != null) && (! only[i])) {
+                    continue;
+                }
                 final int worldX = x0 + x, worldY = y0 + y;
                 final float targetWeight = targetWeights[i];
                 if (applyTerrain && (newTile || (targetWeight > 0))) {
@@ -396,14 +428,13 @@ public class EdgeBlendOperation {
     }
 
     /**
-     * The terrain of the map near its edge closest to a location outside it, from a point jittered along the edge so
-     * that continuing it outwards does not produce streaks.
+     * The terrain of the map near the block of its edge closest to a location outside it, from a point jittered along
+     * the edge so that continuing it outwards does not produce streaks.
      */
-    private static Terrain sampleEdgeTerrain(Context context, Rectangle rect, int x, int y) {
+    private static Terrain sampleEdgeTerrain(Context context, int edgeX, int edgeY, int x, int y) {
         final int jitterX = Math.round((SurfaceRules.random(x, y, 0x1b873593) - 0.5f) * 16), jitterY = Math.round((SurfaceRules.random(x, y, 0x85ebca6b) - 0.5f) * 16);
-        final int edgeX = Math.max(rect.x, Math.min(rect.x + rect.width - 1, x + jitterX));
-        final int edgeY = Math.max(rect.y, Math.min(rect.y + rect.height - 1, y + jitterY));
-        final Terrain terrain = context.dimension.getTerrainAt(edgeX, edgeY);
+        final boolean jittered = context.isPresent(edgeX + jitterX, edgeY + jitterY);
+        final Terrain terrain = context.dimension.getTerrainAt(jittered ? (edgeX + jitterX) : edgeX, jittered ? (edgeY + jitterY) : edgeY);
         return (terrain != null) ? terrain : Terrain.GRASS;
     }
 
@@ -466,13 +497,11 @@ public class EdgeBlendOperation {
     }
 
     /**
-     * Sample the height of the original map near the edge closest to a location outside it. Close to the edge this is
-     * the height of the nearest edge block; further away it is a Gaussian average of an area of the map around that
+     * Sample the height of the original map near the block of its edge closest to a location outside it. Close to the
+     * edge this is the height of that block; further away it is a Gaussian average of an area of the map around that
      * block which grows with the distance, so that features of the edge do not produce streaks.
      */
-    private static float sampleEdgeHeight(Context context, Rectangle rect, int x, int y, float distance) {
-        final int edgeX = Math.max(rect.x, Math.min(rect.x + rect.width - 1, x));
-        final int edgeY = Math.max(rect.y, Math.min(rect.y + rect.height - 1, y));
+    private static float sampleEdgeHeight(Context context, int edgeX, int edgeY, float distance) {
         final float fine = context.dimension.getHeightAt(edgeX, edgeY);
         final float spacing = (2 + distance * 0.75f) / BLUR_RADIUS;
         // Sample from the level of detail matching the sample spacing, to avoid aliasing
@@ -492,30 +521,6 @@ public class EdgeBlendOperation {
         final float blurred = (totalWeight > 0.0001f) ? sum / totalWeight : fine;
         final float t = (float) ProceduralTerrain.smoothStep(0, 12, distance);
         return fine + (blurred - fine) * t;
-    }
-
-    /**
-     * The distance from the centre of a block to the nearest of a set of rectangles.
-     *
-     * @param nearest If not {@code null}, the nearest rectangle is stored in the first element.
-     */
-    private static float distanceToNearest(int x, int y, List<Rectangle> rects, Rectangle[] nearest) {
-        float best = Float.MAX_VALUE;
-        Rectangle bestRect = null;
-        final float px = x + 0.5f, py = y + 0.5f;
-        for (Rectangle rect: rects) {
-            final float dx = Math.max(Math.max(rect.x - px, 0), px - (rect.x + rect.width));
-            final float dy = Math.max(Math.max(rect.y - py, 0), py - (rect.y + rect.height));
-            final float distanceSquared = dx * dx + dy * dy;
-            if (distanceSquared < best) {
-                best = distanceSquared;
-                bestRect = rect;
-            }
-        }
-        if (nearest != null) {
-            nearest[0] = bestRect;
-        }
-        return (bestRect != null) ? (float) Math.sqrt(best) : Float.MAX_VALUE;
     }
 
     private static float distanceToTile(Point a, Point b) {
@@ -557,6 +562,7 @@ public class EdgeBlendOperation {
      * The water level of Minecraft's oceans (the top of the water is at 62).
      */
     public static final int VANILLA_SEA_LEVEL = 63;
+    private static final int NONE = Integer.MIN_VALUE;
     private static final int BLUR_RADIUS = 2, COARSE_CELL_BITS = 2, MIP_LEVELS = TILE_SIZE_BITS - COARSE_CELL_BITS + 1;
     private static final float[] BLUR_WEIGHTS = new float[(2 * BLUR_RADIUS + 1) * (2 * BLUR_RADIUS + 1)];
 
@@ -569,9 +575,10 @@ public class EdgeBlendOperation {
     }
 
     private final class Context {
-        Context(Dimension dimension, Set<Point> original, ProceduralTerrain targetTerrainGenerator, SimplexNoise irregularityNoise) {
+        Context(Dimension dimension, Set<Point> original, Map<Point, boolean[]> notPresent, ProceduralTerrain targetTerrainGenerator, SimplexNoise irregularityNoise) {
             this.dimension = dimension;
             this.original = original;
+            this.notPresent = notPresent;
             this.targetTerrainGenerator = targetTerrainGenerator;
             this.irregularityNoise = irregularityNoise;
             if (targetTerrainGenerator != null) {
@@ -581,6 +588,110 @@ public class EdgeBlendOperation {
                 final ProceduralTerrainSettings rules = ProceduralTerrainSettings.create(ProceduralTerrainSettings.Preset.FLAT_PLAINS, seed);
                 rules.setDefaultTerrain(targetTerrain);
                 surface = new ProceduralTerrain(rules);
+            }
+        }
+
+        /**
+         * Whether a block was part of the original map: its tile was, and the block was present.
+         */
+        boolean isPresent(int x, int y) {
+            final Point coords = new Point(x >> TILE_SIZE_BITS, y >> TILE_SIZE_BITS);
+            if (! original.contains(coords)) {
+                return false;
+            }
+            final boolean[] missing = notPresent.get(coords);
+            return (missing == null) || (! missing[(x & TILE_SIZE_MASK) | ((y & TILE_SIZE_MASK) << TILE_SIZE_BITS)]);
+        }
+
+        /**
+         * For each block of a tile, the nearest block (within reach) which was part of the original map, or which was
+         * not, found with a two pass vector distance transform over the tile and a margin around it.
+         *
+         * @param present Whether to look for blocks which were part of the original map ({@code true}) or which were
+         *                not ({@code false}).
+         */
+        NearestBlocks nearest(Tile tile, boolean present, int reach) {
+            final int size = TILE_SIZE + 2 * reach;
+            final int wx0 = (tile.getX() << TILE_SIZE_BITS) - reach, wy0 = (tile.getY() << TILE_SIZE_BITS) - reach;
+            // The offset to the nearest block found so far, per cell of the window; NONE where there is none yet
+            final int[] dx = new int[size * size], dy = new int[size * size];
+            Arrays.fill(dx, NONE);
+            for (int ty = wy0 >> TILE_SIZE_BITS; ty <= (wy0 + size - 1) >> TILE_SIZE_BITS; ty++) {
+                for (int tx = wx0 >> TILE_SIZE_BITS; tx <= (wx0 + size - 1) >> TILE_SIZE_BITS; tx++) {
+                    final Point coords = new Point(tx, ty);
+                    final boolean inMap = original.contains(coords);
+                    final boolean[] missing = inMap ? notPresent.get(coords) : null;
+                    if ((inMap != present) && (missing == null)) {
+                        // No block of this tile qualifies
+                        continue;
+                    }
+                    final int bx0 = Math.max(wx0, tx << TILE_SIZE_BITS), bx1 = Math.min(wx0 + size, (tx + 1) << TILE_SIZE_BITS);
+                    final int by0 = Math.max(wy0, ty << TILE_SIZE_BITS), by1 = Math.min(wy0 + size, (ty + 1) << TILE_SIZE_BITS);
+                    for (int by = by0; by < by1; by++) {
+                        for (int bx = bx0; bx < bx1; bx++) {
+                            final boolean blockPresent = inMap && ((missing == null) || (! missing[(bx & TILE_SIZE_MASK) | ((by & TILE_SIZE_MASK) << TILE_SIZE_BITS)]));
+                            if (blockPresent == present) {
+                                final int i = (by - wy0) * size + (bx - wx0);
+                                dx[i] = 0;
+                                dy[i] = 0;
+                            }
+                        }
+                    }
+                }
+            }
+            // Forward pass, then backward pass, each with a sweep back along the row
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    propagate(dx, dy, size, x, y, -1, 0);
+                    propagate(dx, dy, size, x, y, -1, -1);
+                    propagate(dx, dy, size, x, y, 0, -1);
+                    propagate(dx, dy, size, x, y, 1, -1);
+                }
+                for (int x = size - 1; x >= 0; x--) {
+                    propagate(dx, dy, size, x, y, 1, 0);
+                }
+            }
+            for (int y = size - 1; y >= 0; y--) {
+                for (int x = size - 1; x >= 0; x--) {
+                    propagate(dx, dy, size, x, y, 1, 0);
+                    propagate(dx, dy, size, x, y, 1, 1);
+                    propagate(dx, dy, size, x, y, 0, 1);
+                    propagate(dx, dy, size, x, y, -1, 1);
+                }
+                for (int x = 0; x < size; x++) {
+                    propagate(dx, dy, size, x, y, -1, 0);
+                }
+            }
+            final NearestBlocks result = new NearestBlocks();
+            for (int y = 0; y < TILE_SIZE; y++) {
+                for (int x = 0; x < TILE_SIZE; x++) {
+                    final int i = (y + reach) * size + x + reach, j = x | (y << TILE_SIZE_BITS);
+                    if (dx[i] == NONE) {
+                        result.distance[j] = Float.MAX_VALUE;
+                    } else {
+                        result.x[j] = wx0 + x + reach + dx[i];
+                        result.y[j] = wy0 + y + reach + dy[i];
+                        // Distances between the centres of the blocks; adjacent blocks are half a block from the edge
+                        result.distance[j] = Math.max(0.5f, (float) Math.sqrt((double) dx[i] * dx[i] + (double) dy[i] * dy[i]) - 0.5f);
+                    }
+                }
+            }
+            return result;
+        }
+
+        private void propagate(int[] dx, int[] dy, int size, int x, int y, int ox, int oy) {
+            final int nx = x + ox, ny = y + oy;
+            if ((nx < 0) || (ny < 0) || (nx >= size) || (ny >= size)) {
+                return;
+            }
+            final int n = ny * size + nx;
+            if (dx[n] == NONE) {
+                return;
+            }
+            final int cx = dx[n] + ox, cy = dy[n] + oy, i = y * size + x;
+            if ((dx[i] == NONE) || ((long) cx * cx + (long) cy * cy < (long) dx[i] * dx[i] + (long) dy[i] * dy[i])) {
+                dx[i] = cx;
+                dy[i] = cy;
             }
         }
 
@@ -707,11 +818,21 @@ public class EdgeBlendOperation {
             final float[][] mips = new float[MIP_LEVELS][];
             int cells = TILE_SIZE >> COARSE_CELL_BITS;
             final int cellSize = 1 << COARSE_CELL_BITS;
+            // Average only the blocks which were present; cells without any are NaN
+            final boolean[] missing = notPresent.get(new Point(tile.getX(), tile.getY()));
             mips[0] = new float[cells * cells];
+            final int[] counts = new int[cells * cells];
             for (int x = 0; x < TILE_SIZE; x++) {
                 for (int y = 0; y < TILE_SIZE; y++) {
-                    mips[0][((y >> COARSE_CELL_BITS) * cells) + (x >> COARSE_CELL_BITS)] += tile.getHeight(x, y) / (cellSize * cellSize);
+                    if ((missing == null) || (! missing[x | (y << TILE_SIZE_BITS)])) {
+                        final int cell = ((y >> COARSE_CELL_BITS) * cells) + (x >> COARSE_CELL_BITS);
+                        mips[0][cell] += tile.getHeight(x, y);
+                        counts[cell]++;
+                    }
                 }
+            }
+            for (int i = 0; i < mips[0].length; i++) {
+                mips[0][i] = (counts[i] > 0) ? mips[0][i] / counts[i] : Float.NaN;
             }
             for (int level = 1; level < MIP_LEVELS; level++) {
                 final int previousCells = cells;
@@ -719,8 +840,15 @@ public class EdgeBlendOperation {
                 final float[] previous = mips[level - 1], current = new float[cells * cells];
                 for (int cx = 0; cx < cells; cx++) {
                     for (int cy = 0; cy < cells; cy++) {
-                        current[cy * cells + cx] = (previous[(2 * cy) * previousCells + 2 * cx] + previous[(2 * cy) * previousCells + 2 * cx + 1]
-                                + previous[(2 * cy + 1) * previousCells + 2 * cx] + previous[(2 * cy + 1) * previousCells + 2 * cx + 1]) / 4;
+                        float sum = 0;
+                        int count = 0;
+                        for (int i: new int[] {(2 * cy) * previousCells + 2 * cx, (2 * cy) * previousCells + 2 * cx + 1, (2 * cy + 1) * previousCells + 2 * cx, (2 * cy + 1) * previousCells + 2 * cx + 1}) {
+                            if (! Float.isNaN(previous[i])) {
+                                sum += previous[i];
+                                count++;
+                            }
+                        }
+                        current[cy * cells + cx] = (count > 0) ? sum / count : Float.NaN;
                     }
                 }
                 mips[level] = current;
@@ -730,9 +858,22 @@ public class EdgeBlendOperation {
 
         final Dimension dimension;
         final Set<Point> original;
+        /**
+         * For the tiles of the original map which were only partly present, which blocks were not.
+         */
+        final Map<Point, boolean[]> notPresent;
         final ProceduralTerrain targetTerrainGenerator, surface;
         final SimplexNoise irregularityNoise;
         private final java.util.concurrent.ConcurrentHashMap<Long, float[][]> coarseHeights = new java.util.concurrent.ConcurrentHashMap<>();
+    }
+
+    /**
+     * For each block of a tile, the nearest block of some kind: its coordinates, and the distance to its edge
+     * ({@link Float#MAX_VALUE} if there is none within reach).
+     */
+    private static final class NearestBlocks {
+        final int[] x = new int[TILE_SIZE * TILE_SIZE], y = new int[TILE_SIZE * TILE_SIZE];
+        final float[] distance = new float[TILE_SIZE * TILE_SIZE];
     }
 
     /**

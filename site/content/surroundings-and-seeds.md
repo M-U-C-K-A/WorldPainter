@@ -35,4 +35,6 @@ Type a number, or any text (as in Minecraft), in the **World seed** field and pr
 
 **Blend edges into this seed…** (or the option at the bottom of the seed search) adds a band of land around the map, 100 blocks wide by default, which goes over smoothly into the land Minecraft generates for the seed: its approximate height, its biomes and a matching surface (sand on beaches, gravel under the sea, podzol in taiga…). The terrain of the map and that of the seed mix block by block across the band, more and more towards the seed, rather than meeting along a line, and trees like those of the seed's forests thin out towards the map. Minecraft then blends the last few blocks itself when it generates the chunks around the map.
 
+The band follows the actual edge of the land, also on round maps, whose corners are filled in. <kbd>⌘</kbd> <kbd>Z</kbd> (<kbd>Ctrl</kbd> <kbd>Z</kbd>) undoes the whole blend, including the land it added, and redo puts it back.
+
 > [!NOTE] The height of the land beyond the map is an estimate from the same climate and terrain spline Minecraft uses, without its fine noise: the large shapes (oceans, coasts, plains, mountains) match, the block by block relief does not.

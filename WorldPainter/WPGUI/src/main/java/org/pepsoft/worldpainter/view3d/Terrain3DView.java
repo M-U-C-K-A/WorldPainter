@@ -591,15 +591,18 @@ class Terrain3DView extends JComponent {
                         light = lights[d];
                         upper = shade(colour, light);
                     }
-                    final int lower = edge ? shade(EARTH, 0.55f * light) : shade(upper, 0.85f);
+                    // At the edge of the land the side goes down to the base of the model, and shows a cross section of
+                    // the ground (see wallColour()); its colours then only carry the light
+                    final int lower = edge ? shade(0xffffff, 0.7f * light) : shade(upper, 0.85f);
+                    final int faceUpper = edge ? shade(0xffffff, light) : upper;
                     // The face lies on the side of the column towards the neighbour
                     final float a0 = (alongX ? offsetX : offsetY) + k * unit, a1 = (alongX ? offsetX : offsetY) + (k + run) * unit;
                     if (alongX) {
                         final float y = offsetY + ((d == 0) ? gy : (gy + 1)) * unit;
-                        quads.add(KIND_SIDE_Y, a0, y, top, a1, y, top, a1, y, bottom, a0, y, bottom, upper, lower);
+                        quads.add(edge ? KIND_WALL : KIND_SIDE_Y, a0, y, top, a1, y, top, a1, y, bottom, a0, y, bottom, faceUpper, lower);
                     } else {
                         final float x = offsetX + ((d == 3) ? gx : (gx + 1)) * unit;
-                        quads.add(KIND_SIDE_X, x, a0, top, x, a1, top, x, a1, bottom, x, a0, bottom, upper, lower);
+                        quads.add(edge ? KIND_WALL : KIND_SIDE_X, x, a0, top, x, a1, top, x, a1, bottom, x, a0, bottom, faceUpper, lower);
                     }
                     k += run;
                 }
@@ -1102,7 +1105,7 @@ class Terrain3DView extends JComponent {
                 for (int i = 0; i < list.size; i++) {
                     final int t = list.values[i];
                     final int a = mesh.triangles[t * 3], b = mesh.triangles[t * 3 + 1], c = mesh.triangles[t * 3 + 2];
-                    final boolean wall = t >= wallStart;
+                    final boolean wall = (t >= wallStart) || ((mesh.kinds != null) && (mesh.kinds[t] == KIND_WALL));
                     rasteriser.triangle(faceOffset + t / 2 + 1, (mesh.kinds != null) ? mesh.kinds[t] : KIND_TOP,
                             sx[a], sy[a], depth[a], q[a], colour[a], wall ? wallHeight(mesh.h[a], wallBase) : mesh.h[a], mesh.x[a] * blockScale, mesh.y[a] * blockScale,
                             sx[b], sy[b], depth[b], q[b], colour[b], wall ? wallHeight(mesh.h[b], wallBase) : mesh.h[b], mesh.x[b] * blockScale, mesh.y[b] * blockScale,
@@ -1112,7 +1115,7 @@ class Terrain3DView extends JComponent {
                 final IntList list2 = clipped[chunk];
                 for (int i = 0; i < list2.size; i++) {
                     final int t = list2.values[i];
-                    rasteriser.clippedTriangle(mesh, t, faceOffset, t >= wallStart, wallBase, cx, cy, cz, colour, camera, blockScale);
+                    rasteriser.clippedTriangle(mesh, t, faceOffset, (t >= wallStart) || ((mesh.kinds != null) && (mesh.kinds[t] == KIND_WALL)), wallBase, cx, cy, cz, colour, camera, blockScale);
                 }
             }
         });
@@ -1480,7 +1483,8 @@ class Terrain3DView extends JComponent {
         final int sx = Math.max(0, Math.min(m.width - 1, (int) Math.floor(blockX / m.step))), sy = Math.max(0, Math.min(m.height - 1, (int) Math.floor(blockY / m.step)));
         final int s = sy * m.width + sx;
         final float height = relativeHeight + m.lowestHeight, terrain = m.heights[s];
-        if (height > terrain + 0.05f) {
+        // (The sides of the block mesh reach to the top of the top block, one above the height of the terrain)
+        if (height > terrain + (blocks ? 1.05f : 0.05f)) {
             // Above the ground: water
             return blend(0x3f7fdc, 0x1d3f8f, Math.min(1, (m.waterLevels[s] - height) / 24));
         }

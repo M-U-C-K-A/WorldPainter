@@ -158,6 +158,18 @@ public class DockingManager {
         }
     }
 
+    /**
+     * Float a frame in a window of its own with specific bounds on the screen.
+     */
+    public void floatFrame(String key, Rectangle bounds) {
+        final FrameInfo info = getInfo(key);
+        closeFloatingWindow(info);
+        info.placement = info.placement.withState(State.FLOATING);
+        info.placement.floatingBounds = new Rectangle(bounds);
+        rebuild();
+        openFloatingWindow(info);
+    }
+
     public boolean isFrameVisible(String key) {
         final FrameInfo info = frames.get(key);
         return (info != null) && (info.placement.state != State.HIDDEN);

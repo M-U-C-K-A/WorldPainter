@@ -1,7 +1,8 @@
 package org.pepsoft.worldpainter;
 
 import com.formdev.flatlaf.FlatClientProperties;
-import org.pepsoft.worldpainter.layers.CustomLayer;
+import org.pepsoft.worldpainter.help.CompositionCards;
+import org.pepsoft.worldpainter.help.ToolCard;
 import org.pepsoft.worldpainter.layers.bo2.TreePack;
 import org.pepsoft.worldpainter.layers.plants.PlantLayerPresets;
 import org.pepsoft.worldpainter.util.Icons;
@@ -12,10 +13,10 @@ import java.awt.*;
 import java.util.List;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import static java.awt.GridBagConstraints.HORIZONTAL;
 import static org.pepsoft.worldpainter.App.createSectionLabel;
-import static org.pepsoft.worldpainter.App.richToolTip;
 
 /**
  * The library of ready made things to paint with, so that a new world can be dressed without any setting up: trees
@@ -42,15 +43,17 @@ class PacksPanel extends JPanel {
 
         final Map<String, List<JButton>> trees = new LinkedHashMap<>();
         for (TreePack.Kind kind: TreePack.Kind.values()) {
+            final String description = "Custom trees from the WorldPainter tree pack, in eight variants. Paint them like any custom object layer. Click to add them and paint.";
             trees.computeIfAbsent("Trees", k -> new ArrayList<>()).add(createButton(swatch(kind.getColour(), treeIcon(kind)), kind.toString(),
-                    "Custom trees from the WorldPainter tree pack, in eight variants. Paint them like any custom object layer.", () -> treeHandler.accept(kind)));
+                    () -> new ToolCard(kind.toString(), description, null, null, null), () -> treeHandler.accept(kind)));
         }
         addSections(trees, constraints);
 
         final Map<String, List<JButton>> plants = new LinkedHashMap<>();
         for (PlantLayerPresets.Preset preset: PlantLayerPresets.Preset.values()) {
+            final String description = preset.getDescription() + ". A plant layer: the more intensity you paint it with, the denser the plants. Click to add it and paint.";
             plants.computeIfAbsent(preset.getFamily().toString(), k -> new ArrayList<>()).add(createButton(swatch(preset.getColour(), plantIcon(preset.getFamily())), preset.toString(),
-                    preset.getDescription() + ". A plant layer: paint it with more intensity for denser plants.", () -> plantHandler.accept(preset)));
+                    () -> CompositionCards.forPlants(preset.toString(), description, PlantLayerPresets.create(preset), colourScheme), () -> plantHandler.accept(preset)));
         }
         addSections(plants, constraints);
 
@@ -58,7 +61,7 @@ class PacksPanel extends JPanel {
         for (MaterialGroup group: MaterialGroup.values()) {
             final MixedMaterial material = group.newMaterial();
             materials.computeIfAbsent(group.getFamily().toString(), k -> new ArrayList<>()).add(createButton(new ImageIcon(material.getIcon(colourScheme)), group.toString(),
-                    "A mix of blocks, added as a custom terrain type: " + describe(material) + ".", () -> materialHandler.accept(group)));
+                    () -> CompositionCards.forMaterial(group.toString(), "A mix of blocks, added as a custom terrain type. Click to add it and paint.", material, colourScheme), () -> materialHandler.accept(group)));
         }
         addSections(materials, constraints);
 
@@ -103,21 +106,15 @@ class PacksPanel extends JPanel {
         repaint();
     }
 
-    private static JButton createButton(Icon icon, String name, String description, Runnable action) {
-        final JButton button = new JButton(icon);
+    private static JButton createButton(Icon icon, String name, Supplier<ToolCard> card, Runnable action) {
+        final JButton button = ToolCard.button();
+        button.setIcon(icon);
         button.setMargin(App.SMALLER_BUTTON_INSETS);
-        button.setToolTipText(richToolTip(name, description, "Click to add and paint"));
+        button.setToolTipText(name);
+        ToolCard.install(button, card);
         button.putClientProperty(KEY_NAME, name);
         button.addActionListener(e -> action.run());
         return button;
-    }
-
-    private static String describe(MixedMaterial material) {
-        final StringJoiner joiner = new StringJoiner(", ");
-        for (MixedMaterial.Row row: material.getRows()) {
-            joiner.add(row.material.simpleName.replace('_', ' '));
-        }
-        return joiner.toString();
     }
 
     private static String treeIcon(TreePack.Kind kind) {

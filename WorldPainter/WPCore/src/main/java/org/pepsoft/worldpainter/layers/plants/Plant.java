@@ -172,7 +172,7 @@ public abstract class Plant implements WPObject {
         return name;
     }
     
-    String[] getIconNames() {
+    public String[] getIconNames() {
         return iconNames;
     }
 

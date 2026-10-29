@@ -200,6 +200,10 @@ public class PlantLayer extends CustomLayer {
             }
         }
 
+        public int getOccurrence() {
+            return occurrence;
+        }
+
         short occurrence;
         @Deprecated
         byte dataValueFrom = -1, dataValueTo = -1;

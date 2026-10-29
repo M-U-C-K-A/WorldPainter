@@ -1,5 +1,7 @@
 package org.pepsoft.worldpainter.procedural;
 
+import org.pepsoft.worldpainter.AddedTiles;
+
 import org.pepsoft.util.ProgressReceiver;
 import org.pepsoft.util.ProgressReceiver.OperationCancelled;
 import org.pepsoft.util.swing.ProgressDialog;
@@ -249,6 +251,7 @@ public class EdgeBlendDialog extends WorldPainterDialog {
         lastFlatTarget = flatRadioButton.isSelected();
         lastTargetHeight = operation.getTargetHeight();
         lastTargetSettings = targetSettings.clone();
+        final java.util.Set<java.awt.Point> tilesBefore = new java.util.HashSet<>(dimension.getTileCoords());
         dimension.setEventsInhibited(true);
         dimension.rememberChanges();
         if (view != null) {
@@ -271,7 +274,9 @@ public class EdgeBlendDialog extends WorldPainterDialog {
                 if (dimension.undoChanges()) {
                     dimension.clearRedo();
                 }
+                AddedTiles.remove(dimension, tilesBefore);
             } else {
+                AddedTiles.record(dimension, tilesBefore);
                 dimension.armSavePoint();
                 ok();
             }

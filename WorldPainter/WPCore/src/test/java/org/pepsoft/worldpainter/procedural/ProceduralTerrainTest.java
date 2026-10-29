@@ -111,4 +111,40 @@ public class ProceduralTerrainTest {
         final float halfway = dimension.getHeightAt(50, 2 * TILE_SIZE);
         assertTrue(halfway > 80 && halfway < 140);
     }
+
+    @Test
+    public void testEdgeBlendCircularMap() throws Exception {
+        // A circular map: the blocks of its tiles outside the circle are not present, and are filled in by the blend
+        final Dimension dimension = TestData.createDimension(new Rectangle(0, 0, 4 * TILE_SIZE, 4 * TILE_SIZE), 150);
+        for (int x = 0; x < 4 * TILE_SIZE; x++) {
+            for (int y = 0; y < 4 * TILE_SIZE; y++) {
+                if (Math.hypot(x + 0.5 - 256, y + 0.5 - 256) > 256) {
+                    dimension.setBitLayerValueAt(org.pepsoft.worldpainter.layers.NotPresent.INSTANCE, x, y, true);
+                }
+            }
+        }
+        final EdgeBlendOperation operation = new EdgeBlendOperation();
+        operation.setWidth(100);
+        operation.setPlacement(EdgeBlendOperation.Placement.OUTSIDE);
+        operation.setIrregularity(0);
+        operation.setTargetHeight(66);
+        operation.apply(dimension, null);
+
+        // Inside the circle the map is unchanged
+        assertEquals(150, dimension.getHeightAt(256, 256), 0.01f);
+        assertEquals(150, dimension.getHeightAt(256 - 175, 256 - 175), 0.01f);
+        // The corners of the tiles, outside the circle, are filled in and present now
+        assertFalse(dimension.getBitLayerValueAt(org.pepsoft.worldpainter.layers.NotPresent.INSTANCE, 5, 5));
+        // Going out from the circle along the diagonal, the land goes down towards the target without a cliff
+        float previous = Float.MAX_VALUE;
+        for (int d = 182; d < 256; d++) {
+            final float h = dimension.getHeightAt(256 - d, 256 - d);
+            assertTrue("Not decreasing at " + d, h <= previous + 0.01f);
+            assertTrue("Too steep at " + d + ": " + (previous - h), (previous == Float.MAX_VALUE) || (previous - h < 4));
+            previous = h;
+        }
+        // Just outside the circle the land is still close to the map, further out close to the target
+        assertTrue(dimension.getHeightAt(256 - 184, 256 - 184) > 140);
+        assertTrue(dimension.getHeightAt(1, 1) < 100);
+    }
 }

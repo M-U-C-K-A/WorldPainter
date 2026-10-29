@@ -39,7 +39,7 @@ The **Packs** panel, next to Terrain, Layers and Biomes, is a library of everyth
 | Plants & ground cover | Grass and flowers, tall grass, ferns, forest floor, bushes, dry grass, desert plants, jungle undergrowth, pale garden, mushrooms |
 | Water plants | Lily pads, seagrass and kelp, coral garden, sugar cane |
 | Crops | Farm crops (on farmland), pumpkins and melons |
-| Soil, stone, sand, cliffs, snow and volcanic | The material mixes below |
+| Grass, dirt, stone, sand, cliff, snow and volcanic mixes | The material mixes below |
 
 Plant layers are painted with an intensity: the higher it is, the denser the plants.
 
@@ -47,16 +47,19 @@ Plant layers are painted with an intensity: the higher it is, the denser the pla
 
 Natural ground is rarely made of one block. The material mixes are ready made mixes of blocks, in patches, noise or layers:
 
-| Soil | Stone | Sand and shore | Cliffs and strata | Snow, ice and volcanic |
-|---|---|---|---|---|
-| Mixed dirt | Rocky ground | Beach mix | Red cliff strata | Snowy rock |
-| Coarse dirt | Limestone | Sand and gravel | Grey cliff strata | Glacier |
-| Forest floor | Mossy rock | Riverbed | Sandstone strata | Volcanic rock |
-| Taiga floor | Alpine scree | Coral reef | White chalk strata | |
-| Meadow | Cobblestone mix | Desert mix | Badlands strata | |
-| Mossy ground | Andesite mix | Red sand mix | | |
-| Trodden path | Granite mix | | | |
-| Swamp mud | Deepslate mix | | | |
+| Grass | Dirt and soil | Stone | Sand and shore | Cliffs and strata | Snow, ice and volcanic |
+|---|---|---|---|---|---|
+| Meadow | Mixed dirt | Rocky ground | Beach mix | Red cliff strata | Snowy rock |
+| Forest floor | Coarse dirt | Limestone | Sand and gravel | Grey cliff strata | Glacier |
+| Mossy ground | Taiga floor | Mossy rock | Riverbed | Sandstone strata | Volcanic rock |
+| Grass and dirt | Trodden path | Alpine scree | Coral reef | White chalk strata | |
+| Grass and stone | Swamp mud | Cobblestone mix | Desert mix | Badlands strata | |
+| Lush grass | Mud and clay | Andesite mix | Red sand mix | | |
+| Dry grass | | Granite mix | | | |
+| | | Deepslate mix | | | |
+| | | Gravel mix | | | |
+
+They are listed in the Terrain panel and in the Packs panel. Hover over one to see its blocks and their shares; click it to add it as a custom terrain type and paint with it.
 
 The cliff strata are horizontal bands of rock which repeat upwards and dip slightly, for canyon walls.
 

@@ -5,19 +5,27 @@ import java.awt.*;
 import java.awt.event.HierarchyEvent;
 import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
- * A rich tooltip for a tool: a card with a looping animation of what the tool does, its name, its keyboard shortcut
- * and a short explanation. Buttons created with {@link #button()} or {@link #toggleButton()} show the card set on
- * them with {@link #install(AbstractButton, ToolCard)} instead of a plain tooltip.
+ * A rich tooltip: a card with an optional preview (such as a looping animation of what a tool does), a title, a
+ * keyboard shortcut, a short explanation, and optionally a list of rows (such as the blocks of a mix of materials, with
+ * their proportions). Buttons created with {@link #button()} or {@link #toggleButton()} show the card set on them with
+ * {@link #install(AbstractButton, ToolCard)} instead of a plain tooltip.
  */
 public final class ToolCard {
     public ToolCard(String title, String description, String shortcut, ToolDemo demo) {
+        this(title, description, shortcut, (demo != null) ? demo::paint : null, null);
+    }
+
+    public ToolCard(String title, String description, String shortcut, Preview preview, List<Row> rows) {
         this.title = title;
         this.description = description;
         this.shortcut = shortcut;
-        this.demo = demo;
+        this.preview = preview;
+        this.rows = (rows != null) ? rows : Collections.emptyList();
     }
 
     public String getTitle() {
@@ -35,11 +43,19 @@ public final class ToolCard {
         }
     }
 
+    /**
+     * Show a card as the tooltip of a button (which must have been created by this class), worked out each time it is
+     * shown, for things which can change. The supplier may return {@code null} for a plain tooltip.
+     */
+    public static void install(AbstractButton button, Supplier<ToolCard> cardSupplier) {
+        button.putClientProperty(KEY_CARD, cardSupplier);
+    }
+
     public static JButton button() {
         return new JButton() {
             @Override
             public JToolTip createToolTip() {
-                final ToolCard card = (ToolCard) getClientProperty(KEY_CARD);
+                final ToolCard card = cardOf(this);
                 return (card != null) ? new CardToolTip(this, card) : super.createToolTip();
             }
         };
@@ -49,16 +65,62 @@ public final class ToolCard {
         return new JToggleButton() {
             @Override
             public JToolTip createToolTip() {
-                final ToolCard card = (ToolCard) getClientProperty(KEY_CARD);
+                final ToolCard card = cardOf(this);
                 return (card != null) ? new CardToolTip(this, card) : super.createToolTip();
             }
         };
     }
 
+    /**
+     * The card tooltip for a component on which a card was installed, for components not created by this class which
+     * override {@link JComponent#createToolTip()} themselves, or {@code null} if it has none.
+     */
+    public static JToolTip toolTipFor(JComponent component) {
+        final ToolCard card = cardOf(component);
+        return (card != null) ? new CardToolTip(component, card) : null;
+    }
+
+    @SuppressWarnings("unchecked") // Guaranteed by install()
+    private static ToolCard cardOf(JComponent component) {
+        final Object card = component.getClientProperty(KEY_CARD);
+        if (card instanceof ToolCard) {
+            return (ToolCard) card;
+        } else if (card instanceof Supplier) {
+            return ((Supplier<ToolCard>) card).get();
+        } else {
+            return null;
+        }
+    }
+
     private final String title, description, shortcut;
-    private final ToolDemo demo;
+    private final Preview preview;
+    private final List<Row> rows;
 
     private static final String KEY_CARD = "org.pepsoft.worldpainter.help.toolCard";
+
+    /**
+     * Something drawn at the top of a card, which may change with the time.
+     */
+    public interface Preview {
+        /**
+         * @param time The time in a loop of a few seconds, from zero to one.
+         */
+        void paint(Graphics2D g2, int width, int height, double time);
+    }
+
+    /**
+     * A row of a card: an icon, a name and a value, such as a block of a mix and its proportion.
+     */
+    public static final class Row {
+        public Row(Icon icon, String name, String value) {
+            this.icon = icon;
+            this.name = name;
+            this.value = value;
+        }
+
+        final Icon icon;
+        final String name, value;
+    }
 
     /**
      * The card itself. It paints everything itself, and animates the demo while it is showing.
@@ -110,12 +172,12 @@ public final class ToolCard {
 
                 // The animation, in a rounded frame
                 final Layout layout = cardLayout();
-                if (card.demo != null) {
+                if (card.preview != null) {
                     final Graphics2D preview = (Graphics2D) g2.create(s(PADDING), s(PADDING), s(WIDTH) - 2 * s(PADDING), s(PREVIEW_HEIGHT));
                     try {
                         preview.clip(new RoundRectangle2D.Float(0, 0, s(WIDTH) - 2 * s(PADDING), s(PREVIEW_HEIGHT), 10, 10));
                         final double time = ((System.currentTimeMillis() - start) % LOOP) / (double) LOOP;
-                        card.demo.paint(preview, s(WIDTH) - 2 * s(PADDING), s(PREVIEW_HEIGHT), time);
+                        card.preview.paint(preview, s(WIDTH) - 2 * s(PADDING), s(PREVIEW_HEIGHT), time);
                     } finally {
                         preview.dispose();
                     }
@@ -150,6 +212,38 @@ public final class ToolCard {
                     g2.drawString(line, s(PADDING), y);
                     y += metrics.getHeight();
                 }
+
+                // The rows: an icon, a name and a value
+                if (! card.rows.isEmpty()) {
+                    g2.setColor(border);
+                    g2.drawLine(s(PADDING), layout.rowsY - s(4), getWidth() - s(PADDING), layout.rowsY - s(4));
+                    final FontMetrics rowMetrics = g2.getFontMetrics(bodyFont());
+                    int rowY = layout.rowsY;
+                    for (Row row: card.rows) {
+                        final int iconSize = s(ROW_HEIGHT) - s(6);
+                        if (row.icon != null) {
+                            final Graphics2D iconGraphics = (Graphics2D) g2.create(s(PADDING), rowY + s(3), iconSize, iconSize);
+                            try {
+                                iconGraphics.clip(new RoundRectangle2D.Float(0, 0, iconSize, iconSize, s(6), s(6)));
+                                iconGraphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+                                final double scale = (double) iconSize / Math.max(1, Math.max(row.icon.getIconWidth(), row.icon.getIconHeight()));
+                                iconGraphics.scale(scale, scale);
+                                row.icon.paintIcon(this, iconGraphics, 0, 0);
+                            } finally {
+                                iconGraphics.dispose();
+                            }
+                        }
+                        final int baseline = rowY + (s(ROW_HEIGHT) + rowMetrics.getAscent() - rowMetrics.getDescent()) / 2;
+                        g2.setFont(bodyFont());
+                        g2.setColor(foreground);
+                        g2.drawString(row.name, s(PADDING) + iconSize + s(10), baseline);
+                        if (row.value != null) {
+                            g2.setColor(muted);
+                            g2.drawString(row.value, getWidth() - s(PADDING) - rowMetrics.stringWidth(row.value), baseline);
+                        }
+                        rowY += s(ROW_HEIGHT);
+                    }
+                }
             } finally {
                 g2.dispose();
             }
@@ -158,12 +252,18 @@ public final class ToolCard {
         private Layout cardLayout() {
             final FontMetrics titleMetrics = getFontMetrics(titleFont()), bodyMetrics = getFontMetrics(bodyFont());
             final Layout layout = new Layout();
-            int y = s(PADDING) + ((card.demo != null) ? s(PREVIEW_HEIGHT) + 10 : 0);
+            int y = s(PADDING) + ((card.preview != null) ? s(PREVIEW_HEIGHT) + 10 : 0);
             layout.titleY = y + titleMetrics.getAscent();
             y += titleMetrics.getHeight() + 4;
             layout.lines = wrap(stripHtml(card.description), bodyMetrics, s(WIDTH) - 2 * s(PADDING));
             layout.bodyY = y + bodyMetrics.getAscent();
-            y += layout.lines.size() * bodyMetrics.getHeight() + s(PADDING) - 2;
+            y += layout.lines.size() * bodyMetrics.getHeight();
+            if (! card.rows.isEmpty()) {
+                y += s(8);
+                layout.rowsY = y;
+                y += card.rows.size() * s(ROW_HEIGHT);
+            }
+            y += s(PADDING) - 2;
             layout.height = y;
             return layout;
         }
@@ -218,11 +318,11 @@ public final class ToolCard {
         private int previousDismissDelay;
 
         private static final class Layout {
-            int titleY, bodyY, height;
+            int titleY, bodyY, rowsY, height;
             List<String> lines;
         }
 
-        private static final int WIDTH = 280, PADDING = 10, PREVIEW_HEIGHT = 140, LOOP = 4200;
+        private static final int WIDTH = 280, PADDING = 10, PREVIEW_HEIGHT = 140, LOOP = 4200, ROW_HEIGHT = 28;
 
         /**
          * Scale a size in pixels to the scale of the user interface.

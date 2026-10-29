@@ -49,6 +49,12 @@ public class LazyLoadingIconToggleButton extends JToggleButton {
         super.paintComponent(g);
     }
 
+    @Override
+    public JToolTip createToolTip() {
+        final JToolTip card = org.pepsoft.worldpainter.help.ToolCard.toolTipFor(this);
+        return (card != null) ? card : super.createToolTip();
+    }
+
     private static Icon getEmptyIcon(int size) {
         return emptyIcons.computeIfAbsent(size, key -> new Icon() {
             @Override public void paintIcon(Component c, Graphics g, int x, int y) { /* Do nothing */ }

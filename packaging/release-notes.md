@@ -4,12 +4,12 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 ## What is in it
 
-- A new interface, with light and dark themes and grouped tools
-- An integrated 3D view, with colour modes, 1:1 blocks near the camera and optional shaders (sun, shadows, water)
+- A new interface, with light and dark themes, palettes which fill their panels, and cards on hover with an animation of each tool, a 3D preview of each brush, and the blocks or plants of each mix and their shares
+- An integrated 3D view, with colour modes, 1:1 blocks up to 4096 blocks around the camera, optional shaders (sun, shadows, water), cross sections of the ground on its sides, and a panel of its own to float next to the map
 - A node graph to generate complete worlds, with 36 kinds of nodes, examples and `.wpgraph` files, including a Floating islands node
-- Surroundings, seed search and blending the edges of the map into a seed
-- Paths from point to point with bridges and tunnels
-- A tree pack and material mixes
+- Surroundings drawn like the map, seed search, and blending the edges of the map into a seed (also round maps, with undo)
+- Paths from point to point with bridges and tunnels, and rectangle selection
+- Packs ready to paint: 14 kinds of custom trees, 24 presets of flowers and plants, 35 mixes of blocks, and 22 terrain stamp brushes
 
 ## Downloads
 

@@ -11,7 +11,7 @@ import java.awt.image.BufferedImage;
  */
 public enum ToolDemo {
     RAISE, FLATTEN, SMOOTH, MOUNTAIN, PYRAMID, ROTATED_PYRAMID, PATH, PENCIL, SPRAY, FILL, EYEDROPPER, GLOBAL, TEXT,
-    FLOOD_WATER, FLOOD_LAVA, SPONGE, SELECT, COPY, CLEAR_SELECTION, SPAWN;
+    FLOOD_WATER, FLOOD_LAVA, SPONGE, SELECT, COPY, CLEAR_SELECTION, SPAWN, SELECT_BRUSH;
 
     /**
      * Draw a frame of the animation.
@@ -207,6 +207,19 @@ public enum ToolDemo {
                     scene.selectionFade = smoothStep(0.6, 0.9, progress);
                 }
                 return (progress < 0.5) ? new double[] {18 + 46 * drag, 12 + 30 * drag, 2, 1} : null;
+            }
+            case SELECT_BRUSH: {
+                scene.addHills(5);
+                scene.dry = new boolean[W * H];
+                final int steps = (int) Math.round(progress * SAMPLES);
+                for (int i = 0; i < steps; i++) {
+                    final double[] p = sweep((double) i / SAMPLES);
+                    scene.sponge(p[0], p[1], 8);
+                }
+                scene.selectedCells = scene.dry;
+                scene.dry = null;
+                final double[] p = sweep(progress);
+                return new double[] {p[0], p[1], 8};
             }
             case SPAWN: {
                 scene.addHills(5);
@@ -441,6 +454,12 @@ public enum ToolDemo {
                         g = g * 3 / 4;
                         b = b * 3 / 4;
                     }
+                    if ((selectedCells != null) && selectedCells[i]) {
+                        // The selection, tinted yellow as on the map
+                        r = (r + 255) / 2;
+                        g = (g + 230) / 2;
+                        b = b / 2;
+                    }
                     image.setRGB(x, y, (r << 16) | (g << 8) | b);
                 }
             }
@@ -478,7 +497,7 @@ public enum ToolDemo {
         final int[] terrain = new int[W * H];
         float waterLevel = Float.NEGATIVE_INFINITY;
         boolean lava;
-        boolean[] dry;
+        boolean[] dry, selectedCells;
         double[][] markers;
         double[] selection, copyOffset;
         double selectionFade, textProgress, flag;
