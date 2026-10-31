@@ -76,11 +76,17 @@ public final class DefaultFilter implements Filter {
 
     public void setDimension(Dimension dimension) {
         this.dimension = dimension;
-        if (onlyOnFilter instanceof TerrainOrLayerFilter) {
-            ((TerrainOrLayerFilter) onlyOnFilter).dimension = dimension;
-        }
-        if (exceptOnFilter instanceof TerrainOrLayerFilter) {
-            ((TerrainOrLayerFilter) exceptOnFilter).dimension = dimension;
+        setDimension(onlyOnFilter, dimension);
+        setDimension(exceptOnFilter, dimension);
+    }
+
+    private static void setDimension(Filter filter, Dimension dimension) {
+        if (filter instanceof TerrainOrLayerFilter) {
+            ((TerrainOrLayerFilter) filter).dimension = dimension;
+        } else if (filter instanceof AnyOfFilter) {
+            ((AnyOfFilter) filter).getFilters().forEach(subFilter -> setDimension(subFilter, dimension));
+        } else if (filter instanceof CombinedFilter) {
+            ((CombinedFilter) filter).getFilters().forEach(subFilter -> setDimension(subFilter, dimension));
         }
     }
 

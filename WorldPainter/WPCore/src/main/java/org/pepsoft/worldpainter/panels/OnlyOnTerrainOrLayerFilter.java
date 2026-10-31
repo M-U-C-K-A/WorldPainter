@@ -90,7 +90,7 @@ public class OnlyOnTerrainOrLayerFilter extends TerrainOrLayerFilter {
     @SuppressWarnings("unchecked") // Guaranteed by code
     public static Filter create(Dimension dimension, Object item) {
         if (item instanceof List) {
-            return new CombinedFilter(((List<Object>) item).stream()
+            return new AnyOfFilter(((List<Object>) item).stream()
                     .map(object -> OnlyOnTerrainOrLayerFilter.create(dimension, object))
                     .collect(toList()));
         } else {

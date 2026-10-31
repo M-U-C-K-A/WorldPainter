@@ -5,6 +5,8 @@ import org.pepsoft.worldpainter.*;
 import org.pepsoft.worldpainter.selection.SelectionBlock;
 import org.pepsoft.worldpainter.selection.SelectionChunk;
 
+import java.util.List;
+
 import static org.junit.Assert.assertEquals;
 import static org.pepsoft.worldpainter.DefaultPlugin.JAVA_ANVIL_1_20_5;
 import static org.pepsoft.worldpainter.Dimension.Anchor.NORMAL_DETAIL;
@@ -45,6 +47,31 @@ public class DefaultFilterTest {
         assertEquals(0.0f, filter.modifyStrength(10, 10, 1.0f), 0.0f);
         filter.setDimension(second);
         assertEquals(1.0f, filter.modifyStrength(10, 10, 1.0f), 0.0f);
+    }
+
+    @Test
+    public void testOnlyOnAndExceptOnSeveralTerrains() {
+        final Dimension dimension = createDimension(70);
+        dimension.setTerrainAt(1, 1, Terrain.GRASS);
+        dimension.setTerrainAt(2, 1, Terrain.STONE);
+        dimension.setTerrainAt(3, 1, Terrain.SAND);
+        final List<Object> grassAndStone = List.of(Terrain.GRASS, Terrain.STONE);
+
+        final DefaultFilter onlyOn = new DefaultFilter(dimension, false, false, Integer.MIN_VALUE, Integer.MIN_VALUE, false, true, grassAndStone, false, null, -1, false);
+        assertEquals(1.0f, onlyOn.modifyStrength(1, 1, 1.0f), 0.0f);
+        assertEquals(1.0f, onlyOn.modifyStrength(2, 1, 1.0f), 0.0f);
+        assertEquals(0.0f, onlyOn.modifyStrength(3, 1, 1.0f), 0.0f);
+
+        final DefaultFilter exceptOn = new DefaultFilter(dimension, false, false, Integer.MIN_VALUE, Integer.MIN_VALUE, false, false, null, true, grassAndStone, -1, false);
+        assertEquals(0.0f, exceptOn.modifyStrength(1, 1, 1.0f), 0.0f);
+        assertEquals(0.0f, exceptOn.modifyStrength(2, 1, 1.0f), 0.0f);
+        assertEquals(1.0f, exceptOn.modifyStrength(3, 1, 1.0f), 0.0f);
+
+        // And they follow when the dimension changes
+        final Dimension other = createDimension(70);
+        other.setTerrainAt(3, 1, Terrain.STONE);
+        onlyOn.setDimension(other);
+        assertEquals(1.0f, onlyOn.modifyStrength(3, 1, 1.0f), 0.0f);
     }
 
     private static DefaultFilter filter(Dimension dimension, boolean inSelection, boolean outsideSelection, int above, int below) {

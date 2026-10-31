@@ -18,8 +18,6 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
 import java.util.List;
 import java.util.*;
 
@@ -34,19 +32,11 @@ public class GlassPane extends javax.swing.JPanel {
     /** Creates new form GlassPane */
     public GlassPane() {
         initComponents();
-        if (getUIScale() != 1.0f) {
-            jLabel1.setIcon(IconUtils.loadScaledIcon("org/pepsoft/worldpainter/scale_bar.png")); // NOI18N
-            jLabel2.setIcon(IconUtils.loadScaledIcon("org/pepsoft/worldpainter/north_arrow_up.png")); // NOI18N
-        }
-        // Keep the north arrow visible on dark themes
-        jLabel2.setIcon(new org.pepsoft.worldpainter.util.TintedIcon(jLabel2.getIcon()));
 //        jPanel2.add(miniMap, BorderLayout.CENTER);
     }
     
     public void setScale(float scale) {
-        int scaleBarSize = (int) (100 / scale * getUIScale());
-        jLabel1.setText(SCALE_FORMAT.format(scaleBarSize));
-        repaint();
+        scaleIndicator.setPixelsPerBlock(scale);
     }
 
     public void setHiddenLayers(Set<Layer> hiddenLayers) {
@@ -143,17 +133,11 @@ public class GlassPane extends javax.swing.JPanel {
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
-        jLabel1 = new javax.swing.JLabel();
-        jLabel2 = new javax.swing.JLabel();
+        scaleIndicator = new org.pepsoft.worldpainter.MapScaleIndicator();
         jPanel1 = new javax.swing.JPanel();
         jPanel2 = new javax.swing.JPanel();
 
         setOpaque(false);
-
-        jLabel1.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/pepsoft/worldpainter/scale_bar.png"))); // NOI18N
-        jLabel1.setText("100 blocks");
-
-        jLabel2.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/pepsoft/worldpainter/north_arrow_up.png"))); // NOI18N
 
         jPanel1.setOpaque(false);
         jPanel1.setLayout(new javax.swing.BoxLayout(jPanel1, javax.swing.BoxLayout.LINE_AXIS));
@@ -169,8 +153,7 @@ public class GlassPane extends javax.swing.JPanel {
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jLabel1)
-                            .addComponent(jLabel2))
+                            .addComponent(scaleIndicator, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                         .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -186,15 +169,12 @@ public class GlassPane extends javax.swing.JPanel {
                 .addGap(18, 18, 18)
                 .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(jLabel2)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jLabel1)
-                .addGap(20, 20, 20))
+                .addComponent(scaleIndicator, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(12, 12, 12))
         );
     }// </editor-fold>//GEN-END:initComponents
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JLabel jLabel1;
-    private javax.swing.JLabel jLabel2;
+    private org.pepsoft.worldpainter.MapScaleIndicator scaleIndicator;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     // End of variables declaration//GEN-END:variables
@@ -205,7 +185,6 @@ public class GlassPane extends javax.swing.JPanel {
     private JLabel soloLayerLabel;
     private List<Component> panelComponentStack = new ArrayList<>();
     
-    private static final NumberFormat SCALE_FORMAT = new DecimalFormat("#,##0.# blocks");
     private static final BufferedImage PROHIBITED_SIGN_BACKGROUND = IconUtils.loadScaledImage("org/pepsoft/worldpainter/icons/prohibited_sign_background.png");
     private static final BufferedImage PROHIBITED_SIGN_FOREGROUND = IconUtils.loadScaledImage("org/pepsoft/worldpainter/icons/prohibited_sign_foreground.png");
     private static final long serialVersionUID = 1L;

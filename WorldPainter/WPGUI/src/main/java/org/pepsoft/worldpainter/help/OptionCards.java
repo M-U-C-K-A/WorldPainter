@@ -47,15 +47,19 @@ public final class OptionCards {
     }
 
     public static ToolCard onlyOn() {
-        return new ToolCard("Only on", "The brush only changes the map where it already has the terrain types or layers you choose.", null,
+        return new ToolCard("Only on", "The brush only changes the map where it already has one of the terrain types or layers you choose.", null,
                 new Panels(new String[] {"Without", "Only on stone"}, OptionCards::paintOnlyOn), null)
-                .tip("For instance: put snow only on stone.");
+                .action("Add another", "Choose as many as you like")
+                .action("\u00d7", "Remove one from the list")
+                .tip("For instance: turn grass and stone into dirt, and leave the rest alone.");
     }
 
     public static ToolCard exceptOn() {
         return new ToolCard("Except on", "The brush leaves the terrain types or layers you choose alone, and changes everything else.", null,
                 new Panels(new String[] {"Without", "Except on stone"}, OptionCards::paintExceptOn), null)
-                .tip("For instance: paint grass without covering the paths.");
+                .action("Add another", "Choose as many as you like")
+                .action("\u00d7", "Remove one from the list")
+                .tip("For instance: paint grass without covering the paths or the sand.");
     }
 
     public static ToolCard slope() {

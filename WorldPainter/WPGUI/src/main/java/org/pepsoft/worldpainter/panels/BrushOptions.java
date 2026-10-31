@@ -118,8 +118,8 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
     public DefaultFilter getFilter() {
         if ((comboBoxMapArea.getSelectedItem() != MapArea.WHOLE_MAP) || checkBoxAbove.isSelected()
-                || checkBoxBelow.isSelected() || checkBoxReplace.isSelected() || (onlyOn != null)
-                || checkBoxExceptOn.isSelected() || (exceptOn != null) || checkBoxAboveSlope.isSelected()
+                || checkBoxBelow.isSelected() || (checkBoxReplace.isSelected() && (onlyOn != null))
+                || (checkBoxExceptOn.isSelected() && (exceptOn != null)) || checkBoxAboveSlope.isSelected()
                 || checkBoxBelowSlope.isSelected()) {
             return new DefaultFilter(App.getInstance().getDimension(),
                     comboBoxMapArea.getSelectedItem() == MapArea.INSIDE_SELECTION,
@@ -127,9 +127,9 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
                     checkBoxAbove.isSelected() ? (Integer) spinnerAbove.getValue() : Integer.MIN_VALUE,
                     checkBoxBelow.isSelected() ? (Integer) spinnerBelow.getValue() : Integer.MIN_VALUE,
                     checkBoxFeather.isSelected(),
-                    checkBoxReplace.isSelected(),
+                    checkBoxReplace.isSelected() && (onlyOn != null),
                     onlyOn,
-                    checkBoxExceptOn.isSelected(),
+                    checkBoxExceptOn.isSelected() && (exceptOn != null),
                     exceptOn,
                     (checkBoxAboveSlope.isSelected() || checkBoxBelowSlope.isSelected()) ? (Integer) spinnerSlope.getValue() : -1,
                     checkBoxAboveSlope.isSelected());
@@ -181,8 +181,8 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
             final App app = App.getInstance();
             if (filter.onlyOnFilter instanceof OnlyOnTerrainOrLayerFilter) {
                 onlyOn = toPaint((OnlyOnTerrainOrLayerFilter) filter.onlyOnFilter);
-            } else if (filter.onlyOnFilter instanceof CombinedFilter) {
-                onlyOn = ((CombinedFilter) filter.onlyOnFilter).getFilters().stream()
+            } else if (filter.onlyOnFilter instanceof AnyOfFilter) {
+                onlyOn = ((AnyOfFilter) filter.onlyOnFilter).getFilters().stream()
                         .map(f -> toPaint((OnlyOnTerrainOrLayerFilter) f))
                         .collect(Collectors.toCollection(ArrayList::new));
             } else if (filter.onlyOnFilter != null) {
@@ -319,70 +319,72 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         comboBoxMapArea.setEnabled((boolean) selectionMayBePresent);
     }
 
-    @SuppressWarnings("unchecked") // Guaranteed by code
+    /**
+     * The new selection with an item added, as a new list so that the previous one can still be gone back to.
+     */
     private Object addToSelection(Object currentSelection, Object item) {
-        final List<Object> selection;
-        if (currentSelection instanceof List) {
-            selection = (List<Object>) currentSelection;
-        } else {
-            selection = new ArrayList<>(singleton(currentSelection));
+        final List<Object> selection = itemsOf(currentSelection);
+        if (selection.contains(item)) {
+            return currentSelection;
         }
         selection.add(item);
-        return selection;
+        return (selection.size() == 1) ? item : selection;
+    }
+
+    private Object removeFromSelection(Object currentSelection, Object item) {
+        final List<Object> selection = itemsOf(currentSelection);
+        selection.remove(item);
+        return selection.isEmpty() ? null : ((selection.size() == 1) ? selection.get(0) : selection);
     }
 
     @SuppressWarnings("unchecked") // Guaranteed by code
-    private void installPaint(Object paint, AbstractButton button) {
-        final String text, tooltip;
-        final Icon icon;
-        if (paint == null) {
-            text = "Choose\u2026";
-            icon = null;
-            tooltip = null;
-        } else if (paint instanceof List) {
-            final List<Object> list = (List<Object>) paint;
-            final String symbol = (button == buttonReplace) ? " + " : " / ";
-            if (list.size() > 2) {
-                text = shorten(getText(list.get(0))) + symbol + (list.size() - 1) + " more";
-            } else {
-                text = shorten(getText(list.get(0)) + symbol + shorten(getText(list.get(1))));
-            }
-            final List<ImageIcon> icons = list.stream()
-                    .map(item -> (ImageIcon) getIcon(item))
-                    .filter(Objects::nonNull)
-                    .limit(2)
-                    .collect(toList());
-            if (icons.isEmpty()) {
-                icon = null;
-            } else if (icons.size() == 1) {
-                icon = icons.get(0);
-            } else {
-                final int iconSize = Math.round(16 * getUIScale()), subSize = Math.round(12 * getUIScale());
-                final BufferedImage image = new BufferedImage(iconSize, iconSize, TYPE_INT_ARGB);
-                final Graphics2D g2 = image.createGraphics();
-                try {
-                    g2.setRenderingHint(KEY_INTERPOLATION, VALUE_INTERPOLATION_BICUBIC);
-                    g2.drawImage(icons.get(0).getImage(), 0, 0, subSize, subSize, null);
-                    g2.drawImage(icons.get(1).getImage(), (iconSize - subSize), (iconSize - subSize), subSize, subSize, null);
-                } finally {
-                    g2.dispose();
-                }
-                icon = new ImageIcon(image);
-            }
-            tooltip = "<html>" + ((List<Object>) paint).stream().map(this::getText).collect(joining("<br>")) + "</html>";
+    private static List<Object> itemsOf(Object selection) {
+        if (selection == null) {
+            return new ArrayList<>();
+        } else if (selection instanceof List) {
+            return new ArrayList<>((List<Object>) selection);
         } else {
-            text = getText(paint);
-            icon = getIcon(paint);
-            tooltip = null;
+            return new ArrayList<>(singleton(selection));
         }
-        button.setText(text);
-        button.setIcon(icon);
-        button.setToolTipText(tooltip);
-        filterChanged();
     }
 
-    private String shorten(String text) {
-        return (text.length() > 15) ? (text.substring(0, 12) + "...") : text;
+    /**
+     * Show what has been chosen as a list, each with a button to remove it, and a button to add more.
+     */
+    private void installPaint(Object paint, AbstractButton button) {
+        final boolean replace = button == buttonReplace;
+        final SelectionList list = replace ? listReplace : listExceptOn;
+        list.removeAll();
+        for (Object item: itemsOf(paint)) {
+            final JPanel row = new JPanel(new BorderLayout(4, 0));
+            final String text = getText(item);
+            final JLabel label = new JLabel(text, getIcon(item), SwingConstants.LEADING);
+            label.setFont(label.getFont().deriveFont(label.getFont().getSize() - 1f));
+            label.setToolTipText(text);
+            row.add(label, BorderLayout.CENTER);
+            final JButton removeButton = new JButton("\u00d7");
+            removeButton.putClientProperty(com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE, com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+            removeButton.setMargin(new Insets(0, 4, 0, 4));
+            removeButton.setFocusable(false);
+            removeButton.setToolTipText("Remove " + text);
+            removeButton.addActionListener(e -> {
+                initialiseIfNecessary();
+                if (replace) {
+                    onlyOn = removeFromSelection(onlyOn, item);
+                    installPaint(onlyOn, buttonReplace);
+                } else {
+                    exceptOn = removeFromSelection(exceptOn, item);
+                    installPaint(exceptOn, buttonExceptOn);
+                }
+            });
+            row.add(removeButton, BorderLayout.LINE_END);
+            row.setAlignmentX(LEFT_ALIGNMENT);
+            list.add(row);
+        }
+        button.setText((paint == null) ? "Choose\u2026" : "Add another\u2026");
+        list.revalidate();
+        list.repaint();
+        filterChanged();
     }
 
     private String getText(Object paint) {
@@ -689,15 +691,17 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         spinnerSlope.setEnabled(checkBoxAboveSlope.isSelected() || checkBoxBelowSlope.isSelected());
         // The buttons to choose what from only appear when they are needed
         buttonReplace.setVisible(checkBoxReplace.isSelected());
+        listReplace.setVisible(checkBoxReplace.isSelected());
         buttonExceptOn.setVisible(checkBoxExceptOn.isSelected());
+        listExceptOn.setVisible(checkBoxExceptOn.isSelected());
         checkBoxFeather.setEnabled(checkBoxAbove.isSelected() || checkBoxBelow.isSelected());
     }
 
     private JPopupMenu createReplaceMenu() {
         final JMenu menu = createObjectSelectionMenu(MENU_ONLY_ON, (object, name, icon) -> {
-            onlyOn = object;
+            onlyOn = addToSelection(onlyOn, object);
             installPaint(onlyOn, buttonReplace);
-        }, false, onlyOn);
+        }, true, onlyOn);
         final JPopupMenu popupMenu = new BetterJPopupMenu();
         Arrays.stream(menu.getMenuComponents()).forEach(popupMenu::add);
         return popupMenu;
@@ -705,9 +709,9 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
     private JPopupMenu createExceptOnMenu() {
         final JMenu menu = createObjectSelectionMenu(MENU_EXCEPT_ON, (object, name, icon) -> {
-            exceptOn = object;
+            exceptOn = addToSelection(exceptOn, object);
             installPaint(exceptOn, buttonExceptOn);
-        }, false, exceptOn);
+        }, true, exceptOn);
         final JPopupMenu popupMenu = new BetterJPopupMenu();
         Arrays.stream(menu.getMenuComponents()).forEach(popupMenu::add);
         return popupMenu;
@@ -906,23 +910,6 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
             annotationsMenu.add(menuItem);
         }
         popupMenu.add(annotationsMenu);
-
-        if ((! addAnother) && (currentSelection != null)) {
-            final JMenu subMenu = createObjectSelectionMenu(descriptor, ((object, name, icon) -> {
-                final List<Object> selection;
-                if (currentSelection instanceof List) {
-                    selection = (List<Object>) currentSelection;
-                } else {
-                    selection = new ArrayList<>();
-                    selection.add(currentSelection);
-                }
-                selection.add(object);
-                listener.objectSelected(selection, "Multiple", ICON_PLUS);
-            }), true, currentSelection);
-            subMenu.setText("Add Another");
-            subMenu.setIcon(ICON_PLUS);
-            popupMenu.add(subMenu);
-        }
 
         popupMenu = breakUpLongMenus(popupMenu, 25);
 
@@ -1179,8 +1166,8 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         constraints.insets = new Insets(10, 0, 0, 0);
         add(sectionTitle("What is on the map"), constraints);
         final JPanel otherFields = new JPanel(new org.pepsoft.worldpainter.util.ResponsiveColumnsLayout(scaled(COLUMN_WIDTH), scaled(4), 3));
-        otherFields.add(withCard(block(checkBoxReplace, buttonReplace), OptionCards.onlyOn()));
-        otherFields.add(withCard(block(checkBoxExceptOn, buttonExceptOn), OptionCards.exceptOn()));
+        otherFields.add(withCard(block(checkBoxReplace, listReplace, buttonReplace), OptionCards.onlyOn()));
+        otherFields.add(withCard(block(checkBoxExceptOn, listExceptOn, buttonExceptOn), OptionCards.exceptOn()));
         final JLabel slopeLabel = new JLabel("slope");
         slopeLabel.setFont(slopeLabel.getFont().deriveFont(slopeLabel.getFont().getSize() - 1f));
         otherFields.add(withCard(block(slopeLabel, row(checkBoxAboveSlope, checkBoxBelowSlope), row(spinnerSlope, jLabel1)), OptionCards.slope()));
@@ -1212,8 +1199,10 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         block.setLayout(new BoxLayout(block, BoxLayout.Y_AXIS));
         for (JComponent component: components) {
             component.setAlignmentX(LEFT_ALIGNMENT);
-            final java.awt.Dimension size = component.getPreferredSize();
-            component.setMaximumSize(new java.awt.Dimension((component instanceof JButton) ? Short.MAX_VALUE : size.width, size.height));
+            if (! (component instanceof SelectionList)) {
+                final java.awt.Dimension size = component.getPreferredSize();
+                component.setMaximumSize(new java.awt.Dimension((component instanceof JButton) ? Short.MAX_VALUE : size.width, size.height));
+            }
             block.add(component);
         }
         return block;
@@ -1375,6 +1364,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     public static final String MENU_EXCEPT_ON = "exceptOn";
     
     private static final Icon ICON_WATER = loadScaledIcon("org/pepsoft/worldpainter/icons/flood.png");
+    private final SelectionList listReplace = new SelectionList(), listExceptOn = new SelectionList();
     private boolean updatingHeightScale;
     private final Deque<HistoryEntry> undoHistory = new ArrayDeque<>(), redoHistory = new ArrayDeque<>();
     private Options currentOptions;
@@ -1388,6 +1378,21 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     private static final Logger logger = LoggerFactory.getLogger(BrushOptions.class);
     private static final long serialVersionUID = 1L;
     
+    /**
+     * The terrain types and layers which have been chosen, under each other, as high as they need to be.
+     */
+    private static final class SelectionList extends JPanel {
+        SelectionList() {
+            setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+            setVisible(false);
+        }
+
+        @Override
+        public java.awt.Dimension getMaximumSize() {
+            return new java.awt.Dimension(Short.MAX_VALUE, getPreferredSize().height);
+        }
+    }
+
     /**
      * The part of the map a brush can be limited to, by the selection which was made on it.
      */

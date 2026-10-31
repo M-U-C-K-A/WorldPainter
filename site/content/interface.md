@@ -59,7 +59,7 @@ The **Options** can limit a brush in several independent ways:
 - **Where on the map** limits it to what you selected on the map with a selection tool, or to everything else. With *Inside selection* and nothing selected, the brush paints nowhere, and the panel says so.
 - The **height limits** limit it to certain heights, shown on a scale with a little landscape: the land in the accent colour is the land the brush will change.
 
-- **What is on the map** limits it to certain terrain types or layers (*only on*, *except on*), or to steep or gentle slopes.
+- **What is on the map** limits it to certain terrain types or layers (*only on*, *except on*), or to steep or gentle slopes. You can choose as many terrain types and layers as you like, with **Add another**: to turn grass and stone into dirt, paint dirt *only on* grass and stone.
 
 For the height limits:
 
