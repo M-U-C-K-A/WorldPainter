@@ -54,14 +54,16 @@ Hover over a brush to see its shape in 3D, turning slowly on a block of ground. 
 
 The brush settings (intensity, rotation, brush and options) stay as they are when you switch between tools, and when you paint with a different material.
 
-The **Options** can limit a brush in two independent ways:
+The **Options** can limit a brush in several independent ways:
 
-- **Inside map selection** and **outside map selection** limit it to what you selected on the map with a selection tool, or to everything else. With *inside map selection* and nothing selected, the brush paints nowhere, and the panel says so.
+- **Where on the map** limits it to what you selected on the map with a selection tool, or to everything else. With *Inside selection* and nothing selected, the brush paints nowhere, and the panel says so.
 - The **height limits** limit it to certain heights, shown on a scale with a little landscape: the land in the accent colour is the land the brush will change.
+
+- **What is on the map** limits it to certain terrain types or layers (*only on*, *except on*), or to steep or gentle slopes.
 
 For the height limits:
 
-- Drag the bars to set the limits, which also switches them on, or type them in the *at or above* and *at or below* fields. A value you type counts as soon as you click elsewhere, without pressing Enter.
+- Drag the bars to set the limits, which also switches them on, or type them in the *at or above* and *at or below* fields. A value you type counts as soon as you click elsewhere, without pressing Enter. *Fade at the limits* lets the brush fade over the 4 blocks beyond them, instead of stopping abruptly.
 - **Between** applies between the two bars; **Beyond** applies below the lower one and above the upper one. Click the highlighted button again to switch the limits off. 
 - Ctrl+Z (⌘Z on macOS) takes back changes to these options, and Ctrl+Y brings them back, as long as you have not changed the map since. After that they undo and redo changes to the map as usual.
 

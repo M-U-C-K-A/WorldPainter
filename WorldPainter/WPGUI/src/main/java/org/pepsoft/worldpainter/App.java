@@ -2855,7 +2855,7 @@ public final class App extends JFrame implements BrushControl,
             dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), entry.getKey(), Side.EAST, 1).withId("customBrushes." + entry.getKey()).scrollable().build());
         }
         
-        dockingManager.addFrame(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", Side.EAST, 2).withId("brushSettings").withIcon(Icons.get("settings-2")).build());
+        dockingManager.addFrame(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", Side.EAST, 2).withId("brushSettings").withIcon(Icons.get("settings-2")).scrollable().build());
 
         dockingManager.addFrame(new DockableFrameBuilder(createSurroundingsPanel(), "Surroundings", Side.EAST, 2).withId("surroundings").withIcon(Icons.get("map"))
                 .withDescription("The world seed, and a preview of the land Minecraft will generate around the map.").scrollable().build());
@@ -4160,6 +4160,10 @@ public final class App extends JFrame implements BrushControl,
         constraints.fill = HORIZONTAL;
         constraints.insets = new Insets(1, 1, 1, 1);
         brushSettingsPanel.add(brushOptions, constraints);
+
+        // Keep everything at the top if there is room left over
+        constraints.weighty = 1.0;
+        brushSettingsPanel.add(Box.createVerticalGlue(), constraints);
 
         brushSettingsPanel.putClientProperty(KEY_ICON, ICON_SETTINGS);
 

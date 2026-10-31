@@ -84,8 +84,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(this::dispatchUndoKey);
         currentOptions = currentOptions();
 
-        checkBoxInSelection.setToolTipText("Only where the map is selected with a selection tool. The bars below are about heights, not about this selection");
-        checkBoxOutsideSelection.setToolTipText("Only where the map is not selected with a selection tool. The bars below are about heights, not about this selection");
+        buildLayout();
         // The selection can change at any time, in many ways
         new javax.swing.Timer(1000, e -> updateNoSelectionHint()).start();
     }
@@ -112,18 +111,17 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         }
         this.selectionState = selectionState;
         selectionState.addObserver(this);
-        checkBoxInSelection.setEnabled(selectionState.getValue());
-        checkBoxOutsideSelection.setEnabled(selectionState.getValue());
+        comboBoxMapArea.setEnabled(selectionState.getValue());
     }
 
     public DefaultFilter getFilter() {
-        if (checkBoxInSelection.isSelected() || checkBoxOutsideSelection.isSelected() || checkBoxAbove.isSelected()
+        if ((comboBoxMapArea.getSelectedItem() != MapArea.WHOLE_MAP) || checkBoxAbove.isSelected()
                 || checkBoxBelow.isSelected() || checkBoxReplace.isSelected() || (onlyOn != null)
                 || checkBoxExceptOn.isSelected() || (exceptOn != null) || checkBoxAboveSlope.isSelected()
                 || checkBoxBelowSlope.isSelected()) {
             return new DefaultFilter(App.getInstance().getDimension(),
-                    checkBoxInSelection.isSelected(),
-                    checkBoxOutsideSelection.isSelected(),
+                    comboBoxMapArea.getSelectedItem() == MapArea.INSIDE_SELECTION,
+                    comboBoxMapArea.getSelectedItem() == MapArea.OUTSIDE_SELECTION,
                     checkBoxAbove.isSelected() ? (Integer) spinnerAbove.getValue() : Integer.MIN_VALUE,
                     checkBoxBelow.isSelected() ? (Integer) spinnerBelow.getValue() : Integer.MIN_VALUE,
                     checkBoxFeather.isSelected(),
@@ -153,8 +151,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
     private void applyFilter(DefaultFilter filter) {
         if (filter == null) {
-            checkBoxInSelection.setSelected(false);
-            checkBoxOutsideSelection.setSelected(false);
+            comboBoxMapArea.setSelectedItem(MapArea.WHOLE_MAP);
             checkBoxAbove.setSelected(false);
             checkBoxBelow.setSelected(false);
             checkBoxReplace.setSelected(false);
@@ -163,8 +160,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
             checkBoxBelowSlope.setSelected(false);
             onlyOn = exceptOn = null;
         } else {
-            checkBoxInSelection.setSelected(filter.inSelection);
-            checkBoxOutsideSelection.setSelected(filter.outsideSelection);
+            comboBoxMapArea.setSelectedItem(filter.inSelection ? MapArea.INSIDE_SELECTION : (filter.outsideSelection ? MapArea.OUTSIDE_SELECTION : MapArea.WHOLE_MAP));
             checkBoxAbove.setSelected(filter.levelType == LevelType.ABOVE || filter.levelType == LevelType.BETWEEN || filter.levelType == LevelType.OUTSIDE);
             if (filter.aboveLevel != Integer.MIN_VALUE) {
                 spinnerAbove.setValue(filter.aboveLevel);
@@ -318,8 +314,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
     @Override
     public void update(Observable o, Object selectionMayBePresent) {
-        checkBoxInSelection.setEnabled((boolean) selectionMayBePresent);
-        checkBoxOutsideSelection.setEnabled((boolean) selectionMayBePresent);
+        comboBoxMapArea.setEnabled((boolean) selectionMayBePresent);
     }
 
     @SuppressWarnings("unchecked") // Guaranteed by code
@@ -339,7 +334,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         final String text, tooltip;
         final Icon icon;
         if (paint == null) {
-            text = "...";
+            text = "Choose\u2026";
             icon = null;
             tooltip = null;
         } else if (paint instanceof List) {
@@ -523,12 +518,12 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     }
 
     /**
-     * "Inside map selection" with nothing selected lets the brush paint nowhere at all, which looks like nothing is
+     * "Inside selection" with nothing selected lets the brush paint nowhere at all, which looks like nothing is
      * working, so say why.
      */
     private void updateNoSelectionHint() {
         boolean nothingSelected = false;
-        if (checkBoxInSelection.isSelected() && isShowing()) {
+        if ((comboBoxMapArea.getSelectedItem() == MapArea.INSIDE_SELECTION) && isShowing()) {
             final App app = App.getInstanceIfExists();
             final Dimension dimension = (app != null) ? app.getDimension() : null;
             nothingSelected = (dimension != null) && (! dimension.containsOneOf(SelectionChunk.INSTANCE, SelectionBlock.INSTANCE));
@@ -632,7 +627,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     }
 
     private Options currentOptions() {
-        return new Options(checkBoxInSelection.isSelected(), checkBoxOutsideSelection.isSelected(),
+        return new Options((MapArea) comboBoxMapArea.getSelectedItem(),
                 checkBoxAbove.isSelected(), (Integer) spinnerAbove.getValue(), checkBoxBelow.isSelected(), (Integer) spinnerBelow.getValue(),
                 checkBoxFeather.isSelected(), checkBoxReplace.isSelected(), onlyOn, checkBoxExceptOn.isSelected(), exceptOn,
                 checkBoxAboveSlope.isSelected(), checkBoxBelowSlope.isSelected(), (Integer) spinnerSlope.getValue());
@@ -641,8 +636,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     private void restore(Options options) {
         historyPaused++;
         try {
-            checkBoxInSelection.setSelected(options.inSelection);
-            checkBoxOutsideSelection.setSelected(options.outsideSelection);
+            comboBoxMapArea.setSelectedItem(options.mapArea);
             checkBoxAbove.setSelected(options.above);
             spinnerAbove.setValue(options.aboveLevel);
             checkBoxBelow.setSelected(options.below);
@@ -694,8 +688,9 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         spinnerAbove.setEnabled(checkBoxAbove.isSelected());
         spinnerBelow.setEnabled(checkBoxBelow.isSelected());
         spinnerSlope.setEnabled(checkBoxAboveSlope.isSelected() || checkBoxBelowSlope.isSelected());
-        buttonReplace.setEnabled(checkBoxReplace.isSelected());
-        buttonExceptOn.setEnabled(checkBoxExceptOn.isSelected());
+        // The buttons to choose what from only appear when they are needed
+        buttonReplace.setVisible(checkBoxReplace.isSelected());
+        buttonExceptOn.setVisible(checkBoxExceptOn.isSelected());
         checkBoxFeather.setEnabled(checkBoxAbove.isSelected() || checkBoxBelow.isSelected());
     }
 
@@ -991,13 +986,13 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     private void showReplaceMenu() {
         App.getInstance().cancelPaintSelection();
         JPopupMenu menu = createReplaceMenu();
-        menu.show(this, buttonReplace.getX() + buttonReplace.getWidth(), buttonReplace.getY());
+        menu.show(checkBoxReplace, 0, checkBoxReplace.getHeight());
     }
     
     private void showExceptOnMenu() {
         App.getInstance().cancelPaintSelection();
         JPopupMenu menu = createExceptOnMenu();
-        menu.show(this, buttonExceptOn.getX() + buttonExceptOn.getWidth(), buttonExceptOn.getY());
+        menu.show(checkBoxExceptOn, 0, checkBoxExceptOn.getHeight());
     }
     
     private void filterChanged() {
@@ -1035,8 +1030,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         checkBoxBelowSlope = new javax.swing.JCheckBox();
         spinnerSlope = new javax.swing.JSpinner();
         jLabel1 = new javax.swing.JLabel();
-        checkBoxInSelection = new javax.swing.JCheckBox();
-        checkBoxOutsideSelection = new javax.swing.JCheckBox();
+        comboBoxMapArea = new javax.swing.JComboBox<>(MapArea.values());
 
         checkBoxAbove.setFont(checkBoxAbove.getFont().deriveFont(checkBoxAbove.getFont().getSize()-1f));
         checkBoxAbove.setText("at or above");
@@ -1074,6 +1068,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
         checkBoxReplace.setFont(checkBoxReplace.getFont().deriveFont(checkBoxReplace.getFont().getSize()-1f));
         checkBoxReplace.setText("only on");
+        checkBoxReplace.setToolTipText("Only change the map where it has certain terrain types or layers");
         checkBoxReplace.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 checkBoxReplaceActionPerformed(evt);
@@ -1081,8 +1076,9 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         });
 
         buttonReplace.setFont(buttonReplace.getFont().deriveFont(buttonReplace.getFont().getSize()-1f));
-        buttonReplace.setText("...");
-        buttonReplace.setEnabled(false);
+        buttonReplace.setText("Choose\u2026");
+        buttonReplace.setToolTipText("Choose the terrain types or layers");
+        buttonReplace.setVisible(false);
         buttonReplace.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 buttonReplaceActionPerformed(evt);
@@ -1090,7 +1086,8 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         });
 
         checkBoxFeather.setFont(checkBoxFeather.getFont().deriveFont(checkBoxFeather.getFont().getSize()-1f));
-        checkBoxFeather.setText("feather");
+        checkBoxFeather.setText("fade at the limits");
+        checkBoxFeather.setToolTipText("Instead of stopping abruptly at the height limits, let the brush fade out over the 4 blocks beyond them");
         checkBoxFeather.setEnabled(false);
         checkBoxFeather.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1100,6 +1097,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
         checkBoxExceptOn.setFont(checkBoxExceptOn.getFont().deriveFont(checkBoxExceptOn.getFont().getSize()-1f));
         checkBoxExceptOn.setText("except on");
+        checkBoxExceptOn.setToolTipText("Don't change the map where it has certain terrain types or layers");
         checkBoxExceptOn.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 checkBoxExceptOnActionPerformed(evt);
@@ -1107,8 +1105,9 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         });
 
         buttonExceptOn.setFont(buttonExceptOn.getFont().deriveFont(buttonExceptOn.getFont().getSize()-1f));
-        buttonExceptOn.setText("...");
-        buttonExceptOn.setEnabled(false);
+        buttonExceptOn.setText("Choose\u2026");
+        buttonExceptOn.setToolTipText("Choose the terrain types or layers");
+        buttonExceptOn.setVisible(false);
         buttonExceptOn.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 buttonExceptOnActionPerformed(evt);
@@ -1143,93 +1142,89 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         jLabel1.setFont(jLabel1.getFont().deriveFont(jLabel1.getFont().getSize()-1f));
         jLabel1.setText("degrees");
 
-        checkBoxInSelection.setFont(checkBoxInSelection.getFont().deriveFont(checkBoxInSelection.getFont().getSize()-1f));
-        checkBoxInSelection.setText("inside map selection");
-        checkBoxInSelection.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                checkBoxInSelectionActionPerformed(evt);
-            }
-        });
-
-        checkBoxOutsideSelection.setFont(checkBoxOutsideSelection.getFont().deriveFont(checkBoxOutsideSelection.getFont().getSize()-1f));
-        checkBoxOutsideSelection.setText("outside map selection");
-        checkBoxOutsideSelection.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                checkBoxOutsideSelectionActionPerformed(evt);
-            }
-        });
+        comboBoxMapArea.setFont(comboBoxMapArea.getFont().deriveFont(comboBoxMapArea.getFont().getSize()-1f));
+        comboBoxMapArea.setToolTipText("If you have selected part of the map with a selection tool, the brush can be limited to that part, or to the rest of the map");
+        comboBoxMapArea.addActionListener(evt -> comboBoxMapAreaActionPerformed());
 
         labelNoSelection.setFont(labelNoSelection.getFont().deriveFont(labelNoSelection.getFont().getSize()-2f));
-        labelNoSelection.setText("<html>Nothing is selected on the map,<br>so this brush won't paint anywhere</html>");
+        labelNoSelection.setText("<html>Nothing is selected on<br>the map, so this brush<br>won't paint anywhere</html>");
         labelNoSelection.setVisible(false);
-
-        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
-        this.setLayout(layout);
-        layout.setHorizontalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(checkBoxInSelection)
-            .addComponent(labelNoSelection)
-            .addComponent(heightScale, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-            .addComponent(checkBoxBelow)
-            .addComponent(checkBoxReplace)
-            .addComponent(checkBoxExceptOn)
-            .addGroup(layout.createSequentialGroup()
-                .addComponent(checkBoxAboveSlope)
-                .addGap(0, 0, 0)
-                .addComponent(checkBoxBelowSlope))
-            .addGroup(layout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(spinnerAbove, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(spinnerBelow, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(checkBoxFeather)
-                    .addComponent(buttonReplace)
-                    .addComponent(buttonExceptOn)
-                    .addGroup(layout.createSequentialGroup()
-                        .addComponent(spinnerSlope, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(0, 0, 0)
-                        .addComponent(jLabel1))))
-            .addComponent(checkBoxAbove)
-            .addComponent(checkBoxOutsideSelection)
-        );
-        layout.setVerticalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
-                .addGap(0, 0, 0)
-                .addComponent(checkBoxInSelection)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(checkBoxOutsideSelection)
-                .addComponent(labelNoSelection)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(heightScale, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(checkBoxAbove)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(spinnerAbove, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(checkBoxBelow)
-                .addGap(0, 0, 0)
-                .addComponent(spinnerBelow, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 0, 0)
-                .addComponent(checkBoxFeather)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(checkBoxReplace)
-                .addGap(0, 0, 0)
-                .addComponent(buttonReplace)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(checkBoxExceptOn)
-                .addGap(0, 0, 0)
-                .addComponent(buttonExceptOn)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(checkBoxAboveSlope)
-                    .addComponent(checkBoxBelowSlope))
-                .addGap(0, 0, 0)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(spinnerSlope, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jLabel1)))
-        );
     }// </editor-fold>//GEN-END:initComponents
+
+    /**
+     * One column in a narrow panel; in a wider one the fields which belong together go next to each other.
+     */
+    private void buildLayout() {
+        setLayout(new GridBagLayout());
+        final GridBagConstraints constraints = new GridBagConstraints();
+        constraints.gridwidth = GridBagConstraints.REMAINDER;
+        constraints.anchor = GridBagConstraints.FIRST_LINE_START;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        constraints.weightx = 1.0;
+
+        add(sectionTitle("Where on the map"), constraints);
+        // Not as wide as its longest item, which would make the whole panel wider; it gets the width of the panel anyway
+        comboBoxMapArea.setPreferredSize(new java.awt.Dimension(1, comboBoxMapArea.getPreferredSize().height));
+        constraints.insets = new Insets(2, 0, 0, 0);
+        add(comboBoxMapArea, constraints);
+        add(labelNoSelection, constraints);
+
+        constraints.insets = new Insets(10, 0, 0, 0);
+        add(heightScale, constraints);
+        final JPanel heightFields = new JPanel(new org.pepsoft.worldpainter.util.ResponsiveColumnsLayout(scaled(COLUMN_WIDTH), scaled(4), 2));
+        heightFields.add(block(checkBoxAbove, spinnerAbove));
+        heightFields.add(block(checkBoxBelow, spinnerBelow));
+        constraints.insets = new Insets(4, 0, 0, 0);
+        add(heightFields, constraints);
+        constraints.insets = new Insets(0, 0, 0, 0);
+        add(checkBoxFeather, constraints);
+
+        constraints.insets = new Insets(10, 0, 0, 0);
+        add(sectionTitle("What is on the map"), constraints);
+        final JPanel otherFields = new JPanel(new org.pepsoft.worldpainter.util.ResponsiveColumnsLayout(scaled(COLUMN_WIDTH), scaled(4), 3));
+        otherFields.add(block(checkBoxReplace, buttonReplace));
+        otherFields.add(block(checkBoxExceptOn, buttonExceptOn));
+        final JLabel slopeLabel = new JLabel("slope");
+        slopeLabel.setFont(slopeLabel.getFont().deriveFont(slopeLabel.getFont().getSize() - 1f));
+        slopeLabel.setToolTipText("Only change the map where its slope is above or below a number of degrees");
+        otherFields.add(block(slopeLabel, row(checkBoxAboveSlope, checkBoxBelowSlope), row(spinnerSlope, jLabel1)));
+        constraints.insets = new Insets(2, 0, 0, 0);
+        add(otherFields, constraints);
+    }
+
+    private static int scaled(int size) {
+        return com.formdev.flatlaf.util.UIScale.scale(size);
+    }
+
+    private static JLabel sectionTitle(String text) {
+        final JLabel label = new JLabel(text);
+        label.setFont(label.getFont().deriveFont(label.getFont().getSize() - 2f));
+        return label;
+    }
+
+    /**
+     * Components under each other, as wide as there is room for if they are buttons, and otherwise as wide as they want
+     * to be.
+     */
+    private static JPanel block(JComponent... components) {
+        final JPanel block = new JPanel();
+        block.setLayout(new BoxLayout(block, BoxLayout.Y_AXIS));
+        for (JComponent component: components) {
+            component.setAlignmentX(LEFT_ALIGNMENT);
+            final java.awt.Dimension size = component.getPreferredSize();
+            component.setMaximumSize(new java.awt.Dimension((component instanceof JButton) ? Short.MAX_VALUE : size.width, size.height));
+            block.add(component);
+        }
+        return block;
+    }
+
+    private static JPanel row(JComponent... components) {
+        final JPanel row = new JPanel(new FlowLayout(FlowLayout.LEADING, 0, 0));
+        for (JComponent component: components) {
+            row.add(component);
+        }
+        return row;
+    }
 
     private void initialiseIfNecessary() {
         if (! initialised) {
@@ -1341,23 +1336,11 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         filterChanged();
     }//GEN-LAST:event_spinnerSlopeStateChanged
 
-    private void checkBoxInSelectionActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxInSelectionActionPerformed
+    private void comboBoxMapAreaActionPerformed() {
         initialiseIfNecessary();
-        if (checkBoxInSelection.isSelected() && checkBoxOutsideSelection.isSelected()) {
-            checkBoxOutsideSelection.setSelected(false);
-        }
         updateNoSelectionHint();
         filterChanged();
-    }//GEN-LAST:event_checkBoxInSelectionActionPerformed
-
-    private void checkBoxOutsideSelectionActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxOutsideSelectionActionPerformed
-        initialiseIfNecessary();
-        if (checkBoxOutsideSelection.isSelected() && checkBoxInSelection.isSelected()) {
-            checkBoxInSelection.setSelected(false);
-        }
-        updateNoSelectionHint();
-        filterChanged();
-    }//GEN-LAST:event_checkBoxOutsideSelectionActionPerformed
+    }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private org.pepsoft.worldpainter.panels.HeightFilterScale heightScale;
@@ -1370,8 +1353,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     private javax.swing.JCheckBox checkBoxBelowSlope;
     private javax.swing.JCheckBox checkBoxExceptOn;
     private javax.swing.JCheckBox checkBoxFeather;
-    private javax.swing.JCheckBox checkBoxInSelection;
-    private javax.swing.JCheckBox checkBoxOutsideSelection;
+    private javax.swing.JComboBox<MapArea> comboBoxMapArea;
     private javax.swing.JCheckBox checkBoxReplace;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JSpinner spinnerAbove;
@@ -1397,7 +1379,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     private Options currentOptions;
     private int historyPaused, lastDragNumber;
     private long lastChangeTime;
-    private static final int MAX_HISTORY = 100;
+    private static final int MAX_HISTORY = 100, COLUMN_WIDTH = 135;
     private static final long SAME_GESTURE_TIME = 300;
     private static final Icon ICON_LAVA = loadScaledIcon("org/pepsoft/worldpainter/icons/flood_with_lava.png");
     private static final Icon ICON_EYEDROPPER = loadScaledIcon("org/pepsoft/worldpainter/icons/eyedropper.png");
@@ -1406,9 +1388,27 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     private static final long serialVersionUID = 1L;
     
     /**
+     * The part of the map a brush can be limited to, by the selection which was made on it.
+     */
+    private enum MapArea {
+        WHOLE_MAP("Whole map"), INSIDE_SELECTION("Inside selection"), OUTSIDE_SELECTION("Outside selection");
+
+        MapArea(String displayName) {
+            this.displayName = displayName;
+        }
+
+        @Override
+        public String toString() {
+            return displayName;
+        }
+
+        private final String displayName;
+    }
+
+    /**
      * The state of all the options, to go back to.
      */
-    private record Options(boolean inSelection, boolean outsideSelection, boolean above, int aboveLevel, boolean below, int belowLevel,
+    private record Options(MapArea mapArea, boolean above, int aboveLevel, boolean below, int belowLevel,
                            boolean feather, boolean replace, Object onlyOn, boolean exceptOnEnabled, Object exceptOn,
                            boolean aboveSlope, boolean belowSlope, int slope) {}
 

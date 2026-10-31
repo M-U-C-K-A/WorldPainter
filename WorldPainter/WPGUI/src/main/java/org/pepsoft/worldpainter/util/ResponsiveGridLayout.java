@@ -5,8 +5,9 @@ import java.awt.*;
 
 /**
  * A grid of square cells which uses as many columns as fit in the width of the container, so that a palette of
- * buttons fills a narrow or a wide side panel alike. The cells are at least as large as the largest preferred size of
- * the components, and grow by up to half again to use the whole width.
+ * buttons fills a narrow or a wide side panel alike. The cells are as large as the largest preferred size of the
+ * components and keep that size whatever the width; what is left over goes in the gaps between the columns, so that
+ * the grid uses the whole width without the buttons, or the height of the grid, changing as the panel is resized.
  *
  * <p>The container should be stretched horizontally by its parent (or be the view of a scroll pane), since its
  * preferred width is that of a single column; its preferred height depends on its current width.
@@ -41,9 +42,8 @@ public class ResponsiveGridLayout implements LayoutManager {
             }
             final int width = parent.getWidth() - insets.left - insets.right;
             final int columns = (width > 0) ? columns(width, cell) : defaultColumns;
-            final int side = (width > 0) ? side(width, columns, cell) : cell;
             final int rows = (count + columns - 1) / columns;
-            return new Dimension(insets.left + insets.right + cell, insets.top + insets.bottom + rows * side + (rows - 1) * gap);
+            return new Dimension(insets.left + insets.right + cell, insets.top + insets.bottom + rows * cell + (rows - 1) * gap);
         }
     }
 
@@ -61,14 +61,16 @@ public class ResponsiveGridLayout implements LayoutManager {
         synchronized (parent.getTreeLock()) {
             final Insets insets = parent.getInsets();
             final int width = parent.getWidth() - insets.left - insets.right, cell = cellSize(parent);
-            final int columns = columns(width, cell), side = side(width, columns, cell);
+            final int columns = columns(width, cell);
+            final int leftOver = Math.max(0, width - columns * cell - (columns - 1) * gap);
             int index = 0;
             for (Component component: parent.getComponents()) {
                 if (! component.isVisible()) {
                     continue;
                 }
                 final int column = index % columns, row = index / columns;
-                component.setBounds(insets.left + column * (side + gap), insets.top + row * (side + gap), side, side);
+                final int x = insets.left + column * (cell + gap) + ((columns > 1) ? (leftOver * column / (columns - 1)) : 0);
+                component.setBounds(x, insets.top + row * (cell + gap), cell, cell);
                 index++;
             }
             if (columns != laidOutColumns) {
@@ -89,14 +91,6 @@ public class ResponsiveGridLayout implements LayoutManager {
 
     private int columns(int width, int cell) {
         return Math.max(1, (width + gap) / (cell + gap));
-    }
-
-    /**
-     * The size of the cells: grown to use the whole width, but by no more than half.
-     */
-    private int side(int width, int columns, int cell) {
-        final int fill = (width - (columns - 1) * gap) / columns;
-        return Math.max(cell, Math.min(fill, cell * 3 / 2));
     }
 
     private static int cellSize(Container parent) {
