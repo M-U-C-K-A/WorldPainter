@@ -158,7 +158,8 @@ public class Terrain3DPanel extends JPanel {
                 legend.setBounds(12, h - 58, 280, 46);
                 final java.awt.Dimension helpSize = helpLabel.getPreferredSize();
                 helpLabel.setBounds(w - helpSize.width - 14, h - helpSize.height - 12, helpSize.width, helpSize.height);
-                sunControl.setBounds(w - SunControl.SIZE - 14, h - helpSize.height - 20 - SunControl.SIZE, SunControl.SIZE, SunControl.SIZE);
+                final java.awt.Dimension sunSize = sunControl.getPreferredSize();
+                sunControl.setBounds(w - sunSize.width - 14, h - helpSize.height - 20 - sunSize.height, sunSize.width, sunSize.height);
                 final java.awt.Dimension statusSize = statusLabel.getPreferredSize();
                 statusLabel.setBounds((w - statusSize.width) / 2, (h - statusSize.height) / 2, statusSize.width, statusSize.height);
             }
@@ -534,89 +535,110 @@ public class Terrain3DPanel extends JPanel {
     }
 
     /**
-     * A small globe, seen from above, on which the user drags the sun: the centre is straight overhead, the rim is the
-     * horizon, north is up.
+     * Where the sun is: two sliders, for the direction it shines from and how high it stands, and a few times of day.
      */
-    private final class SunControl extends JComponent {
+    private final class SunControl extends JPanel {
         SunControl() {
-            setOpaque(false);
-            setToolTipText(App.richToolTip("Sun", "Drag the sun to light the land from another direction and height: the centre is straight overhead, the edge is the horizon. The shadows follow", null));
+            super(new GridBagLayout());
+            setOpaque(true);
+            final GridBagConstraints constraints = new GridBagConstraints();
+            constraints.anchor = GridBagConstraints.LINE_START;
+            constraints.fill = GridBagConstraints.HORIZONTAL;
+            constraints.insets = new Insets(1, 0, 1, 6);
+
+            directionSlider.setFocusable(false);
+            heightSlider.setFocusable(false);
+            updateLabels();
+            addRow(constraints, 0, "Direction", directionSlider, directionLabel);
+            addRow(constraints, 1, "Height", heightSlider, heightLabel);
+            directionSlider.addChangeListener(e -> sliderChanged(directionSlider));
+            heightSlider.addChangeListener(e -> sliderChanged(heightSlider));
+
+            final JPanel times = new JPanel(new GridLayout(1, 3, 2, 0));
+            times.setOpaque(false);
+            times.add(timeButton("Morning", 100, 16));
+            times.add(timeButton("Noon", 170, 62));
+            times.add(timeButton("Evening", -100, 12));
+            constraints.gridx = 0;
+            constraints.gridy = 2;
+            constraints.gridwidth = 3;
+            constraints.insets = new Insets(4, 0, 0, 0);
+            add(times, constraints);
+
             applyTimer.setRepeats(false);
-            final java.awt.event.MouseAdapter adapter = new java.awt.event.MouseAdapter() {
-                @Override
-                public void mousePressed(java.awt.event.MouseEvent e) {
-                    drag(e);
-                }
-
-                @Override
-                public void mouseDragged(java.awt.event.MouseEvent e) {
-                    drag(e);
-                }
-
-                @Override
-                public void mouseReleased(java.awt.event.MouseEvent e) {
-                    drag(e);
-                    applyTimer.stop();
-                    apply();
-                }
-            };
-            addMouseListener(adapter);
-            addMouseMotionListener(adapter);
         }
 
-        private void drag(java.awt.event.MouseEvent e) {
-            final double cx = getWidth() / 2.0, cy = getHeight() / 2.0, radius = getWidth() / 2.0 - 8;
-            final double dx = e.getX() - cx, dy = e.getY() - cy;
-            azimuth = Math.toDegrees(Math.atan2(dx, -dy));
-            elevation = 90 * (1 - Math.min(1, Math.hypot(dx, dy) / radius));
-            repaint();
-            // Lighting the whole map takes a moment, so do it at most a few times per second while dragging
-            if (! applyTimer.isRunning()) {
+        @Override
+        public void updateUI() {
+            super.updateUI();
+            setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(ThemeUtils.getColour("WorldPainter.border", Color.GRAY)), BorderFactory.createEmptyBorder(6, 8, 6, 8)));
+        }
+
+        private void addRow(GridBagConstraints constraints, int row, String title, JSlider slider, JLabel valueLabel) {
+            final Font small = getFont().deriveFont(getFont().getSize2D() - 2f);
+            constraints.gridy = row;
+            constraints.gridx = 0;
+            constraints.weightx = 0;
+            final JLabel titleLabel = new JLabel(title);
+            titleLabel.setFont(small);
+            add(titleLabel, constraints);
+            constraints.gridx = 1;
+            constraints.weightx = 1;
+            slider.setPreferredSize(new java.awt.Dimension(90, slider.getPreferredSize().height));
+            add(slider, constraints);
+            constraints.gridx = 2;
+            constraints.weightx = 0;
+            valueLabel.setFont(small);
+            valueLabel.setHorizontalAlignment(SwingConstants.TRAILING);
+            valueLabel.setPreferredSize(new java.awt.Dimension(26, valueLabel.getPreferredSize().height));
+            add(valueLabel, constraints);
+        }
+
+        private JButton timeButton(String text, int azimuth, int elevation) {
+            final JButton button = new JButton(text);
+            button.setFont(button.getFont().deriveFont(button.getFont().getSize2D() - 2f));
+            button.setMargin(new Insets(1, 2, 1, 2));
+            button.setFocusable(false);
+            button.addActionListener(e -> {
+                directionSlider.setValue(azimuth);
+                heightSlider.setValue(elevation);
+                applyTimer.stop();
+                apply();
+            });
+            return button;
+        }
+
+        private void sliderChanged(JSlider slider) {
+            updateLabels();
+            if (! slider.getValueIsAdjusting()) {
+                applyTimer.stop();
+                apply();
+            } else if (! applyTimer.isRunning()) {
+                // Lighting the whole map takes a moment, so do it at most a few times per second while dragging
                 applyTimer.start();
             }
         }
 
+        private void updateLabels() {
+            final String[] compass = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
+            directionLabel.setText(compass[Math.floorMod(Math.round(directionSlider.getValue() / 45f), 8)]);
+            heightLabel.setText(heightSlider.getValue() + "\u00b0");
+        }
+
         private void apply() {
-            view.setSun(azimuth, elevation);
+            view.setSun(directionSlider.getValue(), heightSlider.getValue());
         }
 
         @Override
-        protected void paintComponent(Graphics g) {
-            final Graphics2D g2 = (Graphics2D) g.create();
-            try {
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-                final int size = Math.min(getWidth(), getHeight());
-                final double radius = size / 2.0 - 8, cx = getWidth() / 2.0, cy = getHeight() / 2.0;
-                final Color background = UIManager.getColor("Panel.background"), foreground = UIManager.getColor("Label.foreground");
-                g2.setColor(new Color(background.getRed(), background.getGreen(), background.getBlue(), 215));
-                g2.fill(new java.awt.geom.Ellipse2D.Double(cx - radius - 6, cy - radius - 6, (radius + 6) * 2, (radius + 6) * 2));
-                final Color line = ThemeUtils.getColour("WorldPainter.border", Color.GRAY);
-                g2.setColor(line);
-                g2.draw(new java.awt.geom.Ellipse2D.Double(cx - radius, cy - radius, radius * 2, radius * 2));
-                g2.draw(new java.awt.geom.Ellipse2D.Double(cx - radius / 2, cy - radius / 2, radius, radius));
-                g2.draw(new java.awt.geom.Line2D.Double(cx - radius, cy, cx + radius, cy));
-                g2.draw(new java.awt.geom.Line2D.Double(cx, cy - radius, cx, cy + radius));
-                g2.setFont(getFont().deriveFont(Font.BOLD, getFont().getSize2D() - 3f));
-                g2.setColor(foreground);
-                final FontMetrics fm = g2.getFontMetrics();
-                g2.drawString("N", (float) (cx - fm.stringWidth("N") / 2.0), (float) (cy - radius - 1));
-                // The sun
-                final double r = radius * (1 - elevation / 90), a = Math.toRadians(azimuth);
-                final double sx = cx + r * Math.sin(a), sy = cy - r * Math.cos(a);
-                g2.setColor(new Color(0xf59e0b));
-                g2.fill(new java.awt.geom.Ellipse2D.Double(sx - 6, sy - 6, 12, 12));
-                g2.setColor(new Color(0xfffbeb));
-                g2.draw(new java.awt.geom.Ellipse2D.Double(sx - 6, sy - 6, 12, 12));
-            } finally {
-                g2.dispose();
-            }
+        public java.awt.Dimension getPreferredSize() {
+            return new java.awt.Dimension(com.formdev.flatlaf.util.UIScale.scale(WIDTH), super.getPreferredSize().height);
         }
 
-        private double azimuth = -50, elevation = 40;
+        private final JSlider directionSlider = new JSlider(-180, 180, 130), heightSlider = new JSlider(2, 90, 35);
+        private final JLabel directionLabel = new JLabel(), heightLabel = new JLabel();
         private final Timer applyTimer = new Timer(150, e -> apply());
 
-        static final int SIZE = 96;
+        private static final int WIDTH = 214;
         private static final long serialVersionUID = 1L;
     }
 }

@@ -60,10 +60,10 @@ The **Blocks** button shows the land around the camera as Minecraft will: every 
 
 The **Shaders** button (the sun) lights the land like a shader pack would:
 
-- the land is lit by the sun, and casts shadows
-- the sky follows the height of the sun
-- the water moves, and reflects the sky and the sun
+- the land is lit by warm sunlight and cool light from the sky, casts shadows, and gets darker in valleys and crevices
+- the sky follows the height of the sun, and distant land fades into it
+- the water moves, is clear along the shore and deep blue further out, and reflects the sky and the sun
 
-Drag the sun on the globe at the bottom right to change its direction and height: the centre is straight overhead, the edge is the horizon.
+The panel at the bottom right sets the **direction** the sun shines from and its **height**, or a time of day: **Morning**, **Noon** or **Evening**. The land looks best with the sun to the side of or behind the camera; looking towards the sun, you mostly see the shaded side of the land.
 
 > [!NOTE] The 3D view shows the terrain, water and colours of the map. It does not show custom objects, trees or floating islands yet.
