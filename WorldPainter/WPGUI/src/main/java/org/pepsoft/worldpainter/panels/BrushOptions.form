@@ -43,6 +43,7 @@
           <Component id="checkBoxAbove" min="-2" max="-2" attributes="0"/>
           <Component id="checkBoxOutsideSelection" alignment="0" min="-2" max="-2" attributes="0"/>
           <Component id="heightScale" alignment="0" max="32767" attributes="0"/>
+          <Component id="labelNoSelection" alignment="0" min="-2" max="-2" attributes="0"/>
       </Group>
     </DimensionLayout>
     <DimensionLayout dim="1">
@@ -52,6 +53,7 @@
               <Component id="checkBoxInSelection" min="-2" max="-2" attributes="0"/>
               <EmptySpace max="-2" attributes="0"/>
               <Component id="checkBoxOutsideSelection" min="-2" max="-2" attributes="0"/>
+              <Component id="labelNoSelection" min="-2" max="-2" attributes="0"/>
               <EmptySpace max="-2" attributes="0"/>
               <Component id="heightScale" min="-2" max="-2" attributes="0"/>
               <EmptySpace max="-2" attributes="0"/>
@@ -272,13 +274,15 @@
             <Font component="checkBoxInSelection" property="font" relativeSize="true" size="-1"/>
           </FontInfo>
         </Property>
-        <Property name="text" type="java.lang.String" value="inside selection"/>
+        <Property name="text" type="java.lang.String" value="inside map selection"/>
       </Properties>
       <Events>
         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="checkBoxInSelectionActionPerformed"/>
       </Events>
     </Component>
     <Component class="org.pepsoft.worldpainter.panels.HeightFilterScale" name="heightScale">
+    </Component>
+    <Component class="javax.swing.JLabel" name="labelNoSelection">
     </Component>
     <Component class="javax.swing.JCheckBox" name="checkBoxOutsideSelection">
       <Properties>
@@ -287,7 +291,7 @@
             <Font component="checkBoxOutsideSelection" property="font" relativeSize="true" size="-1"/>
           </FontInfo>
         </Property>
-        <Property name="text" type="java.lang.String" value="outside selection"/>
+        <Property name="text" type="java.lang.String" value="outside map selection"/>
       </Properties>
       <Events>
         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="checkBoxOutsideSelectionActionPerformed"/>

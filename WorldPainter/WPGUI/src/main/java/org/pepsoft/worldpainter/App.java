@@ -563,6 +563,10 @@ public final class App extends JFrame implements BrushControl,
             }
 
             view.setDimension(dimension, false);
+            // The brush settings stay, and now apply to this dimension
+            if (filter instanceof DefaultFilter) {
+                ((DefaultFilter) filter).setDimension(dimension);
+            }
             outsideDimensionLabel = "Minecraft Generated";
             if (anchor.equals(NORMAL_DETAIL)) {
                 backgroundDimension = world.getDimension(new Anchor(DIM_NORMAL, MASTER, false, 0));
@@ -895,7 +899,7 @@ public final class App extends JFrame implements BrushControl,
     }
 
     public float getToolLevel() {
-        return toolLevel;
+        return level;
     }
 
     public int getZoom() {
@@ -1451,7 +1455,7 @@ public final class App extends JFrame implements BrushControl,
 
     @Override
     public int getRotation() {
-        return (activeOperation instanceof PaintOperation) ? brushRotation : toolBrushRotation;
+        return brushRotation;
     }
 
     @Override
@@ -1460,11 +1464,7 @@ public final class App extends JFrame implements BrushControl,
             rotation = mod(rotation + 180, 360) - 180;
         }
         brushRotationSlider.setValue(rotation);
-        if (activeOperation instanceof PaintOperation) {
-            brushRotation = rotation;
-        } else {
-            toolBrushRotation = rotation;
-        }
+        brushRotation = rotation;
         updateBrushRotation();
     }
 
@@ -1632,11 +1632,7 @@ public final class App extends JFrame implements BrushControl,
         if (programmaticChange) {
             return;
         }
-        if (activeOperation instanceof PaintOperation) {
-            this.filter = filter;
-        } else {
-            toolFilter = filter;
-        }
+        this.filter = filter;
         if (activeOperation instanceof FilteredOperation) {
             ((FilteredOperation) activeOperation).setFilter(filter);
         }
@@ -4107,14 +4103,9 @@ public final class App extends JFrame implements BrushControl,
             levelLabel.setText("Intensity: " + ((value < 52) ? (value - 1) : value) + " %");
             if ((! programmaticChange) && (! levelSlider.getValueIsAdjusting())) {
                 float newLevel = value / 100.0f;
-                if (activeOperation instanceof PaintOperation) {
-                    level = newLevel;
+                level = newLevel;
+                if (activeOperation instanceof MouseOrTabletOperation) {
                     ((MouseOrTabletOperation) activeOperation).setLevel(level);
-                } else {
-                    toolLevel = newLevel;
-                    if (activeOperation instanceof MouseOrTabletOperation) {
-                        ((MouseOrTabletOperation) activeOperation).setLevel(toolLevel);
-                    }
                 }
                 brush.setLevel(newLevel);
             }
@@ -4130,11 +4121,7 @@ public final class App extends JFrame implements BrushControl,
             int value = brushRotationSlider.getValue();
             brushRotationLabel.setText("Rotation: " + ((value < 0) ? (((value - 7) / 15) * 15) : (((value + 7) / 15) * 15)) + "°");
             if ((! programmaticChange) && (! brushRotationSlider.getValueIsAdjusting())) {
-                if (activeOperation instanceof PaintOperation) {
-                    brushRotation = value;
-                } else {
-                    toolBrushRotation = value;
-                }
+                brushRotation = value;
                 updateBrushRotation();
             }
         });
@@ -4180,7 +4167,7 @@ public final class App extends JFrame implements BrushControl,
     }
 
     private void updateBrushRotation() {
-        final int desiredBrushRotation = (activeOperation instanceof PaintOperation) ? brushRotation : toolBrushRotation;
+        final int desiredBrushRotation = brushRotation;
         if (desiredBrushRotation != previousBrushRotation) {
 //            long start = System.currentTimeMillis();
             if (activeOperation instanceof BrushOperation) {
@@ -4208,7 +4195,7 @@ public final class App extends JFrame implements BrushControl,
         if (! (brush instanceof BitmapBrush)) {
             return;
         }
-        final int desiredBrushRotation = (activeOperation instanceof PaintOperation) ? brushRotation : toolBrushRotation;
+        final int desiredBrushRotation = brushRotation;
         final Icon thumbnail = (Icon) button.getClientProperty(KEY_THUMBNAIL);
         if (thumbnail != null) {
             if ((desiredBrushRotation == 0) || (! button.isSelected())){
@@ -5917,13 +5904,6 @@ public final class App extends JFrame implements BrushControl,
                                     view.setBrushRotation(brushRotation);
                                 }
                             }
-                            levelSlider.setValue((int) (level * 100));
-                            brushRotationSlider.setValue(brushRotation);
-                            if (filter instanceof DefaultFilter) {
-                                brushOptions.setFilter((DefaultFilter) filter);
-                            } else {
-                                brushOptions.setFilter(null);
-                            }
                         } finally {
                             programmaticChange = false;
                         }
@@ -5932,23 +5912,16 @@ public final class App extends JFrame implements BrushControl,
                         programmaticChange = true;
                         try {
                             if (operation instanceof MouseOrTabletOperation) {
-                                ((MouseOrTabletOperation) operation).setLevel(toolLevel);
+                                ((MouseOrTabletOperation) operation).setLevel(level);
                                 if (operation instanceof FilteredOperation) {
-                                    ((FilteredOperation) operation).setFilter(toolFilter);
+                                    ((FilteredOperation) operation).setFilter(filter);
                                 }
                                 if (operation instanceof BrushOperation) {
-                                    ((BrushOperation) operation).setBrush(toolBrushRotation == 0 ? toolBrush : RotatedBrush.rotate(toolBrush, toolBrushRotation));
+                                    ((BrushOperation) operation).setBrush(brushRotation == 0 ? toolBrush : RotatedBrush.rotate(toolBrush, brushRotation));
                                     selectBrushButton(toolBrush);
                                     view.setBrushShape(toolBrush.getBrushShape());
-                                    view.setBrushRotation(toolBrushRotation);
+                                    view.setBrushRotation(brushRotation);
                                 }
-                            }
-                            levelSlider.setValue((int) (toolLevel * 100));
-                            brushRotationSlider.setValue(toolBrushRotation);
-                            if (toolFilter instanceof DefaultFilter) {
-                                brushOptions.setFilter((DefaultFilter) toolFilter);
-                            } else {
-                                brushOptions.setFilter(null);
                             }
                         } finally {
                             programmaticChange = false;
@@ -6285,16 +6258,11 @@ public final class App extends JFrame implements BrushControl,
             if (! programmaticChange) {
                 updateBrushRotation(brush, button);
                 if (e.getStateChange() == ItemEvent.SELECTED) {
-                    int effectiveRotation;
-                    if (activeOperation instanceof PaintOperation) {
-                        App.this.brush = brush;
-                        effectiveRotation = brushRotation;
-                    } else {
-                        toolBrush = brush;
-                        effectiveRotation = toolBrushRotation;
-                    }
+                    // The brush the user picked stays picked, whichever tool they go on to use
+                    App.this.brush = brush;
+                    toolBrush = brush;
                     if (activeOperation instanceof BrushOperation) {
-                        ((BrushOperation) activeOperation).setBrush((effectiveRotation == 0) ? brush : RotatedBrush.rotate(brush, effectiveRotation));
+                        ((BrushOperation) activeOperation).setBrush((brushRotation == 0) ? brush : RotatedBrush.rotate(brush, brushRotation));
                     }
                     view.setBrushShape(brush.getBrushShape());
                 }
@@ -7852,8 +7820,8 @@ public final class App extends JFrame implements BrushControl,
     private boolean programmaticChange;
     private UndoManager currentUndoManager;
     private JSlider levelSlider, brushRotationSlider;
-    private float level = 0.51f, toolLevel = 0.51f;
-    private int maxRadius = DEFAULT_MAX_RADIUS, brushRotation = 0, toolBrushRotation = 0, previousBrushRotation = 0;
+    private float level = 0.51f;
+    private int maxRadius = DEFAULT_MAX_RADIUS, brushRotation = 0, previousBrushRotation = 0;
     private JComboBox<TerrainMode> terrainModeComboBox;
     private JCheckBox terrainSoloCheckBox;
     private JToggleButton setSpawnPointToggleButton, eyedropperToggleButton;
@@ -7866,7 +7834,7 @@ public final class App extends JFrame implements BrushControl,
     private BiomesViewerFrame biomesViewerFrame;
     private BiomesPanel biomesPanel;
     private DockableFrame biomesPanelFrame;
-    private Filter filter, toolFilter;
+    private Filter filter;
     private boolean hideAbout, hidePreferences, hideExit;
     private PaintUpdater paintUpdater = () -> {
         // Do nothing

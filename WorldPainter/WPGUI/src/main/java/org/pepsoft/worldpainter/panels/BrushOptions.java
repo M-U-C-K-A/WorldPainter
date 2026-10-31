@@ -13,6 +13,8 @@ import org.pepsoft.worldpainter.biomeschemes.CustomBiome;
 import org.pepsoft.worldpainter.biomeschemes.CustomBiomeManager;
 import org.pepsoft.worldpainter.layers.*;
 import org.pepsoft.worldpainter.operations.Filter;
+import org.pepsoft.worldpainter.selection.SelectionBlock;
+import org.pepsoft.worldpainter.selection.SelectionChunk;
 import org.pepsoft.worldpainter.panels.DefaultFilter.LayerValue;
 import org.pepsoft.worldpainter.panels.DefaultFilter.LevelType;
 import org.pepsoft.worldpainter.tools.Eyedropper;
@@ -81,6 +83,11 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
         KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(this::dispatchUndoKey);
         currentOptions = currentOptions();
+
+        checkBoxInSelection.setToolTipText("Only where the map is selected with a selection tool. The bars below are about heights, not about this selection");
+        checkBoxOutsideSelection.setToolTipText("Only where the map is not selected with a selection tool. The bars below are about heights, not about this selection");
+        // The selection can change at any time, in many ways
+        new javax.swing.Timer(1000, e -> updateNoSelectionHint()).start();
     }
 
     public ColourScheme getColourScheme() {
@@ -515,6 +522,20 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         field.setValue(spinner.getValue());
     }
 
+    /**
+     * "Inside map selection" with nothing selected lets the brush paint nowhere at all, which looks like nothing is
+     * working, so say why.
+     */
+    private void updateNoSelectionHint() {
+        boolean nothingSelected = false;
+        if (checkBoxInSelection.isSelected() && isShowing()) {
+            final App app = App.getInstanceIfExists();
+            final Dimension dimension = (app != null) ? app.getDimension() : null;
+            nothingSelected = (dimension != null) && (! dimension.containsOneOf(SelectionChunk.INSTANCE, SelectionBlock.INSTANCE));
+        }
+        labelNoSelection.setVisible(nothingSelected);
+    }
+
     private void commitOnClickElsewhere(AWTEvent event) {
         if ((event.getID() == MouseEvent.MOUSE_PRESSED) && (event.getSource() instanceof Component)) {
             final Component clicked = (Component) event.getSource();
@@ -637,6 +658,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
             installPaint(onlyOn, buttonReplace, checkBoxReplace);
             installPaint(exceptOn, buttonExceptOn, checkBoxExceptOn);
             setControlStates();
+            updateNoSelectionHint();
             filterChanged();
         } finally {
             historyPaused--;
@@ -999,6 +1021,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     private void initComponents() {
 
         heightScale = new org.pepsoft.worldpainter.panels.HeightFilterScale();
+        labelNoSelection = new javax.swing.JLabel();
         checkBoxAbove = new javax.swing.JCheckBox();
         spinnerAbove = new javax.swing.JSpinner();
         checkBoxBelow = new javax.swing.JCheckBox();
@@ -1121,7 +1144,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         jLabel1.setText("degrees");
 
         checkBoxInSelection.setFont(checkBoxInSelection.getFont().deriveFont(checkBoxInSelection.getFont().getSize()-1f));
-        checkBoxInSelection.setText("inside selection");
+        checkBoxInSelection.setText("inside map selection");
         checkBoxInSelection.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 checkBoxInSelectionActionPerformed(evt);
@@ -1129,18 +1152,23 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         });
 
         checkBoxOutsideSelection.setFont(checkBoxOutsideSelection.getFont().deriveFont(checkBoxOutsideSelection.getFont().getSize()-1f));
-        checkBoxOutsideSelection.setText("outside selection");
+        checkBoxOutsideSelection.setText("outside map selection");
         checkBoxOutsideSelection.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 checkBoxOutsideSelectionActionPerformed(evt);
             }
         });
 
+        labelNoSelection.setFont(labelNoSelection.getFont().deriveFont(labelNoSelection.getFont().getSize()-2f));
+        labelNoSelection.setText("<html>Nothing is selected on the map,<br>so this brush won't paint anywhere</html>");
+        labelNoSelection.setVisible(false);
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
         this.setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addComponent(checkBoxInSelection)
+            .addComponent(labelNoSelection)
             .addComponent(heightScale, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
             .addComponent(checkBoxBelow)
             .addComponent(checkBoxReplace)
@@ -1171,6 +1199,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
                 .addComponent(checkBoxInSelection)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(checkBoxOutsideSelection)
+                .addComponent(labelNoSelection)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(heightScale, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -1317,6 +1346,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         if (checkBoxInSelection.isSelected() && checkBoxOutsideSelection.isSelected()) {
             checkBoxOutsideSelection.setSelected(false);
         }
+        updateNoSelectionHint();
         filterChanged();
     }//GEN-LAST:event_checkBoxInSelectionActionPerformed
 
@@ -1325,11 +1355,13 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         if (checkBoxOutsideSelection.isSelected() && checkBoxInSelection.isSelected()) {
             checkBoxInSelection.setSelected(false);
         }
+        updateNoSelectionHint();
         filterChanged();
     }//GEN-LAST:event_checkBoxOutsideSelectionActionPerformed
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private org.pepsoft.worldpainter.panels.HeightFilterScale heightScale;
+    private javax.swing.JLabel labelNoSelection;
     private javax.swing.JButton buttonExceptOn;
     private javax.swing.JButton buttonReplace;
     private javax.swing.JCheckBox checkBoxAbove;

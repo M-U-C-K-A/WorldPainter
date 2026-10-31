@@ -114,7 +114,7 @@ public final class HeightFilterScale extends JComponent {
     @Override
     public Dimension getPreferredSize() {
         // No wider than it has to be, so that it does not make the panel wider, but it fills whatever width there is
-        return new Dimension(UIScale.scale(MINIMUM_WIDTH), UIScale.scale(SCENE_HEIGHT + 2 * GAP + BUTTON_HEIGHT + CAPTION_HEIGHT));
+        return new Dimension(UIScale.scale(MINIMUM_WIDTH), UIScale.scale(TITLE_HEIGHT + SCENE_HEIGHT + 2 * GAP + BUTTON_HEIGHT + CAPTION_HEIGHT));
     }
 
     @Override
@@ -135,6 +135,8 @@ public final class HeightFilterScale extends JComponent {
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
             g2.setFont(smallFont());
+            g2.setColor(colour("Label.foreground", Color.WHITE));
+            g2.drawString("Height limits", 0, g2.getFontMetrics().getAscent());
             final Rectangle scene = scene();
             paintScene(g2, scene);
             paintAxis(g2, scene);
@@ -234,7 +236,7 @@ public final class HeightFilterScale extends JComponent {
         final int y = heightToY(scene, height);
         g2.drawLine(scene.x - UIScale.scale(3), y, scene.x - 1, y);
         final String label = Integer.toString(height);
-        final int baseline = Math.max(metrics.getAscent(), Math.min(scene.y + scene.height, y + (metrics.getAscent() - metrics.getDescent()) / 2));
+        final int baseline = Math.max(scene.y + metrics.getAscent(), Math.min(scene.y + scene.height, y + (metrics.getAscent() - metrics.getDescent()) / 2));
         g2.drawString(label, scene.x - UIScale.scale(5) - metrics.stringWidth(label), baseline);
     }
 
@@ -459,16 +461,16 @@ public final class HeightFilterScale extends JComponent {
     private Rectangle scene() {
         final FontMetrics metrics = getFontMetrics(smallFont());
         final int axis = Math.max(metrics.stringWidth(Integer.toString(minHeight)), metrics.stringWidth(Integer.toString(maxHeight))) + UIScale.scale(8);
-        return new Rectangle(axis, 0, Math.max(1, getWidth() - axis), UIScale.scale(SCENE_HEIGHT));
+        return new Rectangle(axis, UIScale.scale(TITLE_HEIGHT), Math.max(1, getWidth() - axis), UIScale.scale(SCENE_HEIGHT));
     }
 
     private Rectangle betweenButton() {
-        final int y = UIScale.scale(SCENE_HEIGHT + GAP);
+        final int y = UIScale.scale(TITLE_HEIGHT + SCENE_HEIGHT + GAP);
         return new Rectangle(0, y, getWidth() / 2, UIScale.scale(BUTTON_HEIGHT));
     }
 
     private Rectangle beyondButton() {
-        final int y = UIScale.scale(SCENE_HEIGHT + GAP);
+        final int y = UIScale.scale(TITLE_HEIGHT + SCENE_HEIGHT + GAP);
         return new Rectangle(getWidth() / 2 - 1, y, getWidth() - getWidth() / 2 + 1, UIScale.scale(BUTTON_HEIGHT));
     }
 
@@ -514,7 +516,7 @@ public final class HeightFilterScale extends JComponent {
     private List<Bar> pressed = List.of();
     private int pressY, dragNumber;
 
-    private static final int MINIMUM_WIDTH = 110, SCENE_HEIGHT = 124, BUTTON_HEIGHT = 20, CAPTION_HEIGHT = 14, GAP = 4, GRAB = 6, SEA_LEVEL = 62;
+    private static final int MINIMUM_WIDTH = 110, TITLE_HEIGHT = 16, SCENE_HEIGHT = 124, BUTTON_HEIGHT = 20, CAPTION_HEIGHT = 14, GAP = 4, GRAB = 6, SEA_LEVEL = 62;
 
     /**
      * The shape of the land, in fractions of the height from the sea to the top of the mountain.
