@@ -3,7 +3,6 @@ package org.pepsoft.worldpainter.help;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.HierarchyEvent;
-import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -131,13 +130,15 @@ public final class ToolCard {
             setComponent(component);
             setOpaque(true);
             setBorder(BorderFactory.createEmptyBorder());
-            timer = new Timer(33, e -> repaint());
+            timer = new Timer(16, e -> repaint(s(PADDING), s(PADDING), s(WIDTH) - 2 * s(PADDING), s(PREVIEW_HEIGHT)));
             addHierarchyListener(e -> {
                 if ((e.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0) {
                     final ToolTipManager manager = ToolTipManager.sharedInstance();
                     if (isShowing()) {
                         start = System.currentTimeMillis();
-                        timer.start();
+                        if (card.preview != null) {
+                            timer.start();
+                        }
                         // Leave time to watch the animation
                         previousDismissDelay = manager.getDismissDelay();
                         manager.setDismissDelay(Math.max(previousDismissDelay, 60_000));
@@ -170,19 +171,18 @@ public final class ToolCard {
                 g2.setColor(border);
                 g2.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
 
-                // The animation, in a rounded frame
+                // The animation, in a frame
                 final Layout layout = cardLayout();
                 if (card.preview != null) {
                     final Graphics2D preview = (Graphics2D) g2.create(s(PADDING), s(PADDING), s(WIDTH) - 2 * s(PADDING), s(PREVIEW_HEIGHT));
                     try {
-                        preview.clip(new RoundRectangle2D.Float(0, 0, s(WIDTH) - 2 * s(PADDING), s(PREVIEW_HEIGHT), 10, 10));
                         final double time = ((System.currentTimeMillis() - start) % LOOP) / (double) LOOP;
                         card.preview.paint(preview, s(WIDTH) - 2 * s(PADDING), s(PREVIEW_HEIGHT), time);
                     } finally {
                         preview.dispose();
                     }
                     g2.setColor(border);
-                    g2.draw(new RoundRectangle2D.Float(s(PADDING), s(PADDING), s(WIDTH) - 2 * s(PADDING) - 1, s(PREVIEW_HEIGHT) - 1, 10, 10));
+                    g2.drawRect(s(PADDING), s(PADDING), s(WIDTH) - 2 * s(PADDING) - 1, s(PREVIEW_HEIGHT) - 1);
                 }
 
                 // The title, with the shortcut on the right
@@ -196,9 +196,9 @@ public final class ToolCard {
                     final int chipWidth = metrics.stringWidth(card.shortcut) + 10, chipHeight = metrics.getHeight() + 2;
                     final int chipX = s(WIDTH) - s(PADDING) - chipWidth, chipY = y - metrics.getAscent() - 2;
                     g2.setColor(colour("WorldPainter.subtleBackground", new Color(0x27272a)));
-                    g2.fillRoundRect(chipX, chipY, chipWidth, chipHeight, 6, 6);
+                    g2.fillRect(chipX, chipY, chipWidth, chipHeight);
                     g2.setColor(border);
-                    g2.drawRoundRect(chipX, chipY, chipWidth - 1, chipHeight - 1, 6, 6);
+                    g2.drawRect(chipX, chipY, chipWidth - 1, chipHeight - 1);
                     g2.setColor(muted);
                     g2.drawString(card.shortcut, chipX + 5, y);
                 }
@@ -224,7 +224,6 @@ public final class ToolCard {
                         if (row.icon != null) {
                             final Graphics2D iconGraphics = (Graphics2D) g2.create(s(PADDING), rowY + s(3), iconSize, iconSize);
                             try {
-                                iconGraphics.clip(new RoundRectangle2D.Float(0, 0, iconSize, iconSize, s(6), s(6)));
                                 iconGraphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
                                 final double scale = (double) iconSize / Math.max(1, Math.max(row.icon.getIconWidth(), row.icon.getIconHeight()));
                                 iconGraphics.scale(scale, scale);

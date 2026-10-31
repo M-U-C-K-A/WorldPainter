@@ -162,8 +162,8 @@ public final class ThemeUtils {
             WorldPainterLightLaf.setup();
         }
         // Shorter delays make tooltips feel responsive, as in modern web applications
-        ToolTipManager.sharedInstance().setInitialDelay(450);
-        ToolTipManager.sharedInstance().setReshowDelay(100);
+        ToolTipManager.sharedInstance().setInitialDelay(300);
+        ToolTipManager.sharedInstance().setReshowDelay(50);
         ToolTipManager.sharedInstance().setDismissDelay(15000);
     }
 

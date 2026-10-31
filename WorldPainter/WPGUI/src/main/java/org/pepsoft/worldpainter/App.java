@@ -6271,7 +6271,15 @@ public final class App extends JFrame implements BrushControl,
         button.setFocusable(false);
         button.setToolTipText(richToolTip(brush.getName(), "Brush shape; scroll to change the size, Alt+scroll to rotate", null));
         // A card with the shape of the brush in 3D
-        org.pepsoft.worldpainter.help.ToolCard.install(button, () -> new org.pepsoft.worldpainter.help.ToolCard(brush.getName(), "The shape the brush raises with the height tools, or the strength with which it paints. Scroll over the map to change its size, Alt+scroll to rotate it.", null, new org.pepsoft.worldpainter.help.BrushPreview(brush), null));
+        final org.pepsoft.worldpainter.help.BrushPreview brushPreview = new org.pepsoft.worldpainter.help.BrushPreview(brush);
+        org.pepsoft.worldpainter.help.ToolCard.install(button, new org.pepsoft.worldpainter.help.ToolCard(brush.getName(), "The shape the brush raises with the height tools, or the strength with which it paints. Scroll over the map to change its size, Alt+scroll to rotate it.", null, brushPreview, null));
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                // Have the preview ready by the time the card appears
+                brushPreview.prepare();
+            }
+        });
         button.addItemListener(e -> {
             if (! programmaticChange) {
                 updateBrushRotation(brush, button);
