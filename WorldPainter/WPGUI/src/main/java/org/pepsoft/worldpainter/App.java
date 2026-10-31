@@ -3238,7 +3238,7 @@ public final class App extends JFrame implements BrushControl,
             });
         });
         eyedropperToggleButton.setToolTipText(richToolTip("Eyedropper", "Pick a terrain or layer from the map to paint with", "Alt+Y"));
-        org.pepsoft.worldpainter.help.ToolCard.install(eyedropperToggleButton, new org.pepsoft.worldpainter.help.ToolCard("Eyedropper", "Click on the map to pick the terrain or layer there, and paint with it.", "Alt+Y", org.pepsoft.worldpainter.help.ToolDemo.EYEDROPPER));
+        org.pepsoft.worldpainter.help.ToolCard.install(eyedropperToggleButton, org.pepsoft.worldpainter.help.ToolCards.eyedropper("Alt+Y"));
         eyedropperToggleButton.putClientProperty(KEY_HELP_KEY, "Operation/Eyedropper");
         paintPanel.add(eyedropperToggleButton);
 
@@ -3248,7 +3248,7 @@ public final class App extends JFrame implements BrushControl,
         styleToolButton(button);
         button.addActionListener(e -> showGlobalOperations());
         button.setToolTipText(richToolTip("Global operations", "Fill or clear the whole world (or the selection) with a terrain, biome or layer", null));
-        org.pepsoft.worldpainter.help.ToolCard.install(button, new org.pepsoft.worldpainter.help.ToolCard("Global operations", "Fill or clear the whole world, or only the selection, with a terrain, a biome or a layer, in one go.", null, org.pepsoft.worldpainter.help.ToolDemo.GLOBAL));
+        org.pepsoft.worldpainter.help.ToolCard.install(button, org.pepsoft.worldpainter.help.ToolCards.globalOperations());
         button.putClientProperty(KEY_HELP_KEY, "Operation/GlobalOperations");
         paintPanel.add(button);
         paintPanel.add(createButtonForOperation(new Text(view), 'x'));
@@ -3285,7 +3285,7 @@ public final class App extends JFrame implements BrushControl,
 //            selectionState.setValue(false);
         });
         clearSelectionButton.setToolTipText(richToolTip("Clear selection", "Remove the current selection", null));
-        org.pepsoft.worldpainter.help.ToolCard.install(clearSelectionButton, new org.pepsoft.worldpainter.help.ToolCard("Clear selection", "Remove the current selection, so that the tools work on the whole map again.", null, org.pepsoft.worldpainter.help.ToolDemo.CLEAR_SELECTION));
+        org.pepsoft.worldpainter.help.ToolCard.install(clearSelectionButton, org.pepsoft.worldpainter.help.ToolCards.clearSelection());
         selectionState.addObserver((o, selectionMayBePresent) -> {
             copySelectionButton.setEnabled((boolean) selectionMayBePresent);
             clearSelectionButton.setEnabled((boolean) selectionMayBePresent);
@@ -3688,7 +3688,7 @@ public final class App extends JFrame implements BrushControl,
                 button.setIcon(new ImageIcon(material.getIcon(selectedColourScheme)));
                 button.setMargin(App.SMALLER_BUTTON_INSETS);
                 button.setToolTipText(group.toString());
-                org.pepsoft.worldpainter.help.ToolCard.install(button, () -> org.pepsoft.worldpainter.help.CompositionCards.forMaterial(group.toString(), "A mix of blocks. Click to paint with it; it is added as a custom terrain type.", material, selectedColourScheme));
+                org.pepsoft.worldpainter.help.ToolCard.install(button, () -> org.pepsoft.worldpainter.help.CompositionCards.forMaterialToAdd(group.toString(), material, selectedColourScheme));
                 button.putClientProperty(KEY_SEARCH_TEXT, (group + " " + family + " mix").toLowerCase());
                 // Paint with it straight from this panel, setting it up as a custom terrain type the first time
                 paintButtonGroup.add(button);
@@ -4127,7 +4127,8 @@ public final class App extends JFrame implements BrushControl,
         });
         
         constraints.insets = new Insets(3, 1, 1, 1);
-        brushRotationLabel = new JLabel("Rotation: 0°");
+        brushRotationLabel = org.pepsoft.worldpainter.help.ToolCard.label("Rotation: 0°");
+        org.pepsoft.worldpainter.help.ToolCard.install(brushRotationLabel, org.pepsoft.worldpainter.help.OptionCards.rotation());
         brushSettingsPanel.add(brushRotationLabel, constraints);
         
         constraints.fill = HORIZONTAL;
@@ -4141,7 +4142,8 @@ public final class App extends JFrame implements BrushControl,
 
         constraints.fill = GridBagConstraints.NONE;
         constraints.insets = new Insets(3, 1, 1, 1);
-        levelLabel = new JLabel("Intensity: 50 %");
+        levelLabel = org.pepsoft.worldpainter.help.ToolCard.label("Intensity: 50 %");
+        org.pepsoft.worldpainter.help.ToolCard.install(levelLabel, org.pepsoft.worldpainter.help.OptionCards.intensity());
         brushSettingsPanel.add(levelLabel, constraints);
         
         constraints.fill = HORIZONTAL;
@@ -5734,34 +5736,6 @@ public final class App extends JFrame implements BrushControl,
         }
     }
 
-    /**
-     * A fuller explanation of a tool than its own description, for its tooltip card.
-     */
-    private static String toolCardDescription(Operation operation) {
-        switch (operation.getClass().getSimpleName()) {
-            case "Height": return "Drag to raise the land under the brush; hold Ctrl (Cmd on a Mac) to lower it. The brush and its intensity set the shape and the speed.";
-            case "Flatten": return "Drag to level the land to the height where you started the stroke, for building sites, fields and roads.";
-            case "Smooth": return "Drag to soften rough or jagged land, without changing its overall shape.";
-            case "RaiseMountain": return "Click and hold to grow a mountain with ridges under the brush; the larger the brush, the larger the mountain.";
-            case "RaisePyramid": return "Click and hold to raise a square pyramid, for sharp peaks and man made shapes.";
-            case "RaiseRotatedPyramid": return "Click and hold to raise a pyramid turned by 45 degrees, with its ridges along the axes.";
-            case "PathTool": return "Click the points the path should pass through one by one, then press Enter to choose how it is built: natural, with bridges or with tunnels.";
-            case "Pencil": return "Drag to paint the selected terrain, layer or biome with a hard edge.";
-            case "SprayPaint": return "Drag to spray the selected terrain, layer or biome; it builds up gradually, for natural transitions.";
-            case "Fill": return "Click to fill a connected area which has the same terrain, layer or height with what is selected.";
-            case "Flood": return operation.getName().toLowerCase().contains("lava")
-                    ? "Click on low ground to fill it with lava up to the height where you clicked, as far as it is enclosed."
-                    : "Click on low ground to flood it with water up to the height where you clicked, as far as it is enclosed: lakes, seas and rivers.";
-            case "Sponge": return "Drag to remove water or lava under the brush.";
-            case "EditSelectionOperation": return "Paint the selection with the brush: drag to add to it, drag with the right button to remove from it. For a rectangle, use Select Rectangle.";
-            case "RectangleSelectionOperation": return "Drag across the map to select a rectangle; drag with the right button to remove one. Hold Shift for a square, Ctrl for an ellipse. Tick \"inside selection\" in the options of a tool to limit it to the selection.";
-            case "CopySelectionOperation": return "Copy the selected area, with its terrain and layers, and place it elsewhere on the map.";
-            case "SetSpawnPoint": return "Click to set where players appear when they first join the world.";
-            case "Text": return "Click to write text on the map, as an annotation or with a layer.";
-            default: return operation.getDescription();
-        }
-    }
-
     private static String modernIconFor(Operation operation) {
         switch (operation.getClass().getSimpleName()) {
             case "SprayPaint": return "spray-can";
@@ -5852,7 +5826,7 @@ public final class App extends JFrame implements BrushControl,
             button.setMnemonic(mnemonic);
         }
         button.setToolTipText(richToolTip(operation.getName(), operation.getDescription(), (mnemonic != 0) ? ("Alt+" + Character.toUpperCase(mnemonic)) : null));
-        org.pepsoft.worldpainter.help.ToolCard.install(button, new org.pepsoft.worldpainter.help.ToolCard(operation.getName(), toolCardDescription(operation), (mnemonic != 0) ? ("Alt+" + Character.toUpperCase(mnemonic)) : null, toolDemoFor(operation)));
+        org.pepsoft.worldpainter.help.ToolCard.install(button, org.pepsoft.worldpainter.help.ToolCards.forTool(operation.getClass().getSimpleName(), operation.getName(), operation.getDescription(), (mnemonic != 0) ? ("Alt+" + Character.toUpperCase(mnemonic)) : null, toolDemoFor(operation)));
         if (operation instanceof GlobalOperation) {
             button.addActionListener(event ->  {
                 cancelPaintSelection();
@@ -6113,7 +6087,7 @@ public final class App extends JFrame implements BrushControl,
         if (terrain.isCustom()) {
             // Show what the mix is made of
             org.pepsoft.worldpainter.help.ToolCard.install(button, () -> Terrain.isCustomMaterialConfigured(terrain.getCustomTerrainIndex())
-                    ? org.pepsoft.worldpainter.help.CompositionCards.forMaterial(Terrain.getCustomMaterial(terrain.getCustomTerrainIndex()).getName(), "A custom terrain type. Right-click to change it.", Terrain.getCustomMaterial(terrain.getCustomTerrainIndex()), selectedColourScheme)
+                    ? org.pepsoft.worldpainter.help.CompositionCards.forMaterial(Terrain.getCustomMaterial(terrain.getCustomTerrainIndex()).getName(), "A custom terrain type, mixed from these blocks.", Terrain.getCustomMaterial(terrain.getCustomTerrainIndex()), selectedColourScheme).action("Click", "Select it, then paint on the map").action("Right-click", "Change it")
                     : null);
         } else {
             // Show what its surface is made of
@@ -6250,7 +6224,7 @@ public final class App extends JFrame implements BrushControl,
         button.setToolTipText(richToolTip(brush.getName(), "Brush shape; scroll to change the size, Alt+scroll to rotate", null));
         // A card with the shape of the brush in 3D
         final org.pepsoft.worldpainter.help.BrushPreview brushPreview = new org.pepsoft.worldpainter.help.BrushPreview(brush);
-        org.pepsoft.worldpainter.help.ToolCard.install(button, new org.pepsoft.worldpainter.help.ToolCard(brush.getName(), "The shape the brush raises with the height tools, or the strength with which it paints. Scroll over the map to change its size, Alt+scroll to rotate it.", null, brushPreview, null));
+        org.pepsoft.worldpainter.help.ToolCard.install(button, org.pepsoft.worldpainter.help.ToolCards.brush(brush.getName(), brushPreview));
         button.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {

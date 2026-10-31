@@ -78,7 +78,21 @@ public final class HeightFilterScale extends JComponent {
         };
         addMouseListener(mouseHandler);
         addMouseMotionListener(mouseHandler);
-        setToolTipText("Which heights the brush applies at. Drag a bar to set that limit and switch it on; \"Between\" and \"Beyond\" choose the land between the bars or beyond them");
+        org.pepsoft.worldpainter.help.ToolCard.install(this, org.pepsoft.worldpainter.help.OptionCards.heightLimits());
+    }
+
+    @Override
+    public JToolTip createToolTip() {
+        final JToolTip card = org.pepsoft.worldpainter.help.ToolCard.toolTipFor(this);
+        return (card != null) ? card : super.createToolTip();
+    }
+
+    /**
+     * Only on the title and the buttons, since a card would get in the way when dragging the bars.
+     */
+    @Override
+    public String getToolTipText(MouseEvent event) {
+        return scene().contains(event.getPoint()) ? null : super.getToolTipText(event);
     }
 
     public void setListener(Listener listener) {

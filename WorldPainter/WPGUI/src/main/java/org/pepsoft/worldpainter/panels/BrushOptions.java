@@ -1017,20 +1017,26 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
         heightScale = new org.pepsoft.worldpainter.panels.HeightFilterScale();
         labelNoSelection = new javax.swing.JLabel();
-        checkBoxAbove = new javax.swing.JCheckBox();
+        checkBoxAbove = org.pepsoft.worldpainter.help.ToolCard.checkBox();
         spinnerAbove = new javax.swing.JSpinner();
-        checkBoxBelow = new javax.swing.JCheckBox();
+        checkBoxBelow = org.pepsoft.worldpainter.help.ToolCard.checkBox();
         spinnerBelow = new javax.swing.JSpinner();
-        checkBoxReplace = new javax.swing.JCheckBox();
+        checkBoxReplace = org.pepsoft.worldpainter.help.ToolCard.checkBox();
         buttonReplace = new javax.swing.JButton();
-        checkBoxFeather = new javax.swing.JCheckBox();
-        checkBoxExceptOn = new javax.swing.JCheckBox();
+        checkBoxFeather = org.pepsoft.worldpainter.help.ToolCard.checkBox();
+        checkBoxExceptOn = org.pepsoft.worldpainter.help.ToolCard.checkBox();
         buttonExceptOn = new javax.swing.JButton();
-        checkBoxAboveSlope = new javax.swing.JCheckBox();
-        checkBoxBelowSlope = new javax.swing.JCheckBox();
+        checkBoxAboveSlope = org.pepsoft.worldpainter.help.ToolCard.checkBox();
+        checkBoxBelowSlope = org.pepsoft.worldpainter.help.ToolCard.checkBox();
         spinnerSlope = new javax.swing.JSpinner();
         jLabel1 = new javax.swing.JLabel();
-        comboBoxMapArea = new javax.swing.JComboBox<>(MapArea.values());
+        comboBoxMapArea = new javax.swing.JComboBox<>(MapArea.values()) {
+            @Override
+            public JToolTip createToolTip() {
+                final JToolTip card = org.pepsoft.worldpainter.help.ToolCard.toolTipFor(this);
+                return (card != null) ? card : super.createToolTip();
+            }
+        };
 
         checkBoxAbove.setFont(checkBoxAbove.getFont().deriveFont(checkBoxAbove.getFont().getSize()-1f));
         checkBoxAbove.setText("at or above");
@@ -1068,7 +1074,6 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
         checkBoxReplace.setFont(checkBoxReplace.getFont().deriveFont(checkBoxReplace.getFont().getSize()-1f));
         checkBoxReplace.setText("only on");
-        checkBoxReplace.setToolTipText("Only change the map where it has certain terrain types or layers");
         checkBoxReplace.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 checkBoxReplaceActionPerformed(evt);
@@ -1087,7 +1092,6 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
         checkBoxFeather.setFont(checkBoxFeather.getFont().deriveFont(checkBoxFeather.getFont().getSize()-1f));
         checkBoxFeather.setText("fade at the limits");
-        checkBoxFeather.setToolTipText("Instead of stopping abruptly at the height limits, let the brush fade out over the 4 blocks beyond them");
         checkBoxFeather.setEnabled(false);
         checkBoxFeather.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1097,7 +1101,6 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
         checkBoxExceptOn.setFont(checkBoxExceptOn.getFont().deriveFont(checkBoxExceptOn.getFont().getSize()-1f));
         checkBoxExceptOn.setText("except on");
-        checkBoxExceptOn.setToolTipText("Don't change the map where it has certain terrain types or layers");
         checkBoxExceptOn.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 checkBoxExceptOnActionPerformed(evt);
@@ -1143,7 +1146,6 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         jLabel1.setText("degrees");
 
         comboBoxMapArea.setFont(comboBoxMapArea.getFont().deriveFont(comboBoxMapArea.getFont().getSize()-1f));
-        comboBoxMapArea.setToolTipText("If you have selected part of the map with a selection tool, the brush can be limited to that part, or to the rest of the map");
         comboBoxMapArea.addActionListener(evt -> comboBoxMapAreaActionPerformed());
 
         labelNoSelection.setFont(labelNoSelection.getFont().deriveFont(labelNoSelection.getFont().getSize()-2f));
@@ -1155,6 +1157,14 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
      * One column in a narrow panel; in a wider one the fields which belong together go next to each other.
      */
     private void buildLayout() {
+        org.pepsoft.worldpainter.help.ToolCard.install(comboBoxMapArea, org.pepsoft.worldpainter.help.OptionCards.whereOnTheMap());
+        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxAbove, org.pepsoft.worldpainter.help.OptionCards.heightLimits());
+        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxBelow, org.pepsoft.worldpainter.help.OptionCards.heightLimits());
+        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxFeather, org.pepsoft.worldpainter.help.OptionCards.fade());
+        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxReplace, org.pepsoft.worldpainter.help.OptionCards.onlyOn());
+        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxExceptOn, org.pepsoft.worldpainter.help.OptionCards.exceptOn());
+        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxAboveSlope, org.pepsoft.worldpainter.help.OptionCards.slope());
+        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxBelowSlope, org.pepsoft.worldpainter.help.OptionCards.slope());
         setLayout(new GridBagLayout());
         final GridBagConstraints constraints = new GridBagConstraints();
         constraints.gridwidth = GridBagConstraints.REMAINDER;
@@ -1184,9 +1194,9 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         final JPanel otherFields = new JPanel(new org.pepsoft.worldpainter.util.ResponsiveColumnsLayout(scaled(COLUMN_WIDTH), scaled(4), 3));
         otherFields.add(block(checkBoxReplace, buttonReplace));
         otherFields.add(block(checkBoxExceptOn, buttonExceptOn));
-        final JLabel slopeLabel = new JLabel("slope");
+        final JLabel slopeLabel = org.pepsoft.worldpainter.help.ToolCard.label("slope");
+        org.pepsoft.worldpainter.help.ToolCard.install(slopeLabel, org.pepsoft.worldpainter.help.OptionCards.slope());
         slopeLabel.setFont(slopeLabel.getFont().deriveFont(slopeLabel.getFont().getSize() - 1f));
-        slopeLabel.setToolTipText("Only change the map where its slope is above or below a number of degrees");
         otherFields.add(block(slopeLabel, row(checkBoxAboveSlope, checkBoxBelowSlope), row(spinnerSlope, jLabel1)));
         constraints.insets = new Insets(2, 0, 0, 0);
         add(otherFields, constraints);

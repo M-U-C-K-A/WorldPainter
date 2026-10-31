@@ -43,9 +43,9 @@ class PacksPanel extends JPanel {
 
         final Map<String, List<JButton>> trees = new LinkedHashMap<>();
         for (TreePack.Kind kind: TreePack.Kind.values()) {
-            final String description = "Custom trees from the WorldPainter tree pack, in eight variants. Paint them like any custom object layer. Click to add them and paint.";
+            final String description = "Custom trees from the WorldPainter tree pack, in eight variants.";
             trees.computeIfAbsent("Trees", k -> new ArrayList<>()).add(createButton(swatch(kind.getColour(), treeIcon(kind)), kind.toString(),
-                    () -> new ToolCard(kind.toString(), description, null, null, null), () -> treeHandler.accept(kind)));
+                    () -> new ToolCard(kind.toString(), description, null, null, null).action("Click", "Add them as a layer and paint with it"), () -> treeHandler.accept(kind)));
         }
         addSections(trees, constraints);
 
@@ -61,7 +61,7 @@ class PacksPanel extends JPanel {
         for (MaterialGroup group: MaterialGroup.values()) {
             final MixedMaterial material = group.newMaterial();
             materials.computeIfAbsent(group.getFamily().toString(), k -> new ArrayList<>()).add(createButton(new ImageIcon(material.getIcon(colourScheme)), group.toString(),
-                    () -> CompositionCards.forMaterial(group.toString(), "A mix of blocks, added as a custom terrain type. Click to add it and paint.", material, colourScheme), () -> materialHandler.accept(group)));
+                    () -> CompositionCards.forMaterialToAdd(group.toString(), material, colourScheme), () -> materialHandler.accept(group)));
         }
         addSections(materials, constraints);
 

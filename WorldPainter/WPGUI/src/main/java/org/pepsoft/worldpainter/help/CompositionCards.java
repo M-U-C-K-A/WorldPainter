@@ -38,6 +38,14 @@ public final class CompositionCards {
         return new ToolCard(title, description, null, null, rows);
     }
 
+    /**
+     * A mix of blocks in a panel which adds it when it is clicked.
+     */
+    public static ToolCard forMaterialToAdd(String title, MixedMaterial material, ColourScheme colourScheme) {
+        return forMaterial(title, "A mix of blocks, used like a terrain type.", material, colourScheme)
+                .action("Click", "Add it as a custom terrain type and paint with it");
+    }
+
     public static ToolCard forPlants(String title, String description, PlantLayer layer, ColourScheme colourScheme) {
         final Map<Plant, PlantLayer.PlantSettings> plants = layer.getConfiguredPlants();
         int total = 0;
@@ -80,7 +88,8 @@ public final class CompositionCards {
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
                 .limit(8)
                 .forEach(entry -> rows.add(new ToolCard.Row(BlockIcons.block(materials.get(entry.getKey()), colourScheme), humanise(entry.getKey()), percentage(entry.getValue(), sum))));
-        return new ToolCard(terrain.getName(), terrain.getDescription(), null, null, rows);
+        return new ToolCard(terrain.getName(), terrain.getDescription(), null, null, rows)
+                .action("Click", "Select it, then paint on the map");
     }
 
     /**
