@@ -11,6 +11,8 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 
 ## Next preview
 
+- [ ] [Faster export, first as an experimental button](https://github.com/M-U-C-K-A/WorldPainter/issues/14) (in progress)
+
 - [ ] [Automated export tests in CI](https://github.com/M-U-C-K-A/WorldPainter/issues/1)
 - [ ] [Sign and notarise the macOS app](https://github.com/M-U-C-K-A/WorldPainter/issues/2)
 - [ ] [Merge the latest WorldPainter](https://github.com/M-U-C-K-A/WorldPainter/issues/3)
@@ -34,6 +36,11 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 ## Done
 
 - [x] Preview releases on GitHub, with versions and release notes
+- [x] Brush settings which stay when switching tools, with limits by map selection, by height on a scale you can drag, by several terrain types or layers at once, and by slope, with undo
+- [x] Clearer cards on hover, with what the mouse and keys do and pictures of the brush options
+- [x] Better shaders in the 3D view: sunlight and skylight, shaded valleys, new water and sky
+- [x] Side panels which fold away, and palettes which keep their size when resizing
+- [x] Round maps blended into their surroundings
 - [x] Undo for the layers created by the node graph and the Path tool (trees, bridges, tunnels, floating islands)
 - [x] Node graph with 36 kinds of nodes, examples and `.wpgraph` files
 - [x] Floating islands node

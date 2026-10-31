@@ -16,17 +16,18 @@ WorldPainter Modernised starts from WorldPainter 2.27, which supports Minecraft 
 
 ## See
 
-- **[Integrated 3D view](3d-view.html)**: in the main window, with five colour modes, a block by block mode, sun and shadows, and everything about the block under the mouse.
+- **[Integrated 3D view](3d-view.html)**: in the main window, with five colour modes, a block by block mode, shaders with sunlight, skylight, shadows and moving water, and everything about the block under the mouse.
 - **[Surroundings](surroundings-and-seeds.html)**: the biomes Minecraft will generate around the map, shown faintly around it.
 
 ## Build
 
 - **[Paths](paths.html)**: roads through points you click, following the land, with bridges and tunnels.
 - **[Seed search](surroundings-and-seeds.html#find-a-matching-seed)**: find a seed for which the land around the map matches its edges, and blend the edges into it.
-- **[Packs](trees-and-materials.html#the-packs-panel)**: fourteen kinds of custom trees, twenty-four presets of flowers, plants, water plants and crops, and thirty-five mixes of blocks (grass, dirt, stone, sand, cliffs…), ready to paint, with what each is made of on hover.
+- **[Packs](trees-and-materials.html#the-packs-panel)**: fourteen kinds of custom trees, twenty-four presets of flowers, plants, water plants and crops, and thirty-nine mixes of blocks (grass, dirt, stone, sand, cliffs…), ready to paint, with what each is made of on hover.
 - **[Terrain stamps](interface.html#brushes)**: twenty-two brushes shaped like peaks, ranges, cirques, plateaus, volcanoes, valleys…
 
 ## Use
 
+- **[Brush settings](interface.html#where-a-brush-applies)**: they stay when you switch tools, and can limit a brush by map selection, by height on a scale you can drag, by several terrain types or layers at once, and by slope, with undo.
 - **[A new interface](interface.html)**: light and dark themes, clear panels, palettes which fill their panel, tools grouped by what they do, cards with an animation of each tool and a 3D preview of each brush on hover, rectangle selection, a dotted canvas, and a unified title bar on macOS.
 - **Java 21**, native applications for macOS, Windows and Linux, and more memory for large maps.
