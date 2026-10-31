@@ -12,7 +12,6 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 ## Next preview
 
 - [ ] [Faster export, first as an experimental button](https://github.com/M-U-C-K-A/WorldPainter/issues/14) (in progress)
-
 - [ ] [Automated export tests in CI](https://github.com/M-U-C-K-A/WorldPainter/issues/1)
 - [ ] [Sign and notarise the macOS app](https://github.com/M-U-C-K-A/WorldPainter/issues/2)
 - [ ] [Merge the latest WorldPainter](https://github.com/M-U-C-K-A/WorldPainter/issues/3)
