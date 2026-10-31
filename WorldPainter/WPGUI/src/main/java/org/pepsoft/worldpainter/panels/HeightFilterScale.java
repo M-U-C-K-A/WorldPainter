@@ -103,12 +103,18 @@ public final class HeightFilterScale extends JComponent {
 
     @Override
     public Dimension getPreferredSize() {
-        return new Dimension(UIScale.scale(150), UIScale.scale(SCENE_HEIGHT + 2 * GAP + BUTTON_HEIGHT + CAPTION_HEIGHT));
+        // No wider than it has to be, so that it does not make the panel wider, but it fills whatever width there is
+        return new Dimension(UIScale.scale(MINIMUM_WIDTH), UIScale.scale(SCENE_HEIGHT + 2 * GAP + BUTTON_HEIGHT + CAPTION_HEIGHT));
     }
 
     @Override
     public Dimension getMinimumSize() {
-        return new Dimension(UIScale.scale(110), getPreferredSize().height);
+        return getPreferredSize();
+    }
+
+    @Override
+    public Dimension getMaximumSize() {
+        return new Dimension(Short.MAX_VALUE, getPreferredSize().height);
     }
 
     @Override
@@ -128,7 +134,7 @@ public final class HeightFilterScale extends JComponent {
             paintButton(g2, outside(), "Outside", isOutside());
             g2.setColor(colour("WorldPainter.mutedForeground", Color.GRAY));
             final FontMetrics metrics = g2.getFontMetrics();
-            final String caption = caption();
+            final String caption = caption(metrics);
             g2.drawString(caption, Math.max(0, (getWidth() - metrics.stringWidth(caption)) / 2), getHeight() - metrics.getDescent());
         } finally {
             g2.dispose();
@@ -201,17 +207,25 @@ public final class HeightFilterScale extends JComponent {
         }
         final Color muted = colour("WorldPainter.mutedForeground", Color.GRAY);
         g2.setStroke(new BasicStroke(1f));
+        g2.setColor(muted);
+        // The ends of the scale, which show how far it really goes, and the round numbers there is room for in between
+        paintTick(g2, scene, metrics, minHeight);
+        paintTick(g2, scene, metrics, maxHeight);
+        final int bottomY = heightToY(scene, minHeight), topY = heightToY(scene, maxHeight);
         for (int height = Math.floorDiv(minHeight, step) * step; height <= maxHeight; height += step) {
-            if (height < minHeight) {
-                continue;
-            }
             final int y = heightToY(scene, height);
-            g2.setColor(muted);
-            g2.drawLine(scene.x - UIScale.scale(3), y, scene.x - 1, y);
-            final String label = Integer.toString(height);
-            final int baseline = Math.max(metrics.getAscent(), Math.min(scene.y + scene.height, y + (metrics.getAscent() - metrics.getDescent()) / 2));
-            g2.drawString(label, scene.x - UIScale.scale(5) - metrics.stringWidth(label), baseline);
+            if ((height > minHeight) && (height < maxHeight) && (bottomY - y >= metrics.getHeight()) && (y - topY >= metrics.getHeight())) {
+                paintTick(g2, scene, metrics, height);
+            }
         }
+    }
+
+    private void paintTick(Graphics2D g2, Rectangle scene, FontMetrics metrics, int height) {
+        final int y = heightToY(scene, height);
+        g2.drawLine(scene.x - UIScale.scale(3), y, scene.x - 1, y);
+        final String label = Integer.toString(height);
+        final int baseline = Math.max(metrics.getAscent(), Math.min(scene.y + scene.height, y + (metrics.getAscent() - metrics.getDescent()) / 2));
+        g2.drawString(label, scene.x - UIScale.scale(5) - metrics.stringWidth(label), baseline);
     }
 
     private void paintBar(Graphics2D g2, Rectangle scene, Bar bar) {
@@ -302,18 +316,29 @@ public final class HeightFilterScale extends JComponent {
         return zones;
     }
 
-    private String caption() {
+    /**
+     * What the bars come down to, in as many words as there is room for.
+     */
+    private String caption(FontMetrics metrics) {
+        final String caption;
+        final String shortCaption;
         if (isInside()) {
-            return "Applies from " + above + " to " + below;
+            caption = "Applies from " + above + " to " + below;
+            shortCaption = above + " to " + below;
         } else if (isOutside()) {
-            return "Up to " + below + " and from " + above;
+            caption = "Applies up to " + below + " and from " + above;
+            shortCaption = "\u2264 " + below + " and \u2265 " + above;
         } else if (aboveActive) {
-            return "Applies at " + above + " and above";
+            caption = "Applies at " + above + " and above";
+            shortCaption = above + " and above";
         } else if (belowActive) {
-            return "Applies at " + below + " and below";
+            caption = "Applies at " + below + " and below";
+            shortCaption = below + " and below";
         } else {
-            return "Applies at every height";
+            caption = "Applies at every height";
+            shortCaption = "Every height";
         }
+        return (metrics.stringWidth(caption) <= getWidth()) ? caption : shortCaption;
     }
 
     private boolean isInside() {
@@ -479,7 +504,7 @@ public final class HeightFilterScale extends JComponent {
     private List<Bar> pressed = List.of();
     private int pressY;
 
-    private static final int SCENE_HEIGHT = 124, BUTTON_HEIGHT = 20, CAPTION_HEIGHT = 14, GAP = 4, GRAB = 6, SEA_LEVEL = 62;
+    private static final int MINIMUM_WIDTH = 110, SCENE_HEIGHT = 124, BUTTON_HEIGHT = 20, CAPTION_HEIGHT = 14, GAP = 4, GRAB = 6, SEA_LEVEL = 62;
 
     /**
      * The shape of the land, in fractions of the height from the sea to the top of the mountain.

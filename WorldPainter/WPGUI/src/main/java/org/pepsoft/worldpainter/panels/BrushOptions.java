@@ -166,7 +166,12 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
     public void setMinHeight(int minHeight) {
         boolean updateFilter = false;
+        final Object oldMinHeight = ((SpinnerNumberModel) spinnerAbove.getModel()).getMinimum();
         ((SpinnerNumberModel) spinnerAbove.getModel()).setMinimum(minHeight);
+        // A limit which is off and was at the end of the scale stays there
+        if ((! checkBoxAbove.isSelected()) && spinnerAbove.getValue().equals(oldMinHeight)) {
+            spinnerAbove.setValue(minHeight);
+        }
         if ((Integer) spinnerAbove.getValue() < minHeight) {
             spinnerAbove.setValue(minHeight);
             updateFilter = true;
@@ -184,12 +189,16 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
     public void setMaxHeight(int maxHeight) {
         boolean updateFilter = false;
+        final Object oldMaxHeight = ((SpinnerNumberModel) spinnerBelow.getModel()).getMaximum();
         ((SpinnerNumberModel) spinnerAbove.getModel()).setMaximum(maxHeight - 1);
         if ((Integer) spinnerAbove.getValue() >= maxHeight) {
             spinnerAbove.setValue(maxHeight - 1);
             updateFilter = true;
         }
         ((SpinnerNumberModel) spinnerBelow.getModel()).setMaximum(maxHeight - 1);
+        if ((! checkBoxBelow.isSelected()) && spinnerBelow.getValue().equals(oldMaxHeight)) {
+            spinnerBelow.setValue(maxHeight - 1);
+        }
         if ((Integer) spinnerBelow.getValue() >= maxHeight) {
             spinnerBelow.setValue(maxHeight - 1);
             updateFilter = true;

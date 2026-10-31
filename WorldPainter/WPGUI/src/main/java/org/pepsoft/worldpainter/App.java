@@ -4170,6 +4170,7 @@ public final class App extends JFrame implements BrushControl,
         constraints.insets = new Insets(3, 1, 1, 1);
         brushSettingsPanel.add(new JLabel("Options"), constraints);
         
+        constraints.fill = HORIZONTAL;
         constraints.insets = new Insets(1, 1, 1, 1);
         brushSettingsPanel.add(brushOptions, constraints);
 
