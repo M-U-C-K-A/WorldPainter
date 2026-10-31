@@ -11,6 +11,8 @@ import org.pepsoft.worldpainter.*;
 import org.pepsoft.worldpainter.biomeschemes.BiomeHelper;
 import org.pepsoft.worldpainter.biomeschemes.CustomBiome;
 import org.pepsoft.worldpainter.biomeschemes.CustomBiomeManager;
+import org.pepsoft.worldpainter.help.OptionCards;
+import org.pepsoft.worldpainter.help.ToolCard;
 import org.pepsoft.worldpainter.layers.*;
 import org.pepsoft.worldpainter.operations.Filter;
 import org.pepsoft.worldpainter.selection.SelectionBlock;
@@ -196,8 +198,8 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
                 throw new UnsupportedOperationException("Unsupported exceptOn filter type " + filter.exceptOnFilter.getClass());
             }
         }
-        installPaint(onlyOn, buttonReplace, checkBoxReplace);
-        installPaint(exceptOn, buttonExceptOn, checkBoxExceptOn);
+        installPaint(onlyOn, buttonReplace);
+        installPaint(exceptOn, buttonExceptOn);
         setControlStates();
     }
 
@@ -272,42 +274,42 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     
     public void setOnlyOn(Terrain terrain) {
         onlyOn = terrain;
-        installPaint(onlyOn, buttonReplace, checkBoxReplace);
+        installPaint(onlyOn, buttonReplace);
     }
 
     public void setOnlyOn(Layer layer, int value) {
         onlyOn = toPaint(layer, value);
-        installPaint(onlyOn, buttonReplace, checkBoxReplace);
+        installPaint(onlyOn, buttonReplace);
     }
 
     public void addOnlyOn(Terrain terrain) {
         onlyOn = addToSelection(onlyOn, terrain);
-        installPaint(onlyOn, buttonReplace, checkBoxReplace);
+        installPaint(onlyOn, buttonReplace);
     }
 
     public void addOnlyOn(Layer layer, int value) {
         onlyOn = addToSelection(onlyOn, toPaint(layer, value));
-        installPaint(onlyOn, buttonReplace, checkBoxReplace);
+        installPaint(onlyOn, buttonReplace);
     }
 
     public void setExceptOn(Terrain terrain) {
         exceptOn = terrain;
-        installPaint(exceptOn, buttonExceptOn, checkBoxExceptOn);
+        installPaint(exceptOn, buttonExceptOn);
     }
 
     public void setExceptOn(Layer layer, int value) {
         exceptOn = toPaint(layer, value);
-        installPaint(exceptOn, buttonExceptOn, checkBoxExceptOn);
+        installPaint(exceptOn, buttonExceptOn);
     }
 
     public void addExceptOn(Terrain terrain) {
         exceptOn = addToSelection(exceptOn, terrain);
-        installPaint(exceptOn, buttonExceptOn, checkBoxExceptOn);
+        installPaint(exceptOn, buttonExceptOn);
     }
 
     public void addExceptOn(Layer layer, int value) {
         exceptOn = addToSelection(exceptOn, toPaint(layer, value));
-        installPaint(exceptOn, buttonExceptOn, checkBoxExceptOn);
+        installPaint(exceptOn, buttonExceptOn);
     }
 
     // Observer
@@ -330,7 +332,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     }
 
     @SuppressWarnings("unchecked") // Guaranteed by code
-    private void installPaint(Object paint, AbstractButton button, JComponent... additionalComponents) {
+    private void installPaint(Object paint, AbstractButton button) {
         final String text, tooltip;
         final Icon icon;
         if (paint == null) {
@@ -376,9 +378,6 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         button.setText(text);
         button.setIcon(icon);
         button.setToolTipText(tooltip);
-        for (JComponent additionalComponent: additionalComponents) {
-            additionalComponent.setToolTipText(tooltip);
-        }
         filterChanged();
     }
 
@@ -649,8 +648,8 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
             checkBoxAboveSlope.setSelected(options.aboveSlope);
             checkBoxBelowSlope.setSelected(options.belowSlope);
             spinnerSlope.setValue(options.slope);
-            installPaint(onlyOn, buttonReplace, checkBoxReplace);
-            installPaint(exceptOn, buttonExceptOn, checkBoxExceptOn);
+            installPaint(onlyOn, buttonReplace);
+            installPaint(exceptOn, buttonExceptOn);
             setControlStates();
             updateNoSelectionHint();
             filterChanged();
@@ -697,7 +696,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     private JPopupMenu createReplaceMenu() {
         final JMenu menu = createObjectSelectionMenu(MENU_ONLY_ON, (object, name, icon) -> {
             onlyOn = object;
-            installPaint(onlyOn, buttonReplace, checkBoxReplace);
+            installPaint(onlyOn, buttonReplace);
         }, false, onlyOn);
         final JPopupMenu popupMenu = new BetterJPopupMenu();
         Arrays.stream(menu.getMenuComponents()).forEach(popupMenu::add);
@@ -707,7 +706,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     private JPopupMenu createExceptOnMenu() {
         final JMenu menu = createObjectSelectionMenu(MENU_EXCEPT_ON, (object, name, icon) -> {
             exceptOn = object;
-            installPaint(exceptOn, buttonExceptOn, checkBoxExceptOn);
+            installPaint(exceptOn, buttonExceptOn);
         }, false, exceptOn);
         final JPopupMenu popupMenu = new BetterJPopupMenu();
         Arrays.stream(menu.getMenuComponents()).forEach(popupMenu::add);
@@ -1017,26 +1016,20 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
         heightScale = new org.pepsoft.worldpainter.panels.HeightFilterScale();
         labelNoSelection = new javax.swing.JLabel();
-        checkBoxAbove = org.pepsoft.worldpainter.help.ToolCard.checkBox();
+        checkBoxAbove = new javax.swing.JCheckBox();
         spinnerAbove = new javax.swing.JSpinner();
-        checkBoxBelow = org.pepsoft.worldpainter.help.ToolCard.checkBox();
+        checkBoxBelow = new javax.swing.JCheckBox();
         spinnerBelow = new javax.swing.JSpinner();
-        checkBoxReplace = org.pepsoft.worldpainter.help.ToolCard.checkBox();
+        checkBoxReplace = new javax.swing.JCheckBox();
         buttonReplace = new javax.swing.JButton();
-        checkBoxFeather = org.pepsoft.worldpainter.help.ToolCard.checkBox();
-        checkBoxExceptOn = org.pepsoft.worldpainter.help.ToolCard.checkBox();
+        checkBoxFeather = new javax.swing.JCheckBox();
+        checkBoxExceptOn = new javax.swing.JCheckBox();
         buttonExceptOn = new javax.swing.JButton();
-        checkBoxAboveSlope = org.pepsoft.worldpainter.help.ToolCard.checkBox();
-        checkBoxBelowSlope = org.pepsoft.worldpainter.help.ToolCard.checkBox();
+        checkBoxAboveSlope = new javax.swing.JCheckBox();
+        checkBoxBelowSlope = new javax.swing.JCheckBox();
         spinnerSlope = new javax.swing.JSpinner();
         jLabel1 = new javax.swing.JLabel();
-        comboBoxMapArea = new javax.swing.JComboBox<>(MapArea.values()) {
-            @Override
-            public JToolTip createToolTip() {
-                final JToolTip card = org.pepsoft.worldpainter.help.ToolCard.toolTipFor(this);
-                return (card != null) ? card : super.createToolTip();
-            }
-        };
+        comboBoxMapArea = new javax.swing.JComboBox<>(MapArea.values());
 
         checkBoxAbove.setFont(checkBoxAbove.getFont().deriveFont(checkBoxAbove.getFont().getSize()-1f));
         checkBoxAbove.setText("at or above");
@@ -1082,7 +1075,6 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
         buttonReplace.setFont(buttonReplace.getFont().deriveFont(buttonReplace.getFont().getSize()-1f));
         buttonReplace.setText("Choose\u2026");
-        buttonReplace.setToolTipText("Choose the terrain types or layers");
         buttonReplace.setVisible(false);
         buttonReplace.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1109,7 +1101,6 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
         buttonExceptOn.setFont(buttonExceptOn.getFont().deriveFont(buttonExceptOn.getFont().getSize()-1f));
         buttonExceptOn.setText("Choose\u2026");
-        buttonExceptOn.setToolTipText("Choose the terrain types or layers");
         buttonExceptOn.setVisible(false);
         buttonExceptOn.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1157,14 +1148,6 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
      * One column in a narrow panel; in a wider one the fields which belong together go next to each other.
      */
     private void buildLayout() {
-        org.pepsoft.worldpainter.help.ToolCard.install(comboBoxMapArea, org.pepsoft.worldpainter.help.OptionCards.whereOnTheMap());
-        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxAbove, org.pepsoft.worldpainter.help.OptionCards.heightLimits());
-        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxBelow, org.pepsoft.worldpainter.help.OptionCards.heightLimits());
-        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxFeather, org.pepsoft.worldpainter.help.OptionCards.fade());
-        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxReplace, org.pepsoft.worldpainter.help.OptionCards.onlyOn());
-        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxExceptOn, org.pepsoft.worldpainter.help.OptionCards.exceptOn());
-        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxAboveSlope, org.pepsoft.worldpainter.help.OptionCards.slope());
-        org.pepsoft.worldpainter.help.ToolCard.install(checkBoxBelowSlope, org.pepsoft.worldpainter.help.OptionCards.slope());
         setLayout(new GridBagLayout());
         final GridBagConstraints constraints = new GridBagConstraints();
         constraints.gridwidth = GridBagConstraints.REMAINDER;
@@ -1172,7 +1155,11 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         constraints.fill = GridBagConstraints.HORIZONTAL;
         constraints.weightx = 1.0;
 
-        add(sectionTitle("Where on the map"), constraints);
+        final JLabel mapAreaTitle = sectionTitle("Where on the map");
+        final ToolCard mapAreaCard = OptionCards.whereOnTheMap();
+        ToolCard.showOnHover(mapAreaTitle, mapAreaCard);
+        ToolCard.showOnHover(comboBoxMapArea, mapAreaCard);
+        add(mapAreaTitle, constraints);
         // Not as wide as its longest item, which would make the whole panel wider; it gets the width of the panel anyway
         comboBoxMapArea.setPreferredSize(new java.awt.Dimension(1, comboBoxMapArea.getPreferredSize().height));
         constraints.insets = new Insets(2, 0, 0, 0);
@@ -1182,24 +1169,28 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         constraints.insets = new Insets(10, 0, 0, 0);
         add(heightScale, constraints);
         final JPanel heightFields = new JPanel(new org.pepsoft.worldpainter.util.ResponsiveColumnsLayout(scaled(COLUMN_WIDTH), scaled(4), 2));
-        heightFields.add(block(checkBoxAbove, spinnerAbove));
-        heightFields.add(block(checkBoxBelow, spinnerBelow));
+        heightFields.add(withCard(block(checkBoxAbove, spinnerAbove), OptionCards.atOrAbove()));
+        heightFields.add(withCard(block(checkBoxBelow, spinnerBelow), OptionCards.atOrBelow()));
         constraints.insets = new Insets(4, 0, 0, 0);
         add(heightFields, constraints);
         constraints.insets = new Insets(0, 0, 0, 0);
-        add(checkBoxFeather, constraints);
+        add(withCard(checkBoxFeather, OptionCards.fade()), constraints);
 
         constraints.insets = new Insets(10, 0, 0, 0);
         add(sectionTitle("What is on the map"), constraints);
         final JPanel otherFields = new JPanel(new org.pepsoft.worldpainter.util.ResponsiveColumnsLayout(scaled(COLUMN_WIDTH), scaled(4), 3));
-        otherFields.add(block(checkBoxReplace, buttonReplace));
-        otherFields.add(block(checkBoxExceptOn, buttonExceptOn));
-        final JLabel slopeLabel = org.pepsoft.worldpainter.help.ToolCard.label("slope");
-        org.pepsoft.worldpainter.help.ToolCard.install(slopeLabel, org.pepsoft.worldpainter.help.OptionCards.slope());
+        otherFields.add(withCard(block(checkBoxReplace, buttonReplace), OptionCards.onlyOn()));
+        otherFields.add(withCard(block(checkBoxExceptOn, buttonExceptOn), OptionCards.exceptOn()));
+        final JLabel slopeLabel = new JLabel("slope");
         slopeLabel.setFont(slopeLabel.getFont().deriveFont(slopeLabel.getFont().getSize() - 1f));
-        otherFields.add(block(slopeLabel, row(checkBoxAboveSlope, checkBoxBelowSlope), row(spinnerSlope, jLabel1)));
+        otherFields.add(withCard(block(slopeLabel, row(checkBoxAboveSlope, checkBoxBelowSlope), row(spinnerSlope, jLabel1)), OptionCards.slope()));
         constraints.insets = new Insets(2, 0, 0, 0);
         add(otherFields, constraints);
+    }
+
+    private static <T extends JComponent> T withCard(T component, ToolCard card) {
+        ToolCard.showOnHover(component, card);
+        return component;
     }
 
     private static int scaled(int size) {

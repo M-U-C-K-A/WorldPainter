@@ -21,6 +21,18 @@ public final class OptionCards {
                 .tip("This is about the selection on the map. The height limits below work separately, and on top of it.");
     }
 
+    public static ToolCard atOrAbove() {
+        return new ToolCard("At or above", "The brush only works on land at this height or higher. Everything lower stays as it is.", null,
+                new Panels(new String[] {"Off", "On"}, (g2, index, w, h) -> paintLimit(g2, index, w, h, true)), null)
+                .tip("For instance: put snow only on the mountain tops. Use it with at or below to limit the brush to a band of heights.");
+    }
+
+    public static ToolCard atOrBelow() {
+        return new ToolCard("At or below", "The brush only works on land at this height or lower. Everything higher stays as it is.", null,
+                new Panels(new String[] {"Off", "On"}, (g2, index, w, h) -> paintLimit(g2, index, w, h, false)), null)
+                .tip("For instance: put sand only along the shore. Use it with at or above to limit the brush to a band of heights.");
+    }
+
     public static ToolCard heightLimits() {
         return new ToolCard("Height limits", "Limits the brush to land at certain heights, whichever part of the map it is on.", null,
                 new Panels(new String[] {"Between", "Beyond"}, OptionCards::paintHeights), null)
@@ -111,6 +123,27 @@ public final class OptionCards {
         g2.drawLine(0, lower, w, lower);
     }
 
+    private static void paintLimit(Graphics2D g2, int index, int w, int h, boolean above) {
+        g2.setColor(SKY);
+        g2.fillRect(0, 0, w, h);
+        final Path2D land = landscape(w, h);
+        g2.setColor(GROUND);
+        g2.fill(land);
+        final int limit = (int) (h * 0.5f);
+        final Shape oldClip = g2.getClip();
+        if (index == 1) {
+            g2.clip(above ? new Rectangle(0, 0, w, limit) : new Rectangle(0, limit, w, h - limit));
+        }
+        g2.setColor(ACCENT);
+        g2.fill(land);
+        g2.setClip(oldClip);
+        if (index == 1) {
+            g2.setColor(Color.WHITE);
+            g2.setStroke(new BasicStroke(1.5f));
+            g2.drawLine(0, limit, w, limit);
+        }
+    }
+
     private static void paintFade(Graphics2D g2, int index, int w, int h) {
         g2.setColor(SKY);
         g2.fillRect(0, 0, w, h);
@@ -124,7 +157,7 @@ public final class OptionCards {
             g2.setColor(ACCENT);
             g2.fillRect(0, 0, w, limit);
         } else {
-            g2.setPaint(new GradientPaint(0, limit - h * 0.16f, ACCENT, 0, limit + h * 0.16f, new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 0)));
+            g2.setPaint(new GradientPaint(0, limit, ACCENT, 0, limit + h * 0.22f, new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 0)));
             g2.fillRect(0, 0, w, h);
         }
         g2.setClip(oldClip);

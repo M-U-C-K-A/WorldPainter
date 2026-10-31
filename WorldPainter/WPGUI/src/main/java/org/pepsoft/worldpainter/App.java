@@ -4127,8 +4127,8 @@ public final class App extends JFrame implements BrushControl,
         });
         
         constraints.insets = new Insets(3, 1, 1, 1);
-        brushRotationLabel = org.pepsoft.worldpainter.help.ToolCard.label("Rotation: 0°");
-        org.pepsoft.worldpainter.help.ToolCard.install(brushRotationLabel, org.pepsoft.worldpainter.help.OptionCards.rotation());
+        brushRotationLabel = new JLabel("Rotation: 0°");
+        org.pepsoft.worldpainter.help.ToolCard.showOnHover(brushRotationLabel, org.pepsoft.worldpainter.help.OptionCards.rotation());
         brushSettingsPanel.add(brushRotationLabel, constraints);
         
         constraints.fill = HORIZONTAL;
@@ -4142,8 +4142,8 @@ public final class App extends JFrame implements BrushControl,
 
         constraints.fill = GridBagConstraints.NONE;
         constraints.insets = new Insets(3, 1, 1, 1);
-        levelLabel = org.pepsoft.worldpainter.help.ToolCard.label("Intensity: 50 %");
-        org.pepsoft.worldpainter.help.ToolCard.install(levelLabel, org.pepsoft.worldpainter.help.OptionCards.intensity());
+        levelLabel = new JLabel("Intensity: 50 %");
+        org.pepsoft.worldpainter.help.ToolCard.showOnHover(levelLabel, org.pepsoft.worldpainter.help.OptionCards.intensity());
         brushSettingsPanel.add(levelLabel, constraints);
         
         constraints.fill = HORIZONTAL;

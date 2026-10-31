@@ -2,7 +2,11 @@ package org.pepsoft.worldpainter.help;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ContainerEvent;
+import java.awt.event.ContainerListener;
 import java.awt.event.HierarchyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -72,24 +76,13 @@ public final class ToolCard {
         button.putClientProperty(KEY_CARD, cardSupplier);
     }
 
-    public static JCheckBox checkBox() {
-        return new JCheckBox() {
-            @Override
-            public JToolTip createToolTip() {
-                final ToolCard card = cardOf(this);
-                return (card != null) ? new CardToolTip(this, card) : super.createToolTip();
-            }
-        };
-    }
-
-    public static JLabel label(String text) {
-        return new JLabel(text) {
-            @Override
-            public JToolTip createToolTip() {
-                final ToolCard card = cardOf(this);
-                return (card != null) ? new CardToolTip(this, card) : super.createToolTip();
-            }
-        };
+    /**
+     * Show a card when the mouse rests anywhere on a component or on what is inside it, such as the field and the arrows
+     * of a spinner. Unlike a tooltip this works for any component, whoever created it. Where one of them has a tooltip
+     * of its own, that is shown instead.
+     */
+    public static void showOnHover(JComponent component, ToolCard card) {
+        new HoverHandler(card).attachTo(component);
     }
 
     public static JButton button() {
@@ -173,12 +166,115 @@ public final class ToolCard {
     }
 
     /**
+     * Shows a card in a popup while the mouse rests on a component.
+     */
+    private static final class HoverHandler extends MouseAdapter implements ContainerListener {
+        HoverHandler(ToolCard card) {
+            this.card = card;
+            showTimer = new Timer(0, e -> show());
+            showTimer.setRepeats(false);
+            // Moving between the parts of the component leaves one and enters the next, which should not hide the card
+            hideTimer = new Timer(60, e -> hide());
+            hideTimer.setRepeats(false);
+        }
+
+        void attachTo(Component component) {
+            component.addMouseListener(this);
+            if (component instanceof Container) {
+                ((Container) component).addContainerListener(this);
+                for (Component child: ((Container) component).getComponents()) {
+                    attachTo(child);
+                }
+            }
+        }
+
+        @Override
+        public void componentAdded(ContainerEvent e) {
+            // For instance the arrows of a spinner, which are replaced when the theme changes
+            attachTo(e.getChild());
+        }
+
+        @Override
+        public void componentRemoved(ContainerEvent e) {
+            // Do nothing
+        }
+
+        @Override
+        public void mouseEntered(MouseEvent e) {
+            hideTimer.stop();
+            if (popup == null) {
+                anchor = e.getComponent();
+                if (! ((anchor instanceof JComponent) && (((JComponent) anchor).getToolTipText() != null))) {
+                    showTimer.setInitialDelay(ToolTipManager.sharedInstance().getInitialDelay());
+                    showTimer.restart();
+                }
+            }
+        }
+
+        @Override
+        public void mouseExited(MouseEvent e) {
+            showTimer.stop();
+            if (popup != null) {
+                hideTimer.restart();
+            }
+        }
+
+        @Override
+        public void mousePressed(MouseEvent e) {
+            // The user is getting on with it
+            showTimer.stop();
+            hide();
+        }
+
+        private void show() {
+            if ((anchor == null) || (! anchor.isShowing())) {
+                return;
+            }
+            final PointerInfo pointer = MouseInfo.getPointerInfo();
+            if (pointer == null) {
+                return;
+            }
+            final CardToolTip toolTip = new CardToolTip((anchor instanceof JComponent) ? (JComponent) anchor : null, card);
+            final Dimension size = toolTip.getPreferredSize();
+            final Rectangle screen = anchor.getGraphicsConfiguration().getBounds();
+            final Point location = pointer.getLocation();
+            // Below the pointer if it fits, otherwise above it, and always on the screen
+            int x = Math.max(screen.x, Math.min(location.x + s(12), screen.x + screen.width - size.width));
+            int y = location.y + s(18);
+            if (y + size.height > screen.y + screen.height) {
+                y = Math.max(screen.y, location.y - s(8) - size.height);
+            }
+            popup = PopupFactory.getSharedInstance().getPopup(anchor, toolTip, x, y);
+            popup.show();
+        }
+
+        private void hide() {
+            hideTimer.stop();
+            if (popup != null) {
+                popup.hide();
+                popup = null;
+            }
+        }
+
+        private static int s(int size) {
+            return com.formdev.flatlaf.util.UIScale.scale(size);
+        }
+
+        private final ToolCard card;
+        private final Timer showTimer, hideTimer;
+        private Component anchor;
+        private Popup popup;
+    }
+
+    /**
      * The card itself. It paints everything itself, and animates the demo while it is showing.
      */
     private static final class CardToolTip extends JToolTip {
         CardToolTip(JComponent component, ToolCard card) {
             this.card = card;
-            setComponent(component);
+            if (component != null) {
+                setComponent(component);
+            }
             setOpaque(true);
             setBorder(BorderFactory.createEmptyBorder());
             timer = new Timer(16, e -> repaint(s(PADDING), s(PADDING), s(WIDTH) - 2 * s(PADDING), s(PREVIEW_HEIGHT)));
