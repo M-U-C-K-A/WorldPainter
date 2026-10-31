@@ -4,11 +4,12 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 ## What is in it
 
-- A new interface, with light and dark themes, side panels which fold away, palettes which fill their panels, and cards on hover with an animation of each tool, a 3D preview of each brush, and the blocks or plants of each mix and their shares
-- An integrated 3D view which keeps up with the map, with colour modes, 1:1 blocks up to 4096 blocks around the camera, optional shaders (sun, shadows, water), cross sections of the ground on its sides, and a panel of its own to float next to the map
+- A new interface, with light and dark themes, side panels which fold away, palettes which fill their panels, and cards on hover which show what the mouse and keys do, with an animation of each tool, a 3D preview of each brush, pictures of the brush options, and the blocks or plants of each mix and their shares
+- An integrated 3D view which keeps up with the map, with colour modes, 1:1 blocks up to 4096 blocks around the camera, optional shaders (sun and sky light, shadows, moving water), cross sections of the ground on its sides, and a panel of its own to float next to the map
 - A node graph to generate complete worlds, with 36 kinds of nodes, examples and `.wpgraph` files, including a Floating islands node
 - Surroundings drawn like the map, seed search, and blending the edges of the map into a seed (round maps included, with undo)
 - Paths from point to point with bridges on piers and tunnels, surfaces mixed at random or adapted to the land (beta), in three widths with an optional dynamic width, which clear the trees on their way and can be lined with fences, hedges, walls, lanterns or flowers; and rectangle selection
+- Brush settings which stay when switching tools: limits by map selection, by height on a scale you can drag, by several terrain types or layers at once, and by slope, with undo
 - Packs ready to paint: 14 kinds of custom trees, 24 presets of flowers and plants, 39 mixes of blocks, and 22 terrain stamp brushes
 
 ## Downloads
