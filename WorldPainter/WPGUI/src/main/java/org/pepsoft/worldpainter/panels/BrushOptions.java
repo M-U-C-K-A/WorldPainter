@@ -57,6 +57,9 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         // Eliminate thousands separators to make spinners smaller:
         spinnerAbove.setEditor(new NumberEditor(spinnerAbove, "0"));
         spinnerBelow.setEditor(new NumberEditor(spinnerBelow, "0"));
+
+        heightScale.setListener(this::heightScaleChanged);
+        updateHeightScale();
     }
 
     public ColourScheme getColourScheme() {
@@ -173,6 +176,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
             spinnerBelow.setValue(minHeight);
             updateFilter = true;
         }
+        updateHeightScale();
         if (updateFilter) {
             filterChanged();
         }
@@ -190,6 +194,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
             spinnerBelow.setValue(maxHeight - 1);
             updateFilter = true;
         }
+        updateHeightScale();
         if (updateFilter) {
             filterChanged();
         }
@@ -447,7 +452,29 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         }
     }
 
+    private void heightScaleChanged(boolean aboveActive, int above, boolean belowActive, int below) {
+        initialiseIfNecessary();
+        updatingHeightScale = true;
+        try {
+            checkBoxAbove.setSelected(aboveActive);
+            spinnerAbove.setValue(above);
+            checkBoxBelow.setSelected(belowActive);
+            spinnerBelow.setValue(below);
+        } finally {
+            updatingHeightScale = false;
+        }
+        setControlStates();
+        filterChanged();
+    }
+
+    private void updateHeightScale() {
+        final SpinnerNumberModel model = (SpinnerNumberModel) spinnerAbove.getModel();
+        heightScale.setRange((Integer) model.getMinimum(), (Integer) model.getMaximum());
+        heightScale.setLevels(checkBoxAbove.isSelected(), (Integer) spinnerAbove.getValue(), checkBoxBelow.isSelected(), (Integer) spinnerBelow.getValue());
+    }
+
     private void setControlStates() {
+        updateHeightScale();
         spinnerAbove.setEnabled(checkBoxAbove.isSelected());
         spinnerBelow.setEnabled(checkBoxBelow.isSelected());
         spinnerSlope.setEnabled(checkBoxAboveSlope.isSelected() || checkBoxBelowSlope.isSelected());
@@ -776,6 +803,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
+        heightScale = new org.pepsoft.worldpainter.panels.HeightFilterScale();
         checkBoxAbove = new javax.swing.JCheckBox();
         spinnerAbove = new javax.swing.JSpinner();
         checkBoxBelow = new javax.swing.JCheckBox();
@@ -918,6 +946,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addComponent(checkBoxInSelection)
+            .addComponent(heightScale, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
             .addComponent(checkBoxBelow)
             .addComponent(checkBoxReplace)
             .addComponent(checkBoxExceptOn)
@@ -947,6 +976,8 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
                 .addComponent(checkBoxInSelection)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(checkBoxOutsideSelection)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(heightScale, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(checkBoxAbove)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -1033,11 +1064,17 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     }//GEN-LAST:event_buttonReplaceActionPerformed
 
     private void spinnerAboveStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_spinnerAboveStateChanged
-        filterChanged();
+        if (! updatingHeightScale) {
+            updateHeightScale();
+            filterChanged();
+        }
     }//GEN-LAST:event_spinnerAboveStateChanged
 
     private void spinnerBelowStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_spinnerBelowStateChanged
-        filterChanged();
+        if (! updatingHeightScale) {
+            updateHeightScale();
+            filterChanged();
+        }
     }//GEN-LAST:event_spinnerBelowStateChanged
 
     private void checkBoxFeatherActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxFeatherActionPerformed
@@ -1097,6 +1134,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     }//GEN-LAST:event_checkBoxOutsideSelectionActionPerformed
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private org.pepsoft.worldpainter.panels.HeightFilterScale heightScale;
     private javax.swing.JButton buttonExceptOn;
     private javax.swing.JButton buttonReplace;
     private javax.swing.JCheckBox checkBoxAbove;
@@ -1127,6 +1165,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     public static final String MENU_EXCEPT_ON = "exceptOn";
     
     private static final Icon ICON_WATER = loadScaledIcon("org/pepsoft/worldpainter/icons/flood.png");
+    private boolean updatingHeightScale;
     private static final Icon ICON_LAVA = loadScaledIcon("org/pepsoft/worldpainter/icons/flood_with_lava.png");
     private static final Icon ICON_EYEDROPPER = loadScaledIcon("org/pepsoft/worldpainter/icons/eyedropper.png");
     private static final Icon ICON_PLUS = loadScaledIcon("org/pepsoft/worldpainter/icons/plus.png");

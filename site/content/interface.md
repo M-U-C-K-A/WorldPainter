@@ -50,6 +50,13 @@ A single **Brushes** panel with six basic shapes and twenty-two **terrain stamps
 
 Hover over a brush to see its shape in 3D, turning slowly on a block of ground. On the map the outline of a brush shows its actual shape, rotation included. Rotate it with <kbd>[</kbd> and <kbd>]</kbd> (or <kbd>Alt</kbd>+scroll), and zoom the map with <kbd>Ctrl</kbd>+scroll or <kbd>⌘</kbd>+scroll. Custom brushes (in the `brushes` folder of the configuration) are still supported.
 
+## Where a brush applies
+
+The **Options** of the brush settings panel limit a brush to certain heights, and show them on a scale with a little landscape: the land in the accent colour is the land the brush will change.
+
+- Drag the bars to set the limits, which also switches them on, or type them in the *at or above* and *at or below* fields.
+- **Inside** applies between the two bars; **Outside** applies below the lower one and above the upper one. Click the highlighted button again to switch the limits off.
+
 ## Canvas
 
 The map sits on a dotted canvas instead of a dark blue background. On macOS the toolbar doubles as the title bar.

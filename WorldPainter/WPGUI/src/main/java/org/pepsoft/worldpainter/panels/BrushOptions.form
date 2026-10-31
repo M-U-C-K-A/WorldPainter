@@ -42,6 +42,7 @@
           </Group>
           <Component id="checkBoxAbove" min="-2" max="-2" attributes="0"/>
           <Component id="checkBoxOutsideSelection" alignment="0" min="-2" max="-2" attributes="0"/>
+          <Component id="heightScale" alignment="0" max="32767" attributes="0"/>
       </Group>
     </DimensionLayout>
     <DimensionLayout dim="1">
@@ -51,6 +52,8 @@
               <Component id="checkBoxInSelection" min="-2" max="-2" attributes="0"/>
               <EmptySpace max="-2" attributes="0"/>
               <Component id="checkBoxOutsideSelection" min="-2" max="-2" attributes="0"/>
+              <EmptySpace max="-2" attributes="0"/>
+              <Component id="heightScale" min="-2" max="-2" attributes="0"/>
               <EmptySpace max="-2" attributes="0"/>
               <Component id="checkBoxAbove" min="-2" max="-2" attributes="0"/>
               <EmptySpace max="-2" attributes="0"/>
@@ -274,6 +277,8 @@
       <Events>
         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="checkBoxInSelectionActionPerformed"/>
       </Events>
+    </Component>
+    <Component class="org.pepsoft.worldpainter.panels.HeightFilterScale" name="heightScale">
     </Component>
     <Component class="javax.swing.JCheckBox" name="checkBoxOutsideSelection">
       <Properties>
