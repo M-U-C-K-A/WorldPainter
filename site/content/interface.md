@@ -54,8 +54,9 @@ Hover over a brush to see its shape in 3D, turning slowly on a block of ground. 
 
 The **Options** of the brush settings panel limit a brush to certain heights, and show them on a scale with a little landscape: the land in the accent colour is the land the brush will change.
 
-- Drag the bars to set the limits, which also switches them on, or type them in the *at or above* and *at or below* fields.
-- **Inside** applies between the two bars; **Outside** applies below the lower one and above the upper one. Click the highlighted button again to switch the limits off.
+- Drag the bars to set the limits, which also switches them on, or type them in the *at or above* and *at or below* fields. A value you type counts as soon as you click elsewhere, without pressing Enter.
+- **Between** applies between the two bars; **Beyond** applies below the lower one and above the upper one. Click the highlighted button again to switch the limits off. They are about heights: *inside selection* and *outside selection* above the scale are about the selection on the map.
+- Ctrl+Z (⌘Z on macOS) takes back changes to these options, and Ctrl+Y brings them back, as long as you have not changed the map since. After that they undo and redo changes to the map as usual.
 
 ## Canvas
 

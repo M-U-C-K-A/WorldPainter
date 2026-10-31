@@ -14,7 +14,8 @@ import java.util.List;
 /**
  * Shows which heights a brush applies at: a landscape on a scale of heights, with a bar for the "at or above" level and
  * one for the "at or below" level, and the land which will be affected in the accent colour. The bars can be dragged,
- * which also switches them on, and the two buttons below choose between the land inside and outside the bars.
+ * which also switches them on, and the two buttons below choose between the land between the bars and beyond them. This has nothing to do with the
+ * selection on the map.
  */
 public final class HeightFilterScale extends JComponent {
     public HeightFilterScale() {
@@ -22,13 +23,14 @@ public final class HeightFilterScale extends JComponent {
             @Override
             public void mousePressed(MouseEvent e) {
                 if (SwingUtilities.isLeftMouseButton(e)) {
-                    if (inside().contains(e.getPoint())) {
-                        chooseInside();
-                    } else if (outside().contains(e.getPoint())) {
-                        chooseOutside();
+                    if (betweenButton().contains(e.getPoint())) {
+                        chooseBetween();
+                    } else if (beyondButton().contains(e.getPoint())) {
+                        chooseBeyond();
                     } else {
                         pressed = barsNear(e.getY());
                         pressY = e.getY();
+                        dragNumber++;
                         if (pressed.size() == 1) {
                             dragging = pressed.get(0);
                             drag(e.getY());
@@ -62,7 +64,7 @@ public final class HeightFilterScale extends JComponent {
                     hover = newHover;
                     repaint();
                 }
-                final boolean onButton = inside().contains(e.getPoint()) || outside().contains(e.getPoint());
+                final boolean onButton = betweenButton().contains(e.getPoint()) || beyondButton().contains(e.getPoint());
                 setCursor(Cursor.getPredefinedCursor(onButton ? Cursor.HAND_CURSOR : ((newHover != null) ? Cursor.N_RESIZE_CURSOR : Cursor.DEFAULT_CURSOR)));
             }
 
@@ -76,7 +78,7 @@ public final class HeightFilterScale extends JComponent {
         };
         addMouseListener(mouseHandler);
         addMouseMotionListener(mouseHandler);
-        setToolTipText("Which heights the brush applies at. Drag a bar to set that limit and switch it on; \"Inside\" and \"Outside\" choose the land between the bars or beyond them");
+        setToolTipText("Which heights the brush applies at. Drag a bar to set that limit and switch it on; \"Between\" and \"Beyond\" choose the land between the bars or beyond them");
     }
 
     public void setListener(Listener listener) {
@@ -99,6 +101,14 @@ public final class HeightFilterScale extends JComponent {
         this.belowActive = belowActive;
         this.below = below;
         repaint();
+    }
+
+    /**
+     * A number which identifies the current drag of a bar, or zero if no bar is being dragged, so that all the changes
+     * of one drag can be treated as one.
+     */
+    int getDragNumber() {
+        return (dragging != null) ? dragNumber : 0;
     }
 
     @Override
@@ -130,8 +140,8 @@ public final class HeightFilterScale extends JComponent {
             paintAxis(g2, scene);
             paintBar(g2, scene, Bar.BELOW);
             paintBar(g2, scene, Bar.ABOVE);
-            paintButton(g2, inside(), "Inside", isInside());
-            paintButton(g2, outside(), "Outside", isOutside());
+            paintButton(g2, betweenButton(), "Between", isBetween());
+            paintButton(g2, beyondButton(), "Beyond", isBeyond());
             g2.setColor(colour("WorldPainter.mutedForeground", Color.GRAY));
             final FontMetrics metrics = g2.getFontMetrics();
             final String caption = caption(metrics);
@@ -303,9 +313,9 @@ public final class HeightFilterScale extends JComponent {
      */
     private List<int[]> zones() {
         final List<int[]> zones = new ArrayList<>();
-        if (isInside()) {
+        if (isBetween()) {
             zones.add(new int[] {above, below});
-        } else if (isOutside()) {
+        } else if (isBeyond()) {
             zones.add(new int[] {minHeight, below});
             zones.add(new int[] {above, maxHeight});
         } else if (aboveActive) {
@@ -322,10 +332,10 @@ public final class HeightFilterScale extends JComponent {
     private String caption(FontMetrics metrics) {
         final String caption;
         final String shortCaption;
-        if (isInside()) {
+        if (isBetween()) {
             caption = "Applies from " + above + " to " + below;
             shortCaption = above + " to " + below;
-        } else if (isOutside()) {
+        } else if (isBeyond()) {
             caption = "Applies up to " + below + " and from " + above;
             shortCaption = "\u2264 " + below + " and \u2265 " + above;
         } else if (aboveActive) {
@@ -341,29 +351,29 @@ public final class HeightFilterScale extends JComponent {
         return (metrics.stringWidth(caption) <= getWidth()) ? caption : shortCaption;
     }
 
-    private boolean isInside() {
+    private boolean isBetween() {
         return aboveActive && belowActive && (below >= above);
     }
 
-    private boolean isOutside() {
+    private boolean isBeyond() {
         return aboveActive && belowActive && (below < above);
     }
 
-    private void chooseInside() {
-        if (isInside()) {
+    private void chooseBetween() {
+        if (isBetween()) {
             notifyListener(false, above, false, below);
         } else {
             notifyListener(true, Math.min(above, below), true, Math.max(above, below));
         }
     }
 
-    private void chooseOutside() {
-        if (isOutside()) {
+    private void chooseBeyond() {
+        if (isBeyond()) {
             notifyListener(false, above, false, below);
         } else {
             int low = Math.min(above, below), high = Math.max(above, below);
             if (low == high) {
-                // Outside needs at least one height between them which is left alone
+                // Beyond needs at least one height between them which is left alone
                 if (high < maxHeight) {
                     high++;
                 } else {
@@ -379,10 +389,10 @@ public final class HeightFilterScale extends JComponent {
         int height = yToHeight(scene, y);
         final boolean otherActive = isActive((dragging == Bar.ABOVE) ? Bar.BELOW : Bar.ABOVE);
         if (otherActive) {
-            // The bars don't cross; choosing between inside and outside is what the buttons are for
-            if (isInside()) {
+            // The bars don't cross; that is what the buttons are for
+            if (isBetween()) {
                 height = (dragging == Bar.ABOVE) ? Math.min(height, below) : Math.max(height, above);
-            } else if (isOutside()) {
+            } else if (isBeyond()) {
                 height = (dragging == Bar.ABOVE) ? Math.max(height, below + 1) : Math.min(height, above - 1);
             }
         }
@@ -452,12 +462,12 @@ public final class HeightFilterScale extends JComponent {
         return new Rectangle(axis, 0, Math.max(1, getWidth() - axis), UIScale.scale(SCENE_HEIGHT));
     }
 
-    private Rectangle inside() {
+    private Rectangle betweenButton() {
         final int y = UIScale.scale(SCENE_HEIGHT + GAP);
         return new Rectangle(0, y, getWidth() / 2, UIScale.scale(BUTTON_HEIGHT));
     }
 
-    private Rectangle outside() {
+    private Rectangle beyondButton() {
         final int y = UIScale.scale(SCENE_HEIGHT + GAP);
         return new Rectangle(getWidth() / 2 - 1, y, getWidth() - getWidth() / 2 + 1, UIScale.scale(BUTTON_HEIGHT));
     }
@@ -502,7 +512,7 @@ public final class HeightFilterScale extends JComponent {
     private boolean aboveActive, belowActive;
     private Bar hover, dragging;
     private List<Bar> pressed = List.of();
-    private int pressY;
+    private int pressY, dragNumber;
 
     private static final int MINIMUM_WIDTH = 110, SCENE_HEIGHT = 124, BUTTON_HEIGHT = 20, CAPTION_HEIGHT = 14, GAP = 4, GRAB = 6, SEA_LEVEL = 62;
 

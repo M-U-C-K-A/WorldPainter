@@ -23,6 +23,10 @@ import javax.swing.*;
 import javax.swing.JSpinner.NumberEditor;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.*;
@@ -60,6 +64,23 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
         heightScale.setListener(this::heightScaleChanged);
         updateHeightScale();
+
+        // A value which has been typed counts, however the user goes on to do something else. Clicking on the map doesn't
+        // even move the focus, so also watch for that
+        for (JSpinner spinner: new JSpinner[] {spinnerAbove, spinnerBelow, spinnerSlope}) {
+            final JFormattedTextField field = ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField();
+            field.setFocusLostBehavior(JFormattedTextField.PERSIST);
+            field.addFocusListener(new FocusAdapter() {
+                @Override
+                public void focusLost(FocusEvent e) {
+                    commit(spinner);
+                }
+            });
+        }
+        Toolkit.getDefaultToolkit().addAWTEventListener(this::commitOnClickElsewhere, AWTEvent.MOUSE_EVENT_MASK);
+
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(this::dispatchUndoKey);
+        currentOptions = currentOptions();
     }
 
     public ColourScheme getColourScheme() {
@@ -111,6 +132,19 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     }
     
     public void setFilter(DefaultFilter filter) {
+        // Not something the user did here, and it replaces the options whose changes were being remembered
+        historyPaused++;
+        try {
+            applyFilter(filter);
+        } finally {
+            historyPaused--;
+        }
+        undoHistory.clear();
+        redoHistory.clear();
+        currentOptions = currentOptions();
+    }
+
+    private void applyFilter(DefaultFilter filter) {
         if (filter == null) {
             checkBoxInSelection.setSelected(false);
             checkBoxOutsideSelection.setSelected(false);
@@ -165,6 +199,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     }
 
     public void setMinHeight(int minHeight) {
+        historyPaused++;
         boolean updateFilter = false;
         final Object oldMinHeight = ((SpinnerNumberModel) spinnerAbove.getModel()).getMinimum();
         ((SpinnerNumberModel) spinnerAbove.getModel()).setMinimum(minHeight);
@@ -185,9 +220,11 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         if (updateFilter) {
             filterChanged();
         }
+        historyPaused--;
     }
 
     public void setMaxHeight(int maxHeight) {
+        historyPaused++;
         boolean updateFilter = false;
         final Object oldMaxHeight = ((SpinnerNumberModel) spinnerBelow.getModel()).getMaximum();
         ((SpinnerNumberModel) spinnerAbove.getModel()).setMaximum(maxHeight - 1);
@@ -207,6 +244,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         if (updateFilter) {
             filterChanged();
         }
+        historyPaused--;
     }
 
     public Listener getListener() {
@@ -459,6 +497,153 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
             default:
                 throw new UnsupportedOperationException("Unsupported onlyOn filter type " + filter.objectType);
         }
+    }
+
+    /**
+     * Make a value which has been typed into a spinner count, bringing it within the range if necessary, or go back to
+     * the previous value if it isn't a number.
+     */
+    private void commit(JSpinner spinner) {
+        final JFormattedTextField field = ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField();
+        final SpinnerNumberModel model = (SpinnerNumberModel) spinner.getModel();
+        try {
+            final int value = Integer.parseInt(field.getText().trim());
+            spinner.setValue(Math.max((Integer) model.getMinimum(), Math.min((Integer) model.getMaximum(), value)));
+        } catch (NumberFormatException e) {
+            // Not a number, so show the value which is still in effect again
+        }
+        field.setValue(spinner.getValue());
+    }
+
+    private void commitOnClickElsewhere(AWTEvent event) {
+        if ((event.getID() == MouseEvent.MOUSE_PRESSED) && (event.getSource() instanceof Component)) {
+            final Component clicked = (Component) event.getSource();
+            for (JSpinner spinner: new JSpinner[] {spinnerAbove, spinnerBelow, spinnerSlope}) {
+                if (((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().isFocusOwner() && (! SwingUtilities.isDescendingFrom(clicked, spinner))) {
+                    commit(spinner);
+                    if (! clicked.isFocusable()) {
+                        // Otherwise the keyboard shortcuts would keep going to the spinner
+                        KeyboardFocusManager.getCurrentKeyboardFocusManager().clearGlobalFocusOwner();
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Ctrl+Z and Ctrl+Y take back changes to these options as long as nothing has been done to the map since. After that
+     * they are left to the undo and redo of the map.
+     */
+    private boolean dispatchUndoKey(KeyEvent event) {
+        if ((event.getID() != KeyEvent.KEY_PRESSED) || (! (event.isControlDown() || event.isMetaDown())) || event.isAltDown()
+                || (! isShowing()) || (KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() instanceof Dialog)) {
+            return false;
+        } else if ((event.getKeyCode() == KeyEvent.VK_Z) && (! event.isShiftDown())) {
+            return undo();
+        } else if ((event.getKeyCode() == KeyEvent.VK_Y) || ((event.getKeyCode() == KeyEvent.VK_Z) && event.isShiftDown())) {
+            return redo();
+        } else {
+            return false;
+        }
+    }
+
+    private boolean undo() {
+        // First take back a value which is still being typed
+        for (JSpinner spinner: new JSpinner[] {spinnerAbove, spinnerBelow, spinnerSlope}) {
+            final JFormattedTextField field = ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField();
+            if (field.isFocusOwner() && (! field.getText().trim().equals(spinner.getValue().toString()))) {
+                field.setValue(spinner.getValue());
+                return true;
+            }
+        }
+        return moveThroughHistory(undoHistory, redoHistory);
+    }
+
+    private boolean redo() {
+        return moveThroughHistory(redoHistory, undoHistory);
+    }
+
+    private boolean moveThroughHistory(Deque<HistoryEntry> from, Deque<HistoryEntry> to) {
+        forgetOutdatedHistory();
+        if (from.isEmpty()) {
+            return false;
+        }
+        to.push(new HistoryEntry(currentOptions, mapState()));
+        restore(from.pop().options);
+        return true;
+    }
+
+    private void rememberChange() {
+        final Options options = currentOptions();
+        if (historyPaused == 0 && (! options.equals(currentOptions))) {
+            forgetOutdatedHistory();
+            // Everything which belongs together counts as one change, such as a whole drag of a bar
+            final long now = System.currentTimeMillis();
+            final int dragNumber = heightScale.getDragNumber();
+            final boolean sameGesture = (! undoHistory.isEmpty()) && (((dragNumber != 0) && (dragNumber == lastDragNumber)) || (now - lastChangeTime < SAME_GESTURE_TIME));
+            if (! sameGesture) {
+                undoHistory.push(new HistoryEntry(currentOptions, mapState()));
+                while (undoHistory.size() > MAX_HISTORY) {
+                    undoHistory.removeLast();
+                }
+            }
+            redoHistory.clear();
+            lastChangeTime = now;
+            lastDragNumber = dragNumber;
+        }
+        currentOptions = options;
+    }
+
+    /**
+     * Once the map has changed, changes to the options from before that can no longer be undone, as Ctrl+Z goes to the
+     * map from then on.
+     */
+    private void forgetOutdatedHistory() {
+        final Object mapState = mapState();
+        undoHistory.removeIf(entry -> ! entry.mapState.equals(mapState));
+        redoHistory.removeIf(entry -> ! entry.mapState.equals(mapState));
+    }
+
+    private Object mapState() {
+        final App app = App.getInstanceIfExists();
+        final Dimension dimension = (app != null) ? app.getDimension() : null;
+        return (dimension != null) ? List.of(System.identityHashCode(dimension), dimension.getChangeNo()) : List.of();
+    }
+
+    private Options currentOptions() {
+        return new Options(checkBoxInSelection.isSelected(), checkBoxOutsideSelection.isSelected(),
+                checkBoxAbove.isSelected(), (Integer) spinnerAbove.getValue(), checkBoxBelow.isSelected(), (Integer) spinnerBelow.getValue(),
+                checkBoxFeather.isSelected(), checkBoxReplace.isSelected(), onlyOn, checkBoxExceptOn.isSelected(), exceptOn,
+                checkBoxAboveSlope.isSelected(), checkBoxBelowSlope.isSelected(), (Integer) spinnerSlope.getValue());
+    }
+
+    private void restore(Options options) {
+        historyPaused++;
+        try {
+            checkBoxInSelection.setSelected(options.inSelection);
+            checkBoxOutsideSelection.setSelected(options.outsideSelection);
+            checkBoxAbove.setSelected(options.above);
+            spinnerAbove.setValue(options.aboveLevel);
+            checkBoxBelow.setSelected(options.below);
+            spinnerBelow.setValue(options.belowLevel);
+            checkBoxFeather.setSelected(options.feather);
+            checkBoxReplace.setSelected(options.replace);
+            onlyOn = options.onlyOn;
+            checkBoxExceptOn.setSelected(options.exceptOnEnabled);
+            exceptOn = options.exceptOn;
+            checkBoxAboveSlope.setSelected(options.aboveSlope);
+            checkBoxBelowSlope.setSelected(options.belowSlope);
+            spinnerSlope.setValue(options.slope);
+            installPaint(onlyOn, buttonReplace, checkBoxReplace);
+            installPaint(exceptOn, buttonExceptOn, checkBoxExceptOn);
+            setControlStates();
+            filterChanged();
+        } finally {
+            historyPaused--;
+        }
+        currentOptions = options;
+        lastChangeTime = 0;
+        lastDragNumber = 0;
     }
 
     private void heightScaleChanged(boolean aboveActive, int above, boolean belowActive, int below) {
@@ -794,6 +979,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     }
     
     private void filterChanged() {
+        rememberChange();
         if (listener != null) {
             Filter filter = getFilter();
             if (logger.isTraceEnabled()) {
@@ -1175,12 +1361,30 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     
     private static final Icon ICON_WATER = loadScaledIcon("org/pepsoft/worldpainter/icons/flood.png");
     private boolean updatingHeightScale;
+    private final Deque<HistoryEntry> undoHistory = new ArrayDeque<>(), redoHistory = new ArrayDeque<>();
+    private Options currentOptions;
+    private int historyPaused, lastDragNumber;
+    private long lastChangeTime;
+    private static final int MAX_HISTORY = 100;
+    private static final long SAME_GESTURE_TIME = 300;
     private static final Icon ICON_LAVA = loadScaledIcon("org/pepsoft/worldpainter/icons/flood_with_lava.png");
     private static final Icon ICON_EYEDROPPER = loadScaledIcon("org/pepsoft/worldpainter/icons/eyedropper.png");
     private static final Icon ICON_PLUS = loadScaledIcon("org/pepsoft/worldpainter/icons/plus.png");
     private static final Logger logger = LoggerFactory.getLogger(BrushOptions.class);
     private static final long serialVersionUID = 1L;
     
+    /**
+     * The state of all the options, to go back to.
+     */
+    private record Options(boolean inSelection, boolean outsideSelection, boolean above, int aboveLevel, boolean below, int belowLevel,
+                           boolean feather, boolean replace, Object onlyOn, boolean exceptOnEnabled, Object exceptOn,
+                           boolean aboveSlope, boolean belowSlope, int slope) {}
+
+    /**
+     * Options to go back to, and the state of the map when they were left, since they only apply to that.
+     */
+    private record HistoryEntry(Options options, Object mapState) {}
+
     public interface Listener {
         void filterChanged(Filter newFilter);
     }
