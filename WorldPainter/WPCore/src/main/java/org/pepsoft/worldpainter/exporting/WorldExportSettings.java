@@ -46,6 +46,23 @@ public class WorldExportSettings implements Serializable {
     }
 
     /**
+     * Whether to use the faster ways of exporting which are still being tried out. They are meant to produce exactly the
+     * same result.
+     */
+    public boolean isExperimental() {
+        return experimental;
+    }
+
+    public void setExperimental(boolean experimental) {
+        this.experimental = experimental;
+    }
+
+    /**
+     * Only for this export, so this is not remembered with the world.
+     */
+    private transient boolean experimental;
+
+    /**
      * The dimension(s) to export. If this is {@code null} then <em>all</em> dimensions must be exported.
      */
     private Set<Integer> dimensionsToExport;

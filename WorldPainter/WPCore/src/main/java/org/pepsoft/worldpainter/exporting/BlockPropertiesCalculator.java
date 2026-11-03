@@ -128,49 +128,7 @@ public class BlockPropertiesCalculator {
                     for (int zInChunk = 0; zInChunk < 16; zInChunk++) {
                         final int x = (chunkX << 4) | xInChunk, z = (chunkZ << 4) | zInChunk;
                         for (int y = maxY; y >= dirtyArea.getY1() ; y--) {
-                            boolean changedBlock = false;
-                            Material material = chunk.getMaterial(xInChunk, y, zInChunk);
-                            if (leafDistance && material.leafBlock) {
-                                final int currentDistance = material.getProperty(DISTANCE, 8);
-                                final int distance = Math.min(currentDistance, calculateDistance(chunk, x, y, z));
-                                if (distance != currentDistance) {
-                                    material = material.withProperty(DISTANCE, distance);
-                                    chunk.setMaterial(xInChunk, y, zInChunk, material);
-                                    changedBlock = true;
-                                }
-                            }
-                            if (skyLight) {
-                                final int currentSkylightLevel = chunk.getSkyLightLevel(xInChunk, y, zInChunk);
-                                final int newSkyLightLevel;
-                                if (material.opaque) {
-                                    // Opaque block
-                                    newSkyLightLevel = 0;
-                                } else {
-                                    // Transparent block, or unknown block. We err on the side of transparency for
-                                    // unknown blocks to try and cause less visible lighting bugs
-                                    newSkyLightLevel = (currentSkylightLevel < 15) ? calculateSkyLightLevel(chunk, x, y, z, material) : 15;
-                                }
-                                if (newSkyLightLevel != currentSkylightLevel) {
-                                    chunk.setSkyLightLevel(xInChunk, y, zInChunk, newSkyLightLevel);
-                                    changedBlock = true;
-                                }
-                            }
-                            if (blockLight) {
-                                final int currentBlockLightLevel = chunk.getBlockLightLevel(xInChunk, y, zInChunk);
-                                final int newBlockLightLevel;
-                                if (material.opaque) {
-                                    // Opaque block
-                                    newBlockLightLevel = (material.blockLight > 0) ? currentBlockLightLevel : 0;
-                                } else {
-                                    // Transparent block, or unknown block. We err on the side of transparency for
-                                    // unknown blocks to try and cause less visible lighting bugs
-                                    newBlockLightLevel = max(currentBlockLightLevel, calculateBlockLightLevel(chunk, x, y, z));
-                                }
-                                if (newBlockLightLevel != currentBlockLightLevel) {
-                                    chunk.setBlockLightLevel(xInChunk, y, zInChunk, newBlockLightLevel);
-                                    changedBlock = true;
-                                }
-                            }
+                            final boolean changedBlock = updateBlock(chunk, xInChunk, y, zInChunk, x, z);
                             if (changedBlock) {
                                 changed = true;
                                 if (y - 1 < lowestY) {
@@ -190,6 +148,181 @@ public class BlockPropertiesCalculator {
             dirtyArea.setY2(Math.min(highestY + 1, maxHeight));
         }
         return changed;
+    }
+
+    /**
+     * Do the same as calling {@link #secondPass()} until it returns {@code false}, leaving exactly the same result, but
+     * after one pass over the dirty area only look at blocks next to one which has changed, instead of at all of them
+     * again. Every block can only ever get lighter or get a shorter leaf distance, from what its six neighbours have,
+     * so the order in which they are looked at doesn't influence where it ends up.
+     */
+    public void propagate() {
+        final int x1InChunks = dirtyArea.getX1() >> 4, z1InChunks = dirtyArea.getZ1() >> 4,
+                x2InChunks = (dirtyArea.getX2() - 1) >> 4, z2InChunks = (dirtyArea.getZ2() - 1) >> 4;
+        final int minY = dirtyArea.getY1(), maxYExclusive = dirtyArea.getY2();
+        if (maxYExclusive <= minY) {
+            return;
+        }
+        final int originX = x1InChunks << 4, originZ = z1InChunks << 4;
+        // What changes can spread to blocks above and below the dirty area, as with the second pass
+        final int sizeX = (x2InChunks - x1InChunks + 1) << 4, sizeZ = (z2InChunks - z1InChunks + 1) << 4, sizeY = maxHeight - minHeight;
+        final Chunk[][] chunks = new Chunk[z2InChunks - z1InChunks + 1][x2InChunks - x1InChunks + 1];
+        for (int chunkZ = z1InChunks; chunkZ <= z2InChunks; chunkZ++) {
+            for (int chunkX = x1InChunks; chunkX <= x2InChunks; chunkX++) {
+                chunks[chunkZ - z1InChunks][chunkX - x1InChunks] = world.getChunk(chunkX, chunkZ);
+            }
+        }
+        final BlockQueue queue = new BlockQueue(sizeX * sizeZ * sizeY);
+        // One pass over all of it
+        for (int chunkX = x1InChunks; chunkX <= x2InChunks; chunkX++) {
+            for (int chunkZ = z1InChunks; chunkZ <= z2InChunks; chunkZ++) {
+                final Chunk chunk = chunks[chunkZ - z1InChunks][chunkX - x1InChunks];
+                if (chunk == null) {
+                    continue;
+                }
+                final int maxY = Math.min(maxYExclusive - 1, maxHeights[chunkZ - maxHeightsZOffset][chunkX - maxHeightsXOffset]);
+                for (int xInChunk = 0; xInChunk < 16; xInChunk++) {
+                    for (int zInChunk = 0; zInChunk < 16; zInChunk++) {
+                        final int x = (chunkX << 4) | xInChunk, z = (chunkZ << 4) | zInChunk;
+                        for (int y = maxY; y >= minY; y--) {
+                            if (updateBlock(chunk, xInChunk, y, zInChunk, x, z)) {
+                                queueNeighbours(queue, x - originX, y - minHeight, z - originZ, sizeX, sizeY, sizeZ);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // From there on only what might be affected
+        while (! queue.isEmpty()) {
+            final int index = queue.take();
+            final int y = index / (sizeX * sizeZ), rest = index % (sizeX * sizeZ);
+            final int x = (rest % sizeX) + originX, z = (rest / sizeX) + originZ;
+            final int worldY = y + minHeight, chunkX = x >> 4, chunkZ = z >> 4;
+            final Chunk chunk = chunks[chunkZ - z1InChunks][chunkX - x1InChunks];
+            if ((chunk != null) && (worldY <= maxHeights[chunkZ - maxHeightsZOffset][chunkX - maxHeightsXOffset])
+                    && updateBlock(chunk, x & 0xf, worldY, z & 0xf, x, z)) {
+                queueNeighbours(queue, x - originX, y, z - originZ, sizeX, sizeY, sizeZ);
+            }
+        }
+    }
+
+    private static void queueNeighbours(BlockQueue queue, int x, int y, int z, int sizeX, int sizeY, int sizeZ) {
+        final int layer = sizeX * sizeZ, here = y * layer + z * sizeX + x;
+        if (x > 0) {
+            queue.add(here - 1);
+        }
+        if (x < sizeX - 1) {
+            queue.add(here + 1);
+        }
+        if (z > 0) {
+            queue.add(here - sizeX);
+        }
+        if (z < sizeZ - 1) {
+            queue.add(here + sizeX);
+        }
+        if (y > 0) {
+            queue.add(here - layer);
+        }
+        if (y < sizeY - 1) {
+            queue.add(here + layer);
+        }
+    }
+
+    /**
+     * Work out one block from its neighbours.
+     *
+     * @return Whether it changed.
+     */
+    private boolean updateBlock(Chunk chunk, int xInChunk, int y, int zInChunk, int x, int z) {
+        boolean changedBlock = false;
+        Material material = chunk.getMaterial(xInChunk, y, zInChunk);
+        if (leafDistance && material.leafBlock) {
+            final int currentDistance = material.getProperty(DISTANCE, 8);
+            final int distance = Math.min(currentDistance, calculateDistance(chunk, x, y, z));
+            if (distance != currentDistance) {
+                material = material.withProperty(DISTANCE, distance);
+                chunk.setMaterial(xInChunk, y, zInChunk, material);
+                changedBlock = true;
+            }
+        }
+        if (skyLight) {
+            final int currentSkylightLevel = chunk.getSkyLightLevel(xInChunk, y, zInChunk);
+            final int newSkyLightLevel;
+            if (material.opaque) {
+                // Opaque block
+                newSkyLightLevel = 0;
+            } else {
+                // Transparent block, or unknown block. We err on the side of transparency for
+                // unknown blocks to try and cause less visible lighting bugs
+                newSkyLightLevel = (currentSkylightLevel < 15) ? calculateSkyLightLevel(chunk, x, y, z, material) : 15;
+            }
+            if (newSkyLightLevel != currentSkylightLevel) {
+                chunk.setSkyLightLevel(xInChunk, y, zInChunk, newSkyLightLevel);
+                changedBlock = true;
+            }
+        }
+        if (blockLight) {
+            final int currentBlockLightLevel = chunk.getBlockLightLevel(xInChunk, y, zInChunk);
+            final int newBlockLightLevel;
+            if (material.opaque) {
+                // Opaque block
+                newBlockLightLevel = (material.blockLight > 0) ? currentBlockLightLevel : 0;
+            } else {
+                // Transparent block, or unknown block. We err on the side of transparency for
+                // unknown blocks to try and cause less visible lighting bugs
+                newBlockLightLevel = max(currentBlockLightLevel, calculateBlockLightLevel(chunk, x, y, z));
+            }
+            if (newBlockLightLevel != currentBlockLightLevel) {
+                chunk.setBlockLightLevel(xInChunk, y, zInChunk, newBlockLightLevel);
+                changedBlock = true;
+            }
+        }
+        return changedBlock;
+    }
+
+    /**
+     * Blocks waiting to be looked at, first come first served, each at most once at a time.
+     */
+    private static final class BlockQueue {
+        BlockQueue(int blockCount) {
+            queued = new long[(blockCount >>> 6) + 1];
+        }
+
+        boolean isEmpty() {
+            return size == 0;
+        }
+
+        void add(int index) {
+            final long bit = 1L << index;
+            final int word = index >>> 6;
+            if ((queued[word] & bit) != 0) {
+                return;
+            }
+            queued[word] |= bit;
+            if (size == items.length) {
+                final int[] larger = new int[items.length * 2];
+                final int firstPart = items.length - head;
+                System.arraycopy(items, head, larger, 0, firstPart);
+                System.arraycopy(items, 0, larger, firstPart, head);
+                items = larger;
+                head = 0;
+            }
+            items[(head + size) & (items.length - 1)] = index;
+            size++;
+        }
+
+        int take() {
+            final int index = items[head];
+            head = (head + 1) & (items.length - 1);
+            size--;
+            queued[index >>> 6] &= ~(1L << index);
+            return index;
+        }
+
+        private final long[] queued;
+        private int[] items = new int[1 << 16];
+        private int head, size;
     }
 
     /**

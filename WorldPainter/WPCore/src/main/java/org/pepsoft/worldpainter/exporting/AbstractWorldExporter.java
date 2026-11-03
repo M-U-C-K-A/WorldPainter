@@ -727,10 +727,14 @@ public abstract class AbstractWorldExporter implements WorldExporter {
 
             // Calculate secondary light
             calculator.setDirtyArea(new Box((regionCoords.x << 9) - 16, ((regionCoords.x + 1) << 9) + 16, lowMark, highMark + 1, (regionCoords.y << 9) - 16, ((regionCoords.y + 1) << 9) + 16));
-            int iteration = 1;
-            while (calculator.secondPass()) {
-                if (progressReceiver != null) {
-                    progressReceiver.setProgress(0.2f + 0.8f * (iteration++ / maxIterations));
+            if ((worldExportSettings != null) && worldExportSettings.isExperimental()) {
+                calculator.propagate();
+            } else {
+                int iteration = 1;
+                while (calculator.secondPass()) {
+                    if (progressReceiver != null) {
+                        progressReceiver.setProgress(0.2f + 0.8f * (iteration++ / maxIterations));
+                    }
                 }
             }
             calculator.finalise();

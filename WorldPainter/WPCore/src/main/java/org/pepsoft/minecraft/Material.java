@@ -918,7 +918,13 @@ public final class Material implements Serializable {
      * water.
      */
     public boolean containsWater() {
-        return watery || is(WATERLOGGED) || (isNamed(MC_WATER) && (getProperty(LEVEL, 0) == 0));
+        // Asked very often while exporting, and a material never changes, so only work it out once
+        byte cached = containsWater;
+        if (cached == 0) {
+            cached = (watery || is(WATERLOGGED) || (isNamed(MC_WATER) && (getProperty(LEVEL, 0) == 0))) ? (byte) 1 : (byte) 2;
+            containsWater = cached;
+        }
+        return cached == 1;
     }
 
     private HorizontalOrientationScheme[] determineHorizontalOrientations(Identity identity, String override) {
@@ -1332,8 +1338,24 @@ public final class Material implements Serializable {
     }
 
     public int hashCode() {
-        return ((blockType != -1) ? ((blockType * 17) + data) : 1) * 4099 + identity.hashCode();
+        // Materials are used as keys in maps very often while exporting, and never change
+        int hash = hashCode;
+        if (hash == 0) {
+            hash = ((blockType != -1) ? ((blockType * 17) + data) : 1) * 4099 + identity.hashCode();
+            hashCode = hash;
+        }
+        return hash;
     }
+
+    /**
+     * Cached; zero while not yet worked out (or when it happens to be zero).
+     */
+    private transient int hashCode;
+
+    /**
+     * Cached: zero while not yet worked out, 1 if it contains water and 2 if not.
+     */
+    private transient byte containsWater;
 
     /**
      * Get the modern style (name and property-based) name of this material. For
@@ -2268,8 +2290,15 @@ public final class Material implements Serializable {
 
         @Override
         public int hashCode() {
-            return name.hashCode() * 37 + ((properties != null) ? properties.hashCode() : 0);
+            int hash = hashCode;
+            if (hash == 0) {
+                hash = name.hashCode() * 37 + ((properties != null) ? properties.hashCode() : 0);
+                hashCode = hash;
+            }
+            return hash;
         }
+
+        private transient int hashCode;
 
         @Override
         public String toString() {
