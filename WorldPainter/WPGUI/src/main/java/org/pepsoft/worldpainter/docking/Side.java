@@ -1,21 +1,36 @@
 package org.pepsoft.worldpainter.docking;
 
 /**
- * The side of the workspace to which a {@link DockableFrame} can be docked.
+ * A side of an area or of the map: where to put an area next to another one, or which panels around the map to fold
+ * away.
  */
 public enum Side {
-    WEST("Move to left side"), EAST("Move to right side"), SOUTH("Move to bottom");
+    WEST, EAST, NORTH, SOUTH;
 
-    Side(String moveText) {
-        this.moveText = moveText;
+    /**
+     * Whether this side is to the left or right (or else above or below).
+     */
+    public boolean isHorizontal() {
+        return (this == WEST) || (this == EAST);
     }
 
     /**
-     * The text of the menu item which moves a frame to this side.
+     * Whether this side comes first: to the left or above.
      */
-    public String getMoveText() {
-        return moveText;
+    public boolean isBefore() {
+        return (this == WEST) || (this == NORTH);
     }
 
-    private final String moveText;
+    public Side opposite() {
+        switch (this) {
+            case WEST:
+                return EAST;
+            case EAST:
+                return WEST;
+            case NORTH:
+                return SOUTH;
+            default:
+                return NORTH;
+        }
+    }
 }

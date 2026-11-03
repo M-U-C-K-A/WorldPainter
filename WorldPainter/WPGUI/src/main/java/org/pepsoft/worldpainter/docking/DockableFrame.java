@@ -4,12 +4,13 @@ import javax.swing.*;
 import java.awt.*;
 
 /**
- * A panel which can be managed by a {@link DockingManager}: docked to the left or right of the workspace (on its own
- * or grouped with other frames as tabs), floated in its own window, or hidden.
+ * A page which can be shown in an area of the window by an {@link AreaManager}: the tools, the brushes, the terrain,
+ * the map, the 3D view, etc. Each page is shown in at most one area at a time.
  *
- * <p>Frames are identified by a unique {@link #getKey() key}, which is used to persist the layout. The initial
- * {@link #getInitSide() side} and {@link #getInitIndex() index} determine where the frame is docked by default; frames
- * with the same side and index are grouped together as tabs.
+ * <p>Pages are identified by a unique {@link #getKey() key}, which is used to store the layout. Pages of the same
+ * {@link #getGroup() group} (kind of editor) can be switched between with the tabs down the side of the area which
+ * shows them, like the tabs of the Properties editor of Blender. The {@link #getCategory() category} is the column of
+ * the editor type menu in which the page is listed; by default that of its group.
  */
 public class DockableFrame extends JPanel {
     public DockableFrame(String key) {
@@ -47,26 +48,41 @@ public class DockableFrame extends JPanel {
         firePropertyChange("frameIcon", oldFrameIcon, frameIcon);
     }
 
-    public Side getInitSide() {
-        return initSide;
+    /**
+     * The kind of editor this page belongs to. Pages of the same group share the tabs of the area which shows them.
+     */
+    public String getGroup() {
+        return group;
     }
 
-    public void setInitSide(Side initSide) {
-        this.initSide = initSide;
+    public void setGroup(String group) {
+        this.group = group;
     }
 
-    public int getInitIndex() {
-        return initIndex;
+    /**
+     * The column of the editor type menu in which the page is listed, or {@code null} for that of its group.
+     */
+    public String getCategory() {
+        return category;
     }
 
-    public void setInitIndex(int initIndex) {
-        this.initIndex = initIndex;
+    public void setCategory(String category) {
+        this.category = category;
     }
 
-    private String key, title;
+    /**
+     * A sentence or two about what the page is for, for its tab and its entry in the editor type menu.
+     */
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    private String key, title, group, category, description;
     private Icon frameIcon;
-    private Side initSide = Side.WEST;
-    private int initIndex;
 
     private static final long serialVersionUID = 1L;
 }

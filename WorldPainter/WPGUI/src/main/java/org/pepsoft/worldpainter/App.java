@@ -67,7 +67,7 @@ import org.pepsoft.worldpainter.vanilla.SurroundingsTileProvider;
 import org.pepsoft.worldpainter.vanilla.VanillaBiomeSource;
 import org.pepsoft.worldpainter.vanilla.VanillaBiomes;
 import org.pepsoft.worldpainter.docking.DockableFrame;
-import org.pepsoft.worldpainter.docking.DockingManager;
+import org.pepsoft.worldpainter.docking.AreaManager;
 import org.pepsoft.worldpainter.docking.Side;
 import org.pepsoft.worldpainter.nodes.NodeGraphDialog;
 import org.pepsoft.worldpainter.procedural.EdgeBlendDialog;
@@ -484,13 +484,6 @@ public final class App extends JFrame implements BrushControl,
                 currentUndoManager = null;
             }
 
-            Map<String, byte[]> layoutData = config.getJideLayoutData();
-            if (layoutData == null) {
-                layoutData = new HashMap<>();
-            }
-            layoutData.put(this.dimension.getId().toString(), dockingManager.getLayoutRawData());
-            config.setJideLayoutData(layoutData);
-
             // Remove the existing custom object layers and save the list of custom layers to the dimension to preserve
             // layers which aren't currently in use
             saveCustomLayers();
@@ -518,7 +511,7 @@ public final class App extends JFrame implements BrushControl,
                             visibleLayersChanged = true;
                         }
                     }
-                    dockingManager.removeFrame(palette.getDockableFrame().getKey());
+                    areaManager.removePage(palette.getDockableFrame().getKey());
                 }
                 if (visibleLayersChanged) {
                     updateLayerVisibility();
@@ -701,17 +694,8 @@ public final class App extends JFrame implements BrushControl,
             updateZoomLabel();
             updateRadiusLabel();
 
-            final Map<String, byte[]> layoutData = config.getJideLayoutData();
-            final String key = dimension.getId().toString();
-            if ((layoutData != null) && layoutData.containsKey(key)) {
-                if (dockingManager.loadLayoutFrom(layoutData.get(key))) {
-                    // Make sure the view picks up any change in size caused by resized docks
-                    view.componentResized(new ComponentEvent(view, COMPONENT_RESIZED));
-                }
-            }
-
             updateSurroundingsPanel();
-            if (showing3D || detached3D) {
+            if (areaManager.isPageShown(PAGE_3D)) {
                 terrain3DPanel.setDimension(dimension, selectedColourScheme);
             }
             if (! refreshTerrainMode()) {
@@ -1149,7 +1133,7 @@ public final class App extends JFrame implements BrushControl,
                     while (parent != null) {
                         if (parent instanceof DockableFrame) {
                             if (! parent.isShowing()) {
-                                dockingManager.showFrame(((DockableFrame) parent).getKey());
+                                areaManager.showPage(((DockableFrame) parent).getKey());
                             }
                             break;
                         }
@@ -1167,7 +1151,7 @@ public final class App extends JFrame implements BrushControl,
             if (paintId.startsWith("Layer/Biome/")) {
                 biomesPanel.selectBiome(Integer.parseInt(paintId.substring(12)));
                 if (! biomesPanelFrame.isShowing()) {
-                    dockingManager.showFrame("biomes");
+                    areaManager.showPage("biomes");
                 }
                 return;
             }
@@ -1891,8 +1875,8 @@ public final class App extends JFrame implements BrushControl,
         }
     }
     
-    public DockingManager getDockingManager() {
-        return dockingManager;
+    public AreaManager getAreaManager() {
+        return areaManager;
     }
 
     // JFrame
@@ -1957,7 +1941,8 @@ public final class App extends JFrame implements BrushControl,
         Terrain.setCustomMaterial(index, customMaterial);
 
         if (customTerrainPanel == null) {
-            dockingManager.addFrame(new DockableFrameBuilder(createCustomTerrainPanel(), "Custom Terrain", Side.WEST, 3).withId("customTerrain").scrollable().build());
+            areaManager.addPage(new DockableFrameBuilder(createCustomTerrainPanel(), "Custom Terrain", GROUP_PAINT).withId("customTerrain")
+                    .withDescription("The mixed and custom materials you made, to paint with like the other terrain.").scrollable().build());
         }
 
         JToggleButton newButton = createTerrainButton(Terrain.getCustomTerrain(index));
@@ -1977,7 +1962,7 @@ public final class App extends JFrame implements BrushControl,
                 paintChanged();
             };
             paintUpdater.updatePaint();
-            dockingManager.activateFrame("customTerrain");
+            areaManager.activatePage("customTerrain");
         }
     }
 
@@ -2453,13 +2438,6 @@ public final class App extends JFrame implements BrushControl,
                             throw new IOException("Could not move " + tempFile.getName() + " to " + normalisedFile.getName() + "; world is saved as " + tempFile.getName());
                         }
 
-                        Map<String, byte[]> layoutData = config.getJideLayoutData();
-                        if (layoutData == null) {
-                            layoutData = new HashMap<>();
-                        }
-                        layoutData.put(dimension.getId().toString(), dockingManager.getLayoutRawData());
-                        config.setJideLayoutData(layoutData);
-
                         return null;
                     } catch (IOException e) {
                         throw new RuntimeException("I/O error saving file (message: " + e.getMessage() + ")", e);
@@ -2804,19 +2782,50 @@ public final class App extends JFrame implements BrushControl,
         // The gradient of the Glass theme shows behind the panels, the tool bar and the status bar
         setContentPane(new org.pepsoft.worldpainter.design.Glass.Backdrop(new BorderLayout()));
 
-        // Set up docking framework
-        dockingManager = new DockingManager(this);
-        getContentPane().add(dockingManager.getMainContainer(), BorderLayout.CENTER);
-        // The workspace shows either the map or the integrated 3D view
-        workspaceCards = new JPanel(new CardLayout());
-        workspaceCards.add(viewContainer, WORKSPACE_MAP);
+        // The areas of the window, which can be split, joined, resized, swapped and detached as in Blender, with a
+        // choice of what each one shows, and workspaces with different arrangements
+        areaManager = new AreaManager(this);
+        getContentPane().add(areaManager.getScreen(), BorderLayout.CENTER);
+        areaManager.setCategories(CATEGORY_VIEW, CATEGORY_TOOLS, CATEGORY_PAINT, CATEGORY_WORLD);
+        areaManager.defineGroup(GROUP_MAP, "Map", "map", CATEGORY_VIEW);
+        areaManager.defineGroup(GROUP_3D, "3D View", "box", CATEGORY_VIEW);
+        areaManager.defineGroup(GROUP_TOOLS, "Tools", "pencil-ruler", CATEGORY_TOOLS);
+        areaManager.defineGroup(GROUP_TOOL_SETTINGS, "Tool Settings", "sliders-horizontal", CATEGORY_TOOLS);
+        areaManager.defineGroup(GROUP_BRUSHES, "Brushes", "brush", CATEGORY_TOOLS);
+        areaManager.defineGroup(GROUP_PROPERTIES, "Properties", "settings-2", CATEGORY_TOOLS);
+        areaManager.defineGroup(GROUP_PAINT, "Paint", "palette", CATEGORY_PAINT);
+
+        // The map and the 3D view
+        final DockableFrame mapPage = new DockableFrame(PAGE_MAP);
+        mapPage.setTitle("Map");
+        mapPage.setFrameIcon(Icons.get("map", 16));
+        mapPage.setGroup(GROUP_MAP);
+        mapPage.setDescription("Paint and edit the map from above");
+        mapPage.add(org.pepsoft.worldpainter.design.Glass.frame(viewContainer), BorderLayout.CENTER);
+        areaManager.addPage(mapPage);
         terrain3DPanel = new Terrain3DPanel();
-        terrain3DPanel.setPopOutAction(this::detach3D, false);
-        workspaceCards.add(terrain3DPanel, WORKSPACE_3D);
-        dockingManager.getWorkspace().add(org.pepsoft.worldpainter.design.Glass.frame(workspaceCards), BorderLayout.CENTER);
+        // The header of its area detaches it
+        terrain3DPanel.setPopOutAction(null, false);
+        final DockableFrame threeDeePage = new DockableFrame(PAGE_3D);
+        threeDeePage.setTitle("3D View");
+        threeDeePage.setFrameIcon(Icons.get("box", 16));
+        threeDeePage.setGroup(GROUP_3D);
+        threeDeePage.setDescription("See the map in perspective, with height, slope, biome and relief views and details of every block");
+        threeDeePage.add(terrain3DPanel, BorderLayout.CENTER);
+        areaManager.addPage(threeDeePage);
+        // Build the 3D view when it comes into sight
+        areaManager.addPageVisibilityListener((key, shown) -> {
+            if (PAGE_3D.equals(key) && shown && (dimension != null)) {
+                SwingUtilities.invokeLater(() -> {
+                    if (dimension != null) {
+                        terrain3DPanel.setDimension(dimension, selectedColourScheme);
+                    }
+                });
+            }
+        });
 
         setJMenuBar(createMenuBar());
-        
+
         getContentPane().add(createToolBar(), BorderLayout.NORTH);
 
         getContentPane().add(createStatusBar(), BorderLayout.SOUTH);
@@ -2830,53 +2839,66 @@ public final class App extends JFrame implements BrushControl,
             }
         });
 
-        dockingManager.addFrame(new DockableFrameBuilder(createToolPanel(), "Tools", Side.WEST, 1).withIcon(Icons.get("pencil-ruler")).build());
+        areaManager.addPage(new DockableFrameBuilder(createToolPanel(), "Tools", GROUP_TOOLS).withIcon(Icons.get("pencil-ruler")).build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", Side.WEST, 2).withIcon(Icons.get("sliders-horizontal")).expand().scrollable().build());
+        areaManager.addPage(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", GROUP_TOOL_SETTINGS).withIcon(Icons.get("sliders-horizontal")).expand().scrollable().build());
 
         // The four kinds of things that can be painted, each with a short explanation, from the most basic to the most
         // specialised
         // (the layer panel must be created first, since the terrain panel mirrors its terrain solo check box)
         final JPanel layerPanel = createLayerPanel();
-        dockingManager.addFrame(new DockableFrameBuilder(createTerrainPanel(), "Terrain", Side.WEST, 3).withIcon(Icons.get("mountain-snow"))
+        areaManager.addPage(new DockableFrameBuilder(createTerrainPanel(), "Terrain", GROUP_PAINT).withIcon(Icons.get("mountain-snow"))
                 .withDescription("The block type of the ground surface: grass, sand, stone, snow\u2026").scrollable().build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(layerPanel, "Layers", Side.WEST, 3).withIcon(Icons.get("layers"))
+        areaManager.addPage(new DockableFrameBuilder(layerPanel, "Layers", GROUP_PAINT).withIcon(Icons.get("layers"))
                 .withDescription("Features added on top of or under the terrain: trees, caves, ores, frost\u2026 Toggle their visibility with the eye.").scrollable().build());
 
-        biomesPanelFrame = new DockableFrameBuilder(createBiomesPanelContainer(), "Biomes", Side.WEST, 3).withIcon(Icons.get("trees"))
+        biomesPanelFrame = new DockableFrameBuilder(createBiomesPanelContainer(), "Biomes", GROUP_PAINT).withIcon(Icons.get("trees"))
                 .withDescription("The Minecraft biome of each area (grass colour, weather, mobs). Chosen automatically from the terrain unless you paint one.").scrollable().build();
-        dockingManager.addFrame(biomesPanelFrame);
+        areaManager.addPage(biomesPanelFrame);
 
-        dockingManager.addFrame(new DockableFrameBuilder(new PacksPanel(this::useTreeKind, this::usePlantPreset, this::useMaterialGroup, selectedColourScheme), "Packs", Side.WEST, 3).withIcon(Icons.get("package"))
+        areaManager.addPage(new DockableFrameBuilder(new PacksPanel(this::useTreeKind, this::usePlantPreset, this::useMaterialGroup, selectedColourScheme), "Packs", GROUP_PAINT).withIcon(Icons.get("package"))
                 .withDescription("Ready made trees, flowers, plants and mixes of blocks: click one to add it to the world and paint with it.").scrollable().build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", Side.WEST, 3).withIcon(Icons.get("message-square-text"))
+        areaManager.addPage(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", GROUP_PAINT).withIcon(Icons.get("message-square-text"))
                 .withDescription("Coloured markings for planning the map. They are not exported, unless you enable that in the export settings.").scrollable().build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createBrushPanel(), "Brushes", Side.EAST, 1).withIcon(Icons.get("brush")).scrollable().build());
+        areaManager.addPage(new DockableFrameBuilder(createBrushPanel(), "Brushes", GROUP_BRUSHES).withIcon(Icons.get("brush")).scrollable().build());
 
         if (customBrushes.containsKey(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
-            dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(CUSTOM_BRUSHES_DEFAULT_TITLE, customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE)), "Custom Brushes", Side.EAST, 1).withId("customBrushesDefault").scrollable().build());
+            areaManager.addPage(new DockableFrameBuilder(createCustomBrushPanel(CUSTOM_BRUSHES_DEFAULT_TITLE, customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE)), "Custom Brushes", GROUP_BRUSHES).withId("customBrushesDefault").scrollable().build());
         }
         for (Map.Entry<String, BrushGroup> entry: customBrushes.entrySet()) {
             if (entry.getKey().equals(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
                 continue;
             }
-            dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), entry.getKey(), Side.EAST, 1).withId("customBrushes." + entry.getKey()).scrollable().build());
+            areaManager.addPage(new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), entry.getKey(), GROUP_BRUSHES).withId("customBrushes." + entry.getKey()).scrollable().build());
         }
-        
-        dockingManager.addFrame(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", Side.EAST, 2).withId("brushSettings").withIcon(Icons.get("settings-2")).scrollable().build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createSurroundingsPanel(), "Surroundings", Side.EAST, 2).withId("surroundings").withIcon(Icons.get("map"))
+        areaManager.addPage(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", GROUP_PROPERTIES).withId("brushSettings").withIcon(Icons.get("settings-2")).scrollable().build());
+
+        areaManager.addPage(new DockableFrameBuilder(createSurroundingsPanel(), "Surroundings", GROUP_PROPERTIES).withId("surroundings").withIcon(Icons.get("map")).inCategory(CATEGORY_WORLD)
                 .withDescription("The world seed, and a preview of the land Minecraft will generate around the map.").scrollable().build());
 
         infoPanel = createInfoPanel();
-        dockingManager.addFrame(new DockableFrameBuilder(infoPanel, "Info", Side.EAST, 2).withId("infoPanel").expand().withIcon(Icons.get("info")).build());
+        areaManager.addPage(new DockableFrameBuilder(infoPanel, "Info", GROUP_PROPERTIES).withId("infoPanel").expand().withIcon(Icons.get("info")).inCategory(CATEGORY_WORLD).build());
 
-        if (! dockingManager.loadLayoutFrom(config.getDefaultJideLayoutData())) {
-            dockingManager.resetToDefault();
+        // The built-in arrangements, from which the workspaces are made (the sizes are in pixels at 100%: "a" is the
+        // size of what the area shows, "*" the room left over)
+        final String layout = "H[270=V[a=L(tools,tools);a=L(toolSettings,toolSettings);*=L(paint,terrain)];*=L(map,map);320=V[a=L(brushes,brushes);*=L(properties,brushSettings)]]";
+        areaManager.addTemplate("layout", "Layout", "layout-dashboard", "All the panels around the map, as when WorldPainter starts", layout);
+        areaManager.addTemplate("sculpting", "Sculpting", "mountain", "The tools, their settings and those of the brush on one side of the map and the brushes on the other, to shape the land",
+                "H[270=V[a=L(tools,tools);a=L(toolSettings,toolSettings);*=L(properties,brushSettings)];*=L(map,map);320=L(brushes,brushes)]");
+        areaManager.addTemplate("painting", "Painting", "brush", "The terrain on one side of the map and the layers on the other, next to the tools and brushes",
+                "H[270=V[a=L(tools,tools);a=L(toolSettings,toolSettings);*=L(paint,terrain)];*=L(map,map);300=V[*=L(paint,layers);220=L(brushes,brushes);260=L(properties,brushSettings)]]");
+        areaManager.addTemplate("3d", "3D", "box", "The map and the 3D view side by side, to see the land take shape as you work",
+                "H[250=V[a=L(tools,tools);a=L(toolSettings,toolSettings);*=L(properties,brushSettings)];*=L(map,map);45%=L(view3d,view3d)]");
+        areaManager.addTemplate("minimal", "Minimal", "maximize", "Only the map: fold the panels back out with the buttons at either end of the header", layout, Side.WEST, Side.EAST);
+        if (! areaManager.loadState(config.getDefaultJideLayoutData())) {
+            areaManager.createDefaultWorkspaces();
         }
+        // Remember the arrangement, a little after each change
+        areaManager.setStateListener(() -> Configuration.getInstance().setDefaultJideLayoutData(areaManager.saveState()));
 
         MouseAdapter viewListener = new MouseAdapter() {
             @Override
@@ -2941,11 +2963,11 @@ public final class App extends JFrame implements BrushControl,
         if (false && (config.getShowCalloutCount() > 0)) {
             // Replaced by explanatory tooltips on the controls
             BufferedImage callout = loadCallout("callout_1");
-            view.addOverlay("callout_1", 0, dockingManager.getFrame("tools"), callout);
+            view.addOverlay("callout_1", 0, areaManager.getPage("tools"), callout);
             callout = loadCallout("callout_2");
-            view.addOverlay("callout_2", -callout.getWidth(), dockingManager.getFrame("brushes"), callout);
+            view.addOverlay("callout_2", -callout.getWidth(), areaManager.getPage("brushes"), callout);
             callout = loadCallout("callout_3");
-            view.addOverlay("callout_3", 0, dockingManager.getFrame("layers"), callout);
+            view.addOverlay("callout_3", 0, areaManager.getPage("layers"), callout);
             config.setShowCalloutCount(config.getShowCalloutCount() - 1);
         }
 
@@ -4648,35 +4670,9 @@ public final class App extends JFrame implements BrushControl,
         
         menu.addSeparator();
 
-        JMenu workspaceLayoutMenu = new JMenu("Workspace layout");
-
-        for (WorkspacePreset preset: WorkspacePreset.values()) {
-            menuItem = new JMenuItem(preset.title, Icons.get(preset.icon, 16));
-            menuItem.setToolTipText(preset.description);
-            menuItem.addActionListener(e -> applyWorkspacePreset(preset));
-            workspaceLayoutMenu.add(menuItem);
-        }
-        workspaceLayoutMenu.addSeparator();
-
-        menuItem = new JMenuItem(ACTION_RESET_DOCKS);
-        menuItem.setMnemonic('r');
-        workspaceLayoutMenu.add(menuItem);
-
-        menuItem = new JMenuItem(ACTION_RESET_ALL_DOCKS);
-        menuItem.setMnemonic('a');
-        workspaceLayoutMenu.add(menuItem);
-
-        ACTION_LOAD_LAYOUT.setEnabled(config.getDefaultJideLayoutData() != null);
-        menuItem = new JMenuItem(ACTION_LOAD_LAYOUT);
-        menuItem.setMnemonic('l');
-        workspaceLayoutMenu.add(menuItem);
-
-        menuItem = new JMenuItem(ACTION_SAVE_LAYOUT);
-        menuItem.setMnemonic('s');
-        workspaceLayoutMenu.add(menuItem);
-        menu.add(workspaceLayoutMenu);
-
-        menu.add(dockingManager.createPanelsMenu("Panels"));
+        menu.add(areaManager.createWorkspacesMenu("Workspaces"));
+        menu.add(areaManager.createAreaMenu("Area"));
+        menu.add(areaManager.createPanelsMenu("Panels"));
 
         menu.addSeparator();
         
@@ -5248,8 +5244,8 @@ public final class App extends JFrame implements BrushControl,
         final JToolBar toolBar = createHeaderToolBar();
         // Buttons to fold the panels on either side away, to make room for the map
         westPanelsButton = new JToggleButton(Icons.get("panel-left", 18), true);
-        westPanelsButton.setToolTipText(richToolTip("Left panels", "Show or hide the panels on the left, to make room for the map", null));
-        westPanelsButton.addActionListener(e -> dockingManager.setCollapsed(Side.WEST, ! westPanelsButton.isSelected()));
+        westPanelsButton.setToolTipText(richToolTip("Left panels", "Fold away the areas to the left of the map, to make room for it, or bring them back", null));
+        westPanelsButton.addActionListener(e -> areaManager.setCollapsed(Side.WEST, ! westPanelsButton.isSelected()));
         toolBar.add(westPanelsButton);
         toolBar.addSeparator();
         toolBar.add(ACTION_NEW_WORLD);
@@ -5292,26 +5288,8 @@ public final class App extends JFrame implements BrushControl,
 //        toolBar.add(Box.createHorizontalGlue());
 //        toolBar.add(ACTION_SHOW_HELP_PICKER);
 
-        // Workspace presets, map/3D switch, zoom and theme controls on the right
+        // The zoom and theme controls on the right
         final JToolBar rightToolBar = createHeaderToolBar();
-        workspacePresetButton = new JButton(Icons.muted("chevron-down", 14));
-        workspacePresetButton.setHorizontalTextPosition(SwingConstants.LEADING);
-        workspacePresetButton.addActionListener(e -> createWorkspacePresetMenu().show(workspacePresetButton, 0, workspacePresetButton.getHeight()));
-        updateWorkspacePresetButton();
-        rightToolBar.add(workspacePresetButton);
-        rightToolBar.addSeparator();
-        final ButtonGroup workspaceGroup = new ButtonGroup();
-        mapViewButton = new JToggleButton("Map", Icons.get("map", 16), true);
-        mapViewButton.setToolTipText(richToolTip("Map", "Paint and edit the map from above", null));
-        mapViewButton.addActionListener(e -> showWorkspace(false));
-        workspaceGroup.add(mapViewButton);
-        rightToolBar.add(mapViewButton);
-        threeDeeButton = new JToggleButton("3D", Icons.get("box", 16));
-        threeDeeButton.setToolTipText(richToolTip("3D view", "See the map in perspective, with height, slope, biome and relief views and details of every block", null));
-        threeDeeButton.addActionListener(e -> showWorkspace(true));
-        workspaceGroup.add(threeDeeButton);
-        rightToolBar.add(threeDeeButton);
-        rightToolBar.addSeparator();
         rightToolBar.add(ACTION_ZOOM_OUT);
         headerZoomLabel = new JLabel("100%", SwingConstants.CENTER);
         headerZoomLabel.setPreferredSize(new java.awt.Dimension(Math.round(52 * getUIScale()), headerZoomLabel.getPreferredSize().height));
@@ -5326,19 +5304,13 @@ public final class App extends JFrame implements BrushControl,
         rightToolBar.add(headerZoomLabel);
         rightToolBar.add(ACTION_ZOOM_IN);
         eastPanelsButton = new JToggleButton(Icons.get("panel-right", 18), true);
-        eastPanelsButton.setToolTipText(richToolTip("Right panels", "Show or hide the panels on the right, to make room for the map", null));
-        eastPanelsButton.addActionListener(e -> dockingManager.setCollapsed(Side.EAST, ! eastPanelsButton.isSelected()));
+        eastPanelsButton.setToolTipText(richToolTip("Right panels", "Fold away the areas to the right of the map, to make room for it, or bring them back", null));
+        eastPanelsButton.addActionListener(e -> areaManager.setCollapsed(Side.EAST, ! eastPanelsButton.isSelected()));
         southPanelsButton = new JToggleButton(Icons.get("panel-bottom", 18), true);
-        southPanelsButton.setToolTipText(richToolTip("Bottom panels", "Show or hide the panels at the bottom. Move a panel there with a right click on its title or tab", null));
-        southPanelsButton.addActionListener(e -> dockingManager.setCollapsed(Side.SOUTH, ! southPanelsButton.isSelected()));
-        southPanelsButton.setEnabled(false);
-        dockingManager.setCollapseListener(() -> {
-            westPanelsButton.setSelected(! dockingManager.isCollapsed(Side.WEST));
-            eastPanelsButton.setSelected(! dockingManager.isCollapsed(Side.EAST));
-            southPanelsButton.setSelected(! dockingManager.isCollapsed(Side.SOUTH));
-            // Only of use when there are panels at the bottom
-            southPanelsButton.setEnabled(dockingManager.hasDockedFrames(Side.SOUTH));
-        });
+        southPanelsButton.setToolTipText(richToolTip("Bottom panels", "Fold away the areas below the map, or bring them back. Split an area, or drag one there by its header, to put panels below the map", null));
+        southPanelsButton.addActionListener(e -> areaManager.setCollapsed(Side.SOUTH, ! southPanelsButton.isSelected()));
+        areaManager.addChangeListener(this::updatePanelButtons);
+        updatePanelButtons();
         if (ThemeUtils.isModernTheme()) {
             rightToolBar.addSeparator();
             themeToggleButton = new JButton();
@@ -5368,12 +5340,20 @@ public final class App extends JFrame implements BrushControl,
         header.add(west, BorderLayout.WEST);
         header.add(headerTitleLabel, BorderLayout.CENTER);
         header.add(rightToolBar, BorderLayout.EAST);
-        return header;
+
+        // Below it, as in Blender, the tabs of the workspaces: arrangements of the areas for different kinds of work
+        final JPanel workspaceBar = new JPanel(new BorderLayout());
+        workspaceBar.setBorder(new HairlineBorder(false, false, true, false, new Insets(3, 6, 3, 6)));
+        workspaceBar.add(areaManager.createWorkspaceTabs(), BorderLayout.WEST);
+        final JLabel workspaceHint = new JLabel("Ctrl+Space maximises the area under the mouse \u00b7 drag from a corner of an area to split it");
+        workspaceHint.putClientProperty("FlatLaf.style", "font: -1; foreground: $WorldPainter.mutedForeground");
+        workspaceBar.add(workspaceHint, BorderLayout.EAST);
+        final JPanel top = new JPanel(new BorderLayout());
+        top.add(header, BorderLayout.NORTH);
+        top.add(workspaceBar, BorderLayout.SOUTH);
+        return top;
     }
 
-    /**
-     * Switch the workspace between the map and the integrated 3D view.
-     */
     /**
      * While a modal dialog is open all the menus are disabled (on macOS they show greyed out in the menu bar at the top
      * of the screen). Such a dialog can end up hidden behind the main window, for instance after switching to another
@@ -5390,76 +5370,15 @@ public final class App extends JFrame implements BrushControl,
     }
 
     /**
-     * Move the 3D view out of the workspace into a floating panel of its own, so that it can be seen next to the map,
-     * and docked or floated like the other panels.
+     * Show which sides of the map have areas, and which are folded away.
      */
-    private void detach3D() {
-        if (detached3D) {
-            return;
-        }
-        if (dockingManager.getFrame(FRAME_3D) != null) {
-            dockingManager.removeFrame(FRAME_3D);
-        }
-        workspaceCards.remove(terrain3DPanel);
-        final DockableFrame frame = new DockableFrame(FRAME_3D);
-        frame.setTitle("3D View");
-        frame.setFrameIcon(Icons.get("box", 16));
-        frame.setInitSide(Side.EAST);
-        frame.setInitIndex(3);
-        terrain3DPanel.setPreferredSize(new java.awt.Dimension(Math.round(900 * getUIScale()), Math.round(600 * getUIScale())));
-        frame.add(terrain3DPanel, BorderLayout.CENTER);
-        // (The card layout of the workspace may have hidden it)
-        terrain3DPanel.setVisible(true);
-        dockingManager.addFrame(frame);
-        // Float it over the right part of the main window, leaving the tools on the left visible
-        final Rectangle window = getBounds();
-        dockingManager.floatFrame(FRAME_3D, new Rectangle(window.x + window.width * 2 / 5, window.y + window.height / 8, window.width / 2, window.height * 2 / 3));
-        detached3D = true;
-        terrain3DPanel.setPopOutAction(this::attach3D, true);
-        mapViewButton.setSelected(true);
-        showWorkspace(false);
-        if (dimension != null) {
-            terrain3DPanel.setDimension(dimension, selectedColourScheme);
-        }
-    }
-
-    /**
-     * Put the 3D view back in the workspace, in place of the map.
-     */
-    private void attach3D() {
-        if (! detached3D) {
-            return;
-        }
-        dockingManager.removeFrame(FRAME_3D);
-        final Container parent = terrain3DPanel.getParent();
-        if (parent != null) {
-            parent.remove(terrain3DPanel);
-        }
-        terrain3DPanel.setPreferredSize(null);
-        workspaceCards.add(terrain3DPanel, WORKSPACE_3D);
-        detached3D = false;
-        terrain3DPanel.setPopOutAction(this::detach3D, false);
-        threeDeeButton.setSelected(true);
-        showWorkspace(true);
-    }
-
-    private void showWorkspace(boolean threeDee) {
-        if (threeDee && detached3D) {
-            // The 3D view is in a panel of its own; show that, and keep the map in the workspace
-            if (dockingManager.getFrame(FRAME_3D) != null) {
-                dockingManager.showFrame(FRAME_3D);
-            }
-            mapViewButton.setSelected(true);
-            if (dimension != null) {
-                terrain3DPanel.setDimension(dimension, selectedColourScheme);
-            }
-            return;
-        }
-        showing3D = threeDee;
-        ((CardLayout) workspaceCards.getLayout()).show(workspaceCards, threeDee ? WORKSPACE_3D : WORKSPACE_MAP);
-        if (threeDee && (dimension != null)) {
-            terrain3DPanel.setDimension(dimension, selectedColourScheme);
-        }
+    private void updatePanelButtons() {
+        westPanelsButton.setSelected(! areaManager.isCollapsed(Side.WEST));
+        westPanelsButton.setEnabled(areaManager.hasAreasOn(Side.WEST) || areaManager.isCollapsed(Side.WEST));
+        eastPanelsButton.setSelected(! areaManager.isCollapsed(Side.EAST));
+        eastPanelsButton.setEnabled(areaManager.hasAreasOn(Side.EAST) || areaManager.isCollapsed(Side.EAST));
+        southPanelsButton.setSelected(! areaManager.isCollapsed(Side.SOUTH));
+        southPanelsButton.setEnabled(areaManager.hasAreasOn(Side.SOUTH) || areaManager.isCollapsed(Side.SOUTH));
     }
 
     private static JToolBar createHeaderToolBar() {
@@ -5821,68 +5740,6 @@ public final class App extends JFrame implements BrushControl,
         button.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
         button.setMargin(new Insets(6, 6, 6, 6));
         button.setFocusable(false);
-    }
-
-    /**
-     * Arrange the panels for a kind of work, keeping their sizes.
-     */
-    private void applyWorkspacePreset(WorkspacePreset preset) {
-        final Set<String> keys = new LinkedHashSet<>();
-        dockingManager.getFrames().forEach(frame -> keys.add(frame.getKey()));
-        // The 3D view is moved into and out of a panel of its own with the 3D button
-        keys.remove(FRAME_3D);
-        final Set<String> hidden = new HashSet<>();
-        switch (preset) {
-            case TERRAFORMING:
-                hidden.addAll(asList("terrain", "layers", "biomes", "packs", "annotations", "surroundings", "customTerrain"));
-                break;
-            case PAINTING:
-                hidden.addAll(asList("annotations", "surroundings"));
-                break;
-            case NODE_GRAPH:
-                hidden.addAll(keys);
-                hidden.removeAll(asList("layers", "surroundings", "infoPanel"));
-                break;
-        }
-        final Set<String> docked = new LinkedHashSet<>(keys);
-        docked.removeAll(hidden);
-        dockingManager.arrange(docked, hidden, (preset == WorkspacePreset.MINIMAL) ? EnumSet.allOf(Side.class) : EnumSet.noneOf(Side.class));
-        switch (preset) {
-            case TERRAFORMING:
-                dockingManager.showFrame("brushSettings");
-                break;
-            case PAINTING:
-                dockingManager.showFrame("terrain");
-                dockingManager.showFrame("brushSettings");
-                break;
-            case NODE_GRAPH:
-                dockingManager.showFrame("surroundings");
-                // The node graph is where the work is done
-                SwingUtilities.invokeLater(this::showNodeGraph);
-                break;
-        }
-        workspacePreset = preset;
-        updateWorkspacePresetButton();
-    }
-
-    private JPopupMenu createWorkspacePresetMenu() {
-        final JPopupMenu menu = new JPopupMenu();
-        final ButtonGroup buttonGroup = new ButtonGroup();
-        for (WorkspacePreset preset: WorkspacePreset.values()) {
-            final JRadioButtonMenuItem menuItem = new JRadioButtonMenuItem("<html><b>" + preset.title + "</b><br><span style=\"color: #a1a1aa\">" + preset.description + "</span></html>", Icons.get(preset.icon, 18), preset == workspacePreset);
-            menuItem.setIconTextGap(10);
-            menuItem.addActionListener(e -> applyWorkspacePreset(preset));
-            buttonGroup.add(menuItem);
-            menu.add(menuItem);
-        }
-        return menu;
-    }
-
-    private void updateWorkspacePresetButton() {
-        if (workspacePresetButton != null) {
-            workspacePresetButton.setText(workspacePreset.title);
-            workspacePresetButton.setToolTipText(richToolTip("Workspace", "Arrange the panels for a kind of work: shaping the land, painting, the node graph, or only the map", null));
-        }
     }
 
     /**
@@ -6586,7 +6443,7 @@ public final class App extends JFrame implements BrushControl,
             customTerrainPanel.remove(customMaterialButtons[index]);
             customMaterialButtons[index] = null;
             if (Terrain.getConfiguredCustomMaterialCount() == 0) {
-                dockingManager.removeFrame("customTerrain");
+                areaManager.removePage("customTerrain");
                 customTerrainPanel = null;
             } else {
                 customTerrainPanel.validate();
@@ -6611,7 +6468,7 @@ public final class App extends JFrame implements BrushControl,
             while (customTerrainPanel.getComponentCount() > 1) {
                 customTerrainPanel.remove(0);
             }
-            dockingManager.removeFrame("customTerrain");
+            areaManager.removePage("customTerrain");
             customTerrainPanel = null;
         }
     }
@@ -7722,53 +7579,6 @@ public final class App extends JFrame implements BrushControl,
         }
     };
     
-    private final BetterAction ACTION_RESET_DOCKS = new BetterAction("resetDockLayout", "Reset current and default") {
-        @Override
-        protected void performAction(ActionEvent e) {
-            DesktopUtils.beep();
-            if (JOptionPane.showConfirmDialog(App.this, "Are you sure you want to reset the workspace?", "Confirm Workspace Reset", YES_NO_OPTION) == YES_OPTION) {
-                dockingManager.resetToDefault();
-                Configuration config = Configuration.getInstance();
-                config.setDefaultJideLayoutData(null);
-                ACTION_LOAD_LAYOUT.setEnabled(false);
-            }
-        }
-    };
-
-    private final BetterAction ACTION_RESET_ALL_DOCKS = new BetterAction("resetAllDockLayout", "Reset current, default and all saved worlds") {
-        @Override
-        protected void performAction(ActionEvent e) {
-            DesktopUtils.beep();
-            if (JOptionPane.showConfirmDialog(App.this, "Are you sure you want to reset the workspace for all worlds?", "Confirm Workspace Reset", YES_NO_OPTION) == YES_OPTION) {
-                dockingManager.resetToDefault();
-                Configuration config = Configuration.getInstance();
-                config.setDefaultJideLayoutData(null);
-                config.setJideLayoutData(null);
-                ACTION_LOAD_LAYOUT.setEnabled(false);
-            }
-        }
-    };
-
-    private final BetterAction ACTION_LOAD_LAYOUT = new BetterAction("loadDockLayout", "Load workspace layout") {
-        @Override
-        protected void performAction(ActionEvent e) {
-            Configuration config = Configuration.getInstance();
-            if (config.getDefaultJideLayoutData() != null) {
-                dockingManager.loadLayoutFrom(config.getDefaultJideLayoutData());
-            }
-        }
-    };
-
-    private final BetterAction ACTION_SAVE_LAYOUT = new BetterAction("resetDocks", "Save workspace layout") {
-        @Override
-        protected void performAction(ActionEvent e) {
-            Configuration config = Configuration.getInstance();
-            config.setDefaultJideLayoutData(dockingManager.getLayoutRawData());
-            ACTION_LOAD_LAYOUT.setEnabled(true);
-            showInfo(App.this, "Workspace layout saved", "Workspace layout saved");
-        }
-    };
-
     private final BetterAction ACTION_SWITCH_TO_FROM_CEILING = new BetterAction("switchCeiling", "Switch to/from Ceiling") {
         {
             setAcceleratorKey(getKeyStroke(VK_C, PLATFORM_COMMAND_MASK));
@@ -7860,7 +7670,7 @@ public final class App extends JFrame implements BrushControl,
     final JToggleButton[] customMaterialButtons = new JToggleButton[CUSTOM_TERRAIN_COUNT];
 
     WorldPainter view;
-    DockingManager dockingManager;
+    AreaManager areaManager;
     Paint paint = PaintFactory.NULL_PAINT;
     Set<Layer> hiddenLayers = new HashSet<>();
     Layer soloLayer;
@@ -7892,36 +7702,22 @@ public final class App extends JFrame implements BrushControl,
     private File lastSelectedFile;
     private JLabel heightLabel, slopeLabel, locationLabel, waterLabel, materialLabel, radiusLabel, zoomLabel, biomeLabel, levelLabel, brushRotationLabel;
     private JLabel headerTitleLabel, headerZoomLabel, surroundingsNoteLabel;
-    private JPanel workspaceCards;
     private Terrain3DPanel terrain3DPanel;
-    private JToggleButton threeDeeButton, westPanelsButton, eastPanelsButton, southPanelsButton;
-    private JButton workspacePresetButton;
-    private WorkspacePreset workspacePreset = WorkspacePreset.DEFAULT;
-    private boolean detached3D;
-    private static final String FRAME_3D = "view3d";
+    private JToggleButton westPanelsButton, eastPanelsButton, southPanelsButton;
 
     /**
-     * Ways to arrange the panels for a kind of work, chosen with the button in the toolbar or from View › Workspace
-     * layout.
+     * The pages of the areas which are not built with a {@link DockableFrameBuilder}.
      */
-    private enum WorkspacePreset {
-        DEFAULT("Default", "layout-dashboard", "All the panels, as when WorldPainter starts"),
-        TERRAFORMING("Terraforming", "mountain", "The tools and the brushes, to shape the land"),
-        PAINTING("Painting", "brush", "Terrain, layers and biomes next to the tools and brushes"),
-        NODE_GRAPH("Node graph", "workflow", "Opens the node graph, with the layers and surroundings by the map"),
-        MINIMAL("Minimal", "maximize", "Only the map, with all the panels folded away");
-
-        WorkspacePreset(String title, String icon, String description) {
-            this.title = title;
-            this.icon = icon;
-            this.description = description;
-        }
-
-        final String title, icon, description;
-    }
-    private JToggleButton mapViewButton;
-    private boolean showing3D;
-    private static final String WORKSPACE_MAP = "map", WORKSPACE_3D = "3d";
+    private static final String PAGE_MAP = AreaManager.MAIN_PAGE, PAGE_3D = AreaManager.MAIN_PAGE_2;
+    /**
+     * The kinds of editors; the pages of each kind share the tabs of the area which shows them.
+     */
+    static final String GROUP_MAP = "map", GROUP_3D = "view3d", GROUP_TOOLS = "tools", GROUP_TOOL_SETTINGS = "toolSettings",
+            GROUP_BRUSHES = "brushes", GROUP_PROPERTIES = "properties", GROUP_PAINT = "paint";
+    /**
+     * The columns of the editor type menu.
+     */
+    private static final String CATEGORY_VIEW = "View", CATEGORY_TOOLS = "Tools", CATEGORY_PAINT = "Paint", CATEGORY_WORLD = "World";
     private JCheckBox showSurroundingsCheckBox;
     private JSlider surroundingsMarginSlider;
     private JTextField seedField;

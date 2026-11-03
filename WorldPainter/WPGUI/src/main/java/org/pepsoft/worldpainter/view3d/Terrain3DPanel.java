@@ -244,6 +244,7 @@ public class Terrain3DPanel extends JPanel {
      */
     public void setPopOutAction(Runnable popOutAction, boolean detached) {
         this.popOutAction = popOutAction;
+        popOutButton.setVisible(popOutAction != null);
         popOutButton.setToolTipText(detached
                 ? App.richToolTip("Attach", "Show the 3D view in the main window again, in place of the map", null)
                 : App.richToolTip("Detach", "Show the 3D view in a panel of its own, which can float next to the map or be docked like the other panels", null));

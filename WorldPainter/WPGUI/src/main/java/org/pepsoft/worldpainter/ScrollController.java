@@ -102,7 +102,10 @@ class ScrollController extends MouseAdapter implements KeyEventDispatcher {
     public boolean dispatchKeyEvent(KeyEvent e) {
         if ((e.getKeyCode() == KeyEvent.VK_SPACE) && app.isFocused()) {
             if (e.getID() == KeyEvent.KEY_PRESSED) {
-                if ((e.getWhen() - lastReleased) < KEY_REPEAT_GUARD_TIME) {
+                if ((! keyDragging) && (e.isControlDown() || e.isMetaDown() || e.isAltDown() || (! app.view.isShowing()))) {
+                    // Ctrl+Space maximises the area under the mouse; and the map may not be shown at all
+                    return false;
+                } else if ((e.getWhen() - lastReleased) < KEY_REPEAT_GUARD_TIME) {
                     timer.stop();
                     return true;
                 } else if (!keyDragging) {

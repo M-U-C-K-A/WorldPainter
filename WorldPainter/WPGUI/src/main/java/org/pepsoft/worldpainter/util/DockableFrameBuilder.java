@@ -3,7 +3,6 @@ package org.pepsoft.worldpainter.util;
 import org.pepsoft.util.IconUtils;
 import org.pepsoft.worldpainter.App;
 import org.pepsoft.worldpainter.docking.DockableFrame;
-import org.pepsoft.worldpainter.docking.Side;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -20,12 +19,19 @@ import static javax.swing.SwingConstants.VERTICAL;
 import static org.pepsoft.util.GUIUtils.getUIScale;
 import static org.pepsoft.worldpainter.App.KEY_ICON;
 
+/**
+ * Builds a page for the {@link org.pepsoft.worldpainter.docking.AreaManager}: the component in a panel (which scrolls,
+ * if asked), with a short explanation at the top if there is one.
+ */
 public class DockableFrameBuilder {
-    public DockableFrameBuilder(Component component, String title, Side side, int index) {
+    /**
+     * @param group The kind of editor the page belongs to; pages of the same kind share the tabs of the area which
+     *              shows them.
+     */
+    public DockableFrameBuilder(Component component, String title, String group) {
         this.component = component;
         this.title = title;
-        this.side = side;
-        this.index = index;
+        this.group = group;
         id = (Character.toLowerCase(title.charAt(0)) + title.substring(1)).replaceAll("\\s", "");
     }
 
@@ -50,11 +56,19 @@ public class DockableFrameBuilder {
     }
 
     /**
-     * Add a title and a short explanation of what the panel is for at the top of the panel, also used as the tooltip of
-     * its tab.
+     * Add a short explanation of what the panel is for at the top of the panel, also used for its tab and in the
+     * editor type menu.
      */
     public DockableFrameBuilder withDescription(String description) {
         this.description = description;
+        return this;
+    }
+
+    /**
+     * List the page in another column of the editor type menu than the one of its kind of editor.
+     */
+    public DockableFrameBuilder inCategory(String category) {
+        this.category = category;
         return this;
     }
 
@@ -85,22 +99,31 @@ public class DockableFrameBuilder {
             panel.add(new JPanel(), constraints);
         }
         if (scrollable) {
-            final JScrollPane scrollPane = new JScrollPane(panel, VERTICAL_SCROLLBAR_AS_NEEDED, HORIZONTAL_SCROLLBAR_NEVER);
+            final JScrollPane scrollPane = new JScrollPane(panel, VERTICAL_SCROLLBAR_AS_NEEDED, HORIZONTAL_SCROLLBAR_NEVER) {
+                @Override
+                public boolean isValidateRoot() {
+                    // Let changes in size of the contents reach the areas, so that an area which takes the height of
+                    // its page (such as that of the tool settings) follows it
+                    return false;
+                }
+            };
             scrollPane.setBorder(null);
             dockableFrame.add(scrollPane, BorderLayout.CENTER);
         } else {
             dockableFrame.add(panel, BorderLayout.CENTER);
         }
         if (description != null) {
-            // A fixed width makes the text wrap instead of widening the dock
-            final JLabel header = new JLabel("<html><div style=\"width: " + Math.round(170 * getUIScale()) + "px\"><b>" + title + "</b><br>" + description + "</div></html>");
-            header.putClientProperty("FlatLaf.style", "font: -1");
+            // The title is in the header of the area. A fixed width makes the text wrap instead of widening the area
+            final JLabel header = new JLabel("<html><div style=\"width: " + Math.round(170 * getUIScale()) + "px\">" + description + "</div></html>");
+            header.putClientProperty("FlatLaf.style", "font: -1; foreground: $WorldPainter.mutedForeground");
             header.setBorder(new HairlineBorder(false, false, true, false, new Insets(6, 8, 6, 8)));
             dockableFrame.add(header, BorderLayout.NORTH);
         }
 
         dockableFrame.setTitle(title);
-        dockableFrame.setToolTipText((description != null) ? ("<html><b>" + title + "</b><br><div style=\"width: 220px\">" + description + "</div></html>") : title);
+        dockableFrame.setDescription(description);
+        dockableFrame.setGroup(group);
+        dockableFrame.setCategory(category);
 
         // Try to find an icon to use for the tab
         if ((icon == null) && (component instanceof Container)) {
@@ -126,18 +149,12 @@ public class DockableFrameBuilder {
         }
         dockableFrame.setFrameIcon((icon != null) ? icon : ICON_UNKNOWN_PATTERN);
 
-        // Initial location of panel
-        dockableFrame.setInitSide(side);
-        dockableFrame.setInitIndex(index);
-
         //Help key
         dockableFrame.putClientProperty(App.KEY_HELP_KEY, "Panel/" + id);
         return dockableFrame;
     }
 
-    private final String title;
-    private final Side side;
-    private final int index;
+    private final String title, group;
     private final Component component;
 
     private String id;
@@ -145,7 +162,7 @@ public class DockableFrameBuilder {
     private Icon icon;
     private int margin = 2;
     private boolean scrollable;
-    private String description;
+    private String description, category;
 
     private static Icon findIcon(Container container) {
         if (container instanceof JComponent) {

@@ -5,7 +5,7 @@ description: The integrated 3D view of the map, with colour modes, a block by bl
 
 # 3D view
 
-The **Map** and **3D** buttons at the top right of the window switch the workspace between the map and a 3D view of it. The 3D view is built from the map when you open it, and rebuilt by itself a moment after you stop changing the map; **Refresh** rebuilds it straight away.
+The **3D** workspace, in the tabs below the toolbar, shows the 3D view next to the map; any area can show it too, with the editor type button at the left of its header (see [Areas](interface.html#areas)). The 3D view is built from the map when you open it, and rebuilt by itself a moment after you stop changing the map; **Refresh** rebuilds it straight away.
 
 ![The 3D view in Terrain mode](assets/images/view3d-light.jpg)
 
@@ -46,7 +46,7 @@ The toolbar also turns the water and the contour lines (one every 8 blocks) on a
 
 ## In a panel of its own
 
-The **Detach** button (at the right of the toolbar of the 3D view) moves the 3D view into a panel of its own, which floats next to the map so that you can paint and watch the result at the same time, and which can be docked or grouped like the other panels. **Attach** puts it back in place of the map.
+Like any area, the 3D view can be detached into a window of its own with the button in its header, to float next to the map so that you can paint and watch the result at the same time, or be put on any side of the map by dragging its header there.
 
 ## The sides
 

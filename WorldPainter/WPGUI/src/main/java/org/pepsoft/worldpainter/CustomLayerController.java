@@ -331,9 +331,9 @@ public class CustomLayerController implements PropertyChangeListener {
 
         // Show the palette if it is not showing yet
         if (palette != null) {
-            app.dockingManager.addFrame(palette.getDockableFrame());
+            app.areaManager.addPage(palette.getDockableFrame());
             if (activate) {
-                app.dockingManager.activateFrame(palette.getDockableFrame().getKey());
+                app.areaManager.activatePage(palette.getDockableFrame().getKey());
             }
             palette.addPropertyChangeListener(this);
         } else {
@@ -367,7 +367,7 @@ public class CustomLayerController implements PropertyChangeListener {
         if (palette.isEmpty()) {
             palette.removePropertyChangeListener(this);
             paletteManager.delete(palette);
-            app.dockingManager.removeFrame(palette.getDockableFrame().getKey());
+            app.areaManager.removePage(palette.getDockableFrame().getKey());
         }
     }
 
@@ -916,7 +916,7 @@ public class CustomLayerController implements PropertyChangeListener {
     private void moveLayerToPalette(CustomLayer layer, Palette destPalette) {
         Palette srcPalette = paletteManager.move(layer, destPalette);
         if (srcPalette.isEmpty()) {
-            app.dockingManager.removeFrame(srcPalette.getDockableFrame().getKey());
+            app.areaManager.removePage(srcPalette.getDockableFrame().getKey());
             srcPalette.removePropertyChangeListener(this);
             paletteManager.delete(srcPalette);
         }
@@ -936,9 +936,9 @@ public class CustomLayerController implements PropertyChangeListener {
                 return;
             }
             Palette destPalette = paletteManager.create(name);
-            app.dockingManager.addFrame(destPalette.getDockableFrame());
+            app.areaManager.addPage(destPalette.getDockableFrame());
             moveLayerToPalette(layer, destPalette);
-            app.dockingManager.activateFrame(destPalette.getDockableFrame().getKey());
+            app.areaManager.activatePage(destPalette.getDockableFrame().getKey());
             destPalette.addPropertyChangeListener(this);
         }
     }

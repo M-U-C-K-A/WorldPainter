@@ -11,7 +11,6 @@ import org.pepsoft.worldpainter.App;
 import org.pepsoft.worldpainter.layers.CustomLayer;
 import org.pepsoft.worldpainter.layers.Layer;
 import org.pepsoft.worldpainter.docking.DockableFrame;
-import org.pepsoft.worldpainter.docking.Side;
 import org.pepsoft.worldpainter.util.DockableFrameBuilder;
 import org.pepsoft.worldpainter.util.Icons;
 import org.pepsoft.worldpainter.util.LayoutUtils;
@@ -65,7 +64,7 @@ public class Palette {
         // Row: components provided to constructor
         LayoutUtils.addRowOfComponents(panel, constraints, buttonComponents);
 
-        dockableFrame = new DockableFrameBuilder(panel, name, Side.WEST, 3).withIcon(ICON_LAYERS).scrollable().build();
+        dockableFrame = new DockableFrameBuilder(panel, name, "paint").withIcon(ICON_LAYERS).scrollable().build();
         dockableFrame.setKey("customLayerPalette." + name);
     }
 
