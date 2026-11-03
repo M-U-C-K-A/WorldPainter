@@ -1817,7 +1817,7 @@ public class ImportHeightMapDialog extends WorldPainterDialog implements Documen
     private Platform platform;
 
     private static final String UPDATE_HEIGHT_MAP_PREVIEW = ImportHeightMapDialog.class.getName() + ".updateHeightMap";
-    private static final Icon ICON_WARNING = IconUtils.loadScaledIcon("org/pepsoft/worldpainter/icons/error.png");
+    private static final Icon ICON_WARNING = org.pepsoft.worldpainter.design.ModernIcons.themed(IconUtils.loadScaledIcon("org/pepsoft/worldpainter/icons/error.png"), "warning");
     private static final int LAYER_HEIGHT_MAP = 0;
     private static final int LAYER_CURRENT_DIMENSION = -1;
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ImportHeightMapDialog.class);

@@ -6,8 +6,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Gives the main windows a banner which says what they are for, and what each of their tabs is for. Windows which are
- * not listed here are left as they are.
+ * Gives the main windows a banner which says what they are for, and what each of their tabs is for, and the icons of
+ * the Modern theme to every window. Windows which are not listed here get no banner.
  */
 public final class DialogDesign {
     private DialogDesign() {
@@ -18,6 +18,7 @@ public final class DialogDesign {
      * Add the banner to a window, if it has one. To be done once, just before it is first shown.
      */
     public static void decorate(JDialog dialog) {
+        ModernIcons.install(dialog.getRootPane());
         final Spec spec = SPECS.get(dialog.getClass().getSimpleName());
         if (spec == null) {
             return;
@@ -44,8 +45,8 @@ public final class DialogDesign {
             update.run();
         }
 
-        // Make room for it
-        final int bannerHeight = banner.getPreferredSize().height;
+        // Make room for it, unless it is hidden, as it is in the Modern theme
+        final int bannerHeight = banner.isVisible() ? banner.getPreferredSize().height : 0;
         if ((dialog.getWidth() > 0) && (dialog.getHeight() > 0)) {
             final Rectangle screen = dialog.getGraphicsConfiguration().getBounds();
             final int height = Math.min(dialog.getHeight() + bannerHeight, screen.height - 40);

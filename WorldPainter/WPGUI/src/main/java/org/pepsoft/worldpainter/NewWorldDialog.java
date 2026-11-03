@@ -1894,7 +1894,7 @@ public class NewWorldDialog extends WorldPainterDialog {
 
     static final int ESTIMATED_TILE_DATA_SIZE = 81; // in KB
 
-    private static final Icon ICON_WARNING = IconUtils.loadScaledIcon("/org/pepsoft/worldpainter/icons/error.png");
+    private static final Icon ICON_WARNING = org.pepsoft.worldpainter.design.ModernIcons.themed(IconUtils.loadScaledIcon("/org/pepsoft/worldpainter/icons/error.png"), "warning");
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(NewWorldDialog.class);
     private static final long serialVersionUID = 1L;

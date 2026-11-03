@@ -9,8 +9,8 @@ import java.util.List;
 
 /**
  * A band at the top of a window: an illustration of what it is about, its title, what it is for in a sentence, and
- * what the selected tab is for. In the Classic theme it is a tinted band with the illustration in a frame; in the Modern
- * theme the illustration sits in a rounded tile, like an icon, next to the words, on the background of the window.
+ * what the selected tab is for. It belongs to the Classic theme only: in the Modern theme it is hidden, and the window
+ * starts directly with its content, under its title bar.
  */
 public final class DialogBanner extends JComponent {
     public DialogBanner(Illustration illustration, Color accent, String title, String description) {
@@ -18,6 +18,13 @@ public final class DialogBanner extends JComponent {
         this.accent = accent;
         this.title = title;
         this.description = description;
+        setVisible(! Design.isModern());
+    }
+
+    @Override
+    public void updateUI() {
+        super.updateUI();
+        setVisible(! Design.isModern());
     }
 
     /**
@@ -30,11 +37,6 @@ public final class DialogBanner extends JComponent {
 
     @Override
     public Dimension getPreferredSize() {
-        if (Design.isModern()) {
-            final FontMetrics title = getFontMetrics(Design.semibold(5f)), body = getFontMetrics(Design.font(0f, Font.PLAIN)), detail = getFontMetrics(Design.font(-1f, Font.PLAIN));
-            final int text = title.getHeight() + UIScale.scale(3) + 2 * body.getHeight() + UIScale.scale(6) + detail.getHeight();
-            return new Dimension(UIScale.scale(400), 2 * UIScale.scale(MODERN_PADDING) + Math.max(UIScale.scale(MODERN_TILE), text));
-        }
         // Room for the title, two lines of description and a line about the tab
         final FontMetrics title = getFontMetrics(Design.font(4f, Font.BOLD)), body = getFontMetrics(Design.font(0f, Font.PLAIN)), detail = getFontMetrics(Design.font(-1f, Font.PLAIN));
         final int height = 2 * UIScale.scale(14) + UIScale.scale(2) + title.getHeight() + UIScale.scale(5) + 2 * (body.getHeight() + UIScale.scale(1)) + UIScale.scale(4) + detail.getHeight();
@@ -52,10 +54,6 @@ public final class DialogBanner extends JComponent {
         try {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-            if (Design.isModern()) {
-                paintModern(g2);
-                return;
-            }
             final int w = getWidth(), h = getHeight();
             // A band tinted with the colour of the window, fading into the background towards the right
             final Color base = Design.background();
@@ -110,59 +108,6 @@ public final class DialogBanner extends JComponent {
         }
     }
 
-    private void paintModern(Graphics2D g2) {
-        final int w = getWidth(), h = getHeight();
-        final Color base = Design.background();
-        g2.setColor(base);
-        g2.fillRect(0, 0, w, h);
-        g2.setColor(Design.separator());
-        g2.fillRect(0, h - 1, w, 1);
-
-        // The illustration in a tile with rounded corners, tinted with the colour of the window
-        final int pad = UIScale.scale(MODERN_PADDING), tile = UIScale.scale(MODERN_TILE);
-        final int tileX = UIScale.scale(20), tileY = (h - tile) / 2;
-        final java.awt.geom.RoundRectangle2D shape = new java.awt.geom.RoundRectangle2D.Float(tileX, tileY, tile, tile, UIScale.scale(16f), UIScale.scale(16f));
-        final Graphics2D tileGraphics = (Graphics2D) g2.create();
-        try {
-            tileGraphics.clip(shape);
-            tileGraphics.setPaint(new GradientPaint(tileX, tileY, Design.mix(Design.surface(), accent, Design.isDark() ? 0.3f : 0.12f), tileX, tileY + tile, Design.mix(Design.surface(), accent, Design.isDark() ? 0.16f : 0.04f)));
-            tileGraphics.fill(shape);
-            final int inset = UIScale.scale(7);
-            illustration.paint(tileGraphics, tileX + inset, tileY + inset + UIScale.scale(2), tile - 2 * inset, tile - 2 * inset - UIScale.scale(4), accent);
-        } finally {
-            tileGraphics.dispose();
-        }
-        g2.setColor(Design.isDark() ? new Color(255, 255, 255, 28) : new Color(0, 0, 0, 22));
-        g2.draw(new java.awt.geom.RoundRectangle2D.Float(tileX + 0.5f, tileY + 0.5f, tile - 1, tile - 1, UIScale.scale(16f), UIScale.scale(16f)));
-
-        // The words, centred on the tile
-        final int textX = tileX + tile + UIScale.scale(16), textWidth = w - textX - pad;
-        final FontMetrics titleMetrics = g2.getFontMetrics(Design.semibold(5f)), bodyMetrics = g2.getFontMetrics(Design.font(0f, Font.PLAIN)), detailMetrics = g2.getFontMetrics(Design.font(-1f, Font.PLAIN));
-        final List<String> lines = wrap(description, bodyMetrics, textWidth, 2);
-        final List<String> detailLines = wrap(detail, detailMetrics, textWidth, 1);
-        int textHeight = titleMetrics.getHeight() + UIScale.scale(3) + lines.size() * bodyMetrics.getHeight();
-        if (! detailLines.isEmpty()) {
-            textHeight += UIScale.scale(6) + detailMetrics.getHeight();
-        }
-        int y = (h - textHeight) / 2;
-        g2.setFont(Design.semibold(5f));
-        g2.setColor(Design.foreground());
-        g2.drawString(title, textX, y + titleMetrics.getAscent());
-        y += titleMetrics.getHeight() + UIScale.scale(3);
-        g2.setFont(Design.font(0f, Font.PLAIN));
-        g2.setColor(Design.muted());
-        for (String line: lines) {
-            g2.drawString(line, textX, y + bodyMetrics.getAscent());
-            y += bodyMetrics.getHeight();
-        }
-        if (! detailLines.isEmpty()) {
-            y += UIScale.scale(6);
-            g2.setFont(Design.font(-1f, Font.PLAIN));
-            g2.setColor(Design.mix(Design.muted(), Design.foreground(), 0.25f));
-            g2.drawString(detailLines.get(0), textX, y + detailMetrics.getAscent());
-        }
-    }
-
     /**
      * Break a text into lines no wider than a width, ending the last one allowed with an ellipsis if it doesn't fit.
      */
@@ -206,5 +151,5 @@ public final class DialogBanner extends JComponent {
     private final String title, description;
     private String detail;
 
-    private static final int MIN_HEIGHT = 96, ART_WIDTH = 128, MODERN_PADDING = 18, MODERN_TILE = 60;
+    private static final int MIN_HEIGHT = 96, ART_WIDTH = 128;
 }
