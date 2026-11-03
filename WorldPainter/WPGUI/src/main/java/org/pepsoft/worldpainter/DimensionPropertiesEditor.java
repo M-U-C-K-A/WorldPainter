@@ -10,6 +10,8 @@
  */
 package org.pepsoft.worldpainter;
 
+import org.pepsoft.worldpainter.design.SettingsCard;
+import org.pepsoft.worldpainter.design.SettingsPage;
 import org.jnbt.Tag;
 import org.pepsoft.minecraft.*;
 import org.pepsoft.util.DesktopUtils;
@@ -98,6 +100,8 @@ public class DimensionPropertiesEditor extends javax.swing.JPanel {
             checkBoxPopulate.setVisible(false);
             jLabel47.setVisible(false);
         }
+
+        designGeneralTab();
 
         configureSpinners(spinnerGoldChance, spinnerGoldMinLevel, spinnerGoldMaxLevel);
         configureSpinners(spinnerIronChance, spinnerIronMinLevel, spinnerIronMaxLevel);
@@ -206,6 +210,61 @@ public class DimensionPropertiesEditor extends javax.swing.JPanel {
         return dimension;
     }
 
+    /**
+     * Arrange the General tab in cards, with a title and a sentence about what each group of settings does, instead of
+     * one long list. The settings themselves are the ones made by the form editor.
+     */
+    private void designGeneralTab() {
+        // Said by the titles of the cards now
+        jLabel4.setVisible(false);
+        jLabel7.setVisible(false);
+        borderCard = new SettingsCard("Border", "What lies around the map in Minecraft, beyond what you painted: nothing, water, lava or an invisible barrier, and walls or a roof.")
+                .whole(panelBorderWallRoof)
+                .wide();
+        jLabel65.setText("Top layer depth:");
+        jLabel66.setText("to");
+        checkBoxCoverSteepTerrain.setText("Keep steep terrain covered");
+        jLabel94.setText("World type:");
+        jLabel95.setText("Seed:");
+        minecraftCard = new SettingsCard("Minecraft", "The world type and seed with which Minecraft generates the land beyond the map.")
+                .whole(panelMinecraftSettings);
+        final int index = jTabbedPane1.indexOfComponent(panelGeneral);
+        jTabbedPane1.setComponentAt(index, SettingsPage.of(
+                new SettingsCard("Under the surface", "What lies under the terrain you paint: how deep its top layer goes, and the blocks and the biome below it.")
+                        .field(jLabel65, spinnerMinSurfaceDepth, jLabel66, spinnerMaxSurfaceDepth, new JLabel("blocks"))
+                        .row(checkBoxCoverSteepTerrain)
+                        .field(jLabel83, comboBoxSurfaceLayerAnchor)
+                        .field(jLabel6, comboBoxSubsurfaceMaterial)
+                        .field(jLabel84, comboBoxUndergroundLayerAnchor)
+                        .field(jLabel79, comboBoxSubsurfaceBiome),
+                new SettingsCard("Bottom and ceiling", "Whether the world has a floor of bedrock at the bottom, and how high a ceiling dimension is.")
+                        .row(checkBoxBottomless, jLabel67)
+                        .field(jLabel78, spinnerCeilingHeight),
+                minecraftCard,
+                borderCard));
+        // The other tabs keep their own layout, in a card with a title and a sentence about what they are for
+        final String[][] descriptions = {
+                {"Theme", "Which terrain type and layers go at which height, as used by the Mountain tool and when resetting the terrain."},
+                {"Caves, Caverns and Chasms", "Where the hollows under the ground go, how deep they are, whether they are flooded and how they are decorated."},
+                {"Resources", "How common each ore and underground block is, and between which heights it is found."},
+                {"Other Layers", "The other layers which can cover the whole map at once."},
+                {"Custom Layers", "The custom layers of this dimension, and whether each of them is exported."}};
+        for (int i = 0; i < jTabbedPane1.getTabCount(); i++) {
+            for (String[] description: descriptions) {
+                if (description[0].equals(jTabbedPane1.getTitleAt(i)) && (jTabbedPane1.getComponentAt(i) instanceof JComponent)) {
+                    // Taken out of the tab first, since adding it elsewhere would remove the whole tab
+                    final JComponent content = (JComponent) jTabbedPane1.getComponentAt(i);
+                    jTabbedPane1.setComponentAt(i, new JPanel());
+                    // The tabbed pane hides the components of tabs which are not selected
+                    content.setVisible(true);
+                    jTabbedPane1.setComponentAt(i, SettingsPage.of(new SettingsCard(description[0], description[1])
+                            .whole(content)
+                            .wide()));
+                }
+            }
+        }
+    }
+
     private void setDimension(Dimension dimension) {
         requireNonNull(dimension);
         if (this.dimension != null) {
@@ -217,8 +276,8 @@ public class DimensionPropertiesEditor extends javax.swing.JPanel {
             // If we do this straight away it doesn't work due to some bizarre Swing bug, even though we're on the event
             // thread already
             doLaterOnEventThread(() -> {
-                panelGeneral.remove(panelMinecraftSettings);
-                panelGeneral.remove(panelBorderWallRoof);
+                minecraftCard.setVisible(false);
+                borderCard.setVisible(false);
             });
         }
         setPlatform(dimension.getWorld().getPlatform());
@@ -4215,6 +4274,8 @@ public class DimensionPropertiesEditor extends javax.swing.JPanel {
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
         resetResources();
     }//GEN-LAST:event_jButton1ActionPerformed
+
+    private SettingsCard borderCard, minecraftCard;
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton buttonCustomLayerBottom;

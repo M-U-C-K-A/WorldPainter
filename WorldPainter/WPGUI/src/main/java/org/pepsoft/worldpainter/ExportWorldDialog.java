@@ -11,6 +11,9 @@
 
 package org.pepsoft.worldpainter;
 
+import org.pepsoft.worldpainter.design.Badge;
+import org.pepsoft.worldpainter.design.SettingsCard;
+import org.pepsoft.worldpainter.design.SettingsPage;
 import org.pepsoft.util.DesktopUtils;
 import org.pepsoft.worldpainter.Dimension.Anchor;
 import org.pepsoft.worldpainter.World2.BorderSettings;
@@ -74,6 +77,7 @@ public class ExportWorldDialog extends WPDialogWithPaintSelection {
         this.customBiomeManager = customBiomeManager;
         this.view = view;
         initComponents();
+        designGeneralTab();
 
         final Configuration config = Configuration.getInstance();
         if (config.isEasyMode()) {
@@ -216,6 +220,52 @@ public class ExportWorldDialog extends WPDialogWithPaintSelection {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Arrange the General tab in cards, with a title and a sentence about what each group of settings does, instead of
+     * one long list. The settings themselves are the ones made by the form editor.
+     */
+    private void designGeneralTab() {
+        // Said by the titles of the cards now
+        jLabel4.setVisible(false);
+        jLabel7.setVisible(false);
+        jLabel11.setVisible(false);
+        jLabel12.setVisible(false);
+        jSeparator1.setVisible(false);
+        panelMinecraftWorldBorder.setBorder(null);
+        final Color linkColour = UIManager.getColor("Component.linkColor");
+        if (linkColour != null) {
+            labelPlatform.setForeground(linkColour);
+        }
+        final JPanel dataPackButtons = new JPanel();
+        dataPackButtons.setLayout(new BoxLayout(dataPackButtons, BoxLayout.Y_AXIS));
+        dataPackButtons.add(buttonAddDataPack);
+        dataPackButtons.add(buttonRemoveDataPack);
+        final JPanel dataPacks = new JPanel(new BorderLayout(6, 0));
+        dataPacks.add(jScrollPane1, BorderLayout.CENTER);
+        dataPacks.add(dataPackButtons, BorderLayout.LINE_END);
+        jScrollPane1.setPreferredSize(new java.awt.Dimension(200, 110));
+        final int index = jTabbedPane1.indexOfComponent(jPanel1);
+        jTabbedPane1.setComponentAt(index, new JPanel());
+        jTabbedPane1.setComponentAt(index, SettingsPage.of(
+                new SettingsCard("Where to save it", "The folder the world is saved in, and the name it has in Minecraft.")
+                        .stretched(jLabel2, fieldDirectory, buttonSelectDirectory)
+                        .stretched(jLabel3, fieldName)
+                        .field(jLabel1, labelPlatform)
+                        .field(new JLabel(), labelPlatformWarning)
+                        .field(jLabel10, checkBoxGoodies)
+                        .wide(),
+                new SettingsCard("Game", "The rules of the world when it is first played.")
+                        .field(jLabel5, comboBoxGameType)
+                        .field(jLabel6, comboBoxDifficulty)
+                        .field(jLabel8, checkBoxAllowCheats)
+                        .field(jLabel9, checkBoxMapFeatures),
+                new SettingsCard("World border", "The border Minecraft shows around the world: where its centre is, and how wide it is.")
+                        .whole(panelMinecraftWorldBorder),
+                new SettingsCard("Data packs", "Data packs which are installed in the world. WorldPainter does not check whether they are valid, or meant for this version of Minecraft.", Badge.Kind.EXPERIMENTAL)
+                        .whole(dataPacks)
+                        .wide()));
     }
 
     protected final void export(WorldExportSettings exportSettings) {

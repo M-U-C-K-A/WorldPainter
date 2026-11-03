@@ -23,6 +23,10 @@ import org.pepsoft.worldpainter.themes.TerrainListCellRenderer;
 import org.pepsoft.worldpainter.util.BackupUtils;
 import org.pepsoft.worldpainter.util.EnumListCellRenderer;
 
+import org.pepsoft.worldpainter.design.Badge;
+import org.pepsoft.worldpainter.design.SettingsCard;
+import org.pepsoft.worldpainter.design.SettingsPage;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -91,6 +95,8 @@ public class PreferencesDialog extends WorldPainterDialog {
         ((SpinnerNumberModel) spinnerManualThreadCount.getModel()).setMaximum(logicalProcessorCount);
         spinnerManualThreadCount.setValue(logicalProcessorCount);
 
+        designPages();
+
         loadSettings();
         
         rootPane.setDefaultButton(buttonOK);
@@ -102,6 +108,100 @@ public class PreferencesDialog extends WorldPainterDialog {
     public void ok() {
         saveSettings();
         super.ok();
+    }
+
+    private static Color linkColour() {
+        final Color colour = UIManager.getColor("Component.linkColor");
+        return (colour != null) ? colour : BLUE;
+    }
+
+    /**
+     * Arrange the settings of each tab in cards, with a title and a sentence about what they do, instead of one long
+     * list. The settings themselves are the ones made by the form editor.
+     */
+    private void designPages() {
+        // Said by the badges and the banner now
+        jLabel32.setVisible(false);
+        jLabel36.setVisible(false);
+        jLabel41.setVisible(false);
+        jLabel54.setVisible(false);
+        for (JLabel link: new JLabel[] {labelTerrainAndLayerSettings, labelEditExportSettingsLink}) {
+            link.setForeground(linkColour());
+        }
+        // Shorter, to fit in a card
+        checkBoxAutoDeleteBackups.setText("Offer to delete old backups when exporting or merging");
+        jLabel23.setText("height:");
+        jLabel25.setText("%");
+
+        final JLabel uiScaleLabel = jLabel2;
+        jTabbedPane1.setComponentAt(0, SettingsPage.of(
+                new SettingsCard("Undo", "How many of your last changes Ctrl+Z can take back. More steps use more memory.")
+                        .row(checkBoxUndo)
+                        .indented(jLabel5, spinnerUndoLevels),
+                new SettingsCard("Look", "The theme of the whole program. Modern follows the light or dark setting of your system.")
+                        .field(jLabel30, comboBoxLookAndFeel),
+                new SettingsCard("Interface size", "How large the text and controls are, for screens with small or large pixels.", Badge.Kind.RESTART)
+                        .field(uiScaleLabel, radioButtonUIScaleAuto, labelUIScale)
+                        .field(new JLabel(), radioButtonUIScaleManual, sliderUIScale),
+                new SettingsCard("Backups and autosave", "Copies of your world files which WorldPainter keeps, in case something goes wrong.")
+                        .field(jLabel20, spinnerWorldBackups)
+                        .row(checkBoxAutoSave)
+                        .indented(jLabel45, spinnerAutoSaveGuardTime, jLabel47)
+                        .indented(jLabel46, spinnerAutoSaveInterval, jLabel48),
+                new SettingsCard("Disk space", "Exporting and merging keep a backup of the previous version of the map, which takes space.")
+                        .field(jLabel50, spinnerFreeSpaceForMaps, jLabel51)
+                        .row(checkBoxAutoDeleteBackups)
+                        .row(buttonCleanUpBackupsNow),
+                new SettingsCard("Privacy and updates", null)
+                        .row(checkBoxPing)
+                        .note(jLabel3.getText().trim() + " " + jLabel4.getText().trim())
+                        .row(checkBoxCheckForUpdates)));
+
+        jTabbedPane1.setComponentAt(1, SettingsPage.of(
+                new SettingsCard("View", "How the map is shown when you open or create a world.")
+                        .row(checkBoxGrid, jLabel7, spinnerGrid)
+                        .row(checkBoxContours, jLabel8, spinnerContours)
+                        .row(checkBoxViewDistance)
+                        .row(checkBoxWalkingDistance)
+                        .field(jLabel22, comboBoxLightDirection),
+                new SettingsCard("Brushes", "The largest a brush can be made. Very large brushes can make your computer slow to respond.", Badge.Kind.SLOW)
+                        .field(jLabel26, spinnerBrushSize),
+                new SettingsCard("New worlds", "What a new world starts with: its size, its land and its water.", Badge.Kind.NEW_WORLDS)
+                        .field(jLabel10, spinnerWidth, jLabel11, spinnerHeight, jLabel19)
+                        .field(jLabel12, comboBoxHeight)
+                        .field(jLabel13, radioButtonHilly)
+                        .field(new JLabel(), new JLabel("    "), jLabel23, spinnerRange, jLabel24, spinnerScale, jLabel25)
+                        .field(new JLabel(), radioButtonFlat)
+                        .row(checkBoxCircular)
+                        .field(jLabel14, spinnerGroundLevel)
+                        .field(jLabel15, spinnerWaterLevel, checkBoxLava)
+                        .row(checkBoxBeaches)
+                        .field(jLabel16, comboBoxSurfaceMaterial)
+                        .row(checkBoxResourcesEverywhere)
+                        .row(checkBoxExtendedBlockIds)
+                        .row(labelTerrainAndLayerSettings)
+                        .row(buttonReset),
+                new SettingsCard("Exported worlds", "The game settings exported worlds start with.")
+                        .field(jLabel52, comboBoxPlatform)
+                        .field(jLabel28, comboBoxWorldType, buttonModePreset)
+                        .field(jLabel29, comboBoxMode)
+                        .row(checkBoxStructures)
+                        .row(checkBoxCheats)
+                        .row(checkBoxChestOfGoodies)
+                        .row(labelEditExportSettingsLink)));
+
+        for (JPanel panel: new JPanel[] {jPanel3, jPanel4, jPanel6}) {
+            panel.setBorder(null);
+        }
+        jTabbedPane1.setComponentAt(2, SettingsPage.of(
+                new SettingsCard("Drawing", "How the map is drawn on the screen. Try another method if the map is slow to draw or flickers.", Badge.Kind.RESTART, Badge.Kind.PERFORMANCE)
+                        .whole(jPanel3)
+                        .wide(),
+                new SettingsCard("Images over the map", "How images laid over the map are scaled and drawn, trading speed against memory.", Badge.Kind.RELOAD)
+                        .whole(jPanel4)
+                        .wide(),
+                new SettingsCard("Exporting", "How many processor cores exporting uses at the same time.", Badge.Kind.NEXT_EXPORT, Badge.Kind.PERFORMANCE)
+                        .whole(jPanel6)));
     }
     
     private void loadSettings() {
@@ -483,14 +583,14 @@ public class PreferencesDialog extends WorldPainterDialog {
             final PlatformProvider platformProvider = PlatformManager.getInstance().getPlatformProvider(platform);
             final ExportSettings platformDefaultExportSettings = platformProvider.getDefaultExportSettings(platform);
             if (platformDefaultExportSettings != null) {
-                labelEditExportSettingsLink.setForeground(BLUE);
+                labelEditExportSettingsLink.setForeground(linkColour());
                 labelEditExportSettingsLink.setCursor(new Cursor(HAND_CURSOR));
                 if ((defaultExportSettings != null) && (platformDefaultExportSettings.getClass() != defaultExportSettings.getClass())) {
                     defaultExportSettings = null;
                 }
             } else {
                 defaultExportSettings = null;
-                labelEditExportSettingsLink.setForeground(GRAY);
+                labelEditExportSettingsLink.setForeground(UIManager.getColor("Label.disabledForeground"));
                 labelEditExportSettingsLink.setCursor(null);
             }
 
@@ -517,10 +617,10 @@ public class PreferencesDialog extends WorldPainterDialog {
         final PlatformProvider platformProvider = PlatformManager.getInstance().getPlatformProvider(platform);
         final ExportSettings platformDefaultExportSettings = platformProvider.getDefaultExportSettings(platform);
         if (platformDefaultExportSettings != null) {
-            labelEditExportSettingsLink.setForeground(BLUE);
+            labelEditExportSettingsLink.setForeground(linkColour());
             labelEditExportSettingsLink.setCursor(new Cursor(HAND_CURSOR));
         } else {
-            labelEditExportSettingsLink.setForeground(GRAY);
+            labelEditExportSettingsLink.setForeground(UIManager.getColor("Label.disabledForeground"));
             labelEditExportSettingsLink.setCursor(null);
         }
 

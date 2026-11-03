@@ -11,6 +11,10 @@
 
 package org.pepsoft.worldpainter;
 
+import com.formdev.flatlaf.util.UIScale;
+import org.pepsoft.worldpainter.design.Design;
+import org.pepsoft.worldpainter.design.SettingsCard;
+import org.pepsoft.worldpainter.design.SettingsPage;
 import org.pepsoft.minecraft.MapGenerator;
 import org.pepsoft.minecraft.Material;
 import org.pepsoft.minecraft.SeededGenerator;
@@ -83,6 +87,7 @@ public class NewWorldDialog extends WorldPainterDialog {
         this.baseDimension = baseDimension;
         
         initComponents();
+        designForm();
 
         List<Platform> allPlatforms = PlatformManager.getInstance().getAllPlatforms();
         comboBoxTarget.setModel(new DefaultComboBoxModel(allPlatforms.toArray()));
@@ -1648,6 +1653,71 @@ public class NewWorldDialog extends WorldPainterDialog {
         setControlStates();
         updateWalkingTimes();
     }//GEN-LAST:event_checkBoxCircularActionPerformed
+
+    /**
+     * Arrange the settings in cards, with a title and a sentence about what each group of settings does, instead of one
+     * long list. The settings themselves are the ones made by the form editor.
+     */
+    private void designForm() {
+        // Said by the titles of the cards now
+        jLabel7.setVisible(false);
+        jLabel6.setVisible(false);
+        jLabel16.setVisible(false);
+        jLabel10.setText("to");
+        jLabel12.setText("Walking time:");
+        jLabel12.setToolTipText("How long it takes to walk from one edge of the map to the other");
+        for (JCheckBox checkBox: new JCheckBox[] {checkBoxLava, checkBoxBeaches, checkBoxExtendedBlockIds}) {
+            checkBox.setText(checkBox.getText().replaceAll(":$", ""));
+            checkBox.setHorizontalTextPosition(SwingConstants.TRAILING);
+        }
+        jLabel3.setForeground(Design.muted());
+        labelScaledDimensions.setForeground(Design.muted());
+        final Color linkColour = UIManager.getColor("Component.linkColor");
+        if (linkColour != null) {
+            labelAdvancedTerrain.setForeground(linkColour);
+        }
+        checkBoxMasterDimension.setText("Create as master dimension (1:16 scale)");
+        radioButtonCustomSeed.setText("Custom:");
+        // The warning about the build limits only takes up room when there is one
+        final JLabel warningSpace = new JLabel();
+        labelWarning.setVisible(false);
+        warningSpace.setVisible(false);
+        labelWarning.addPropertyChangeListener("text", event -> {
+            labelWarning.setVisible(! labelWarning.getText().isBlank());
+            warningSpace.setVisible(labelWarning.isVisible());
+        });
+        final JComponent page = SettingsPage.of(860,
+                new SettingsCard("Map", "The name of the map, and the version of Minecraft it is for.")
+                        .stretched(jLabel8, fieldName)
+                        .field(jLabel13, comboBoxTarget)
+                        .row(checkBoxMasterDimension, buttonMasterInfo),
+                new SettingsCard("Land", "The shape the map starts with, before you paint it.")
+                        .field(jLabel4, radioButtonHilly, radioButtonFlat)
+                        .field(jLabel18, spinnerRange)
+                        .field(jLabel19, spinnerScale, jLabel20)
+                        .field(jLabel5, spinnerTerrainLevel)
+                        .field(jLabel9, spinnerWaterLevel, jLabel17)
+                        .row(checkBoxLava)
+                        .row(checkBoxBeaches),
+                new SettingsCard("Size and shape", "How large the map is, and how high and deep it can go.")
+                        .field(jLabel1, spinnerWidth, jLabel2, spinnerLength)
+                        .field(new JLabel(), jLabel3, labelScaledDimensions)
+                        .row(checkBoxCircular)
+                        .field(jLabel15, jLabel16, comboBoxMinHeight, jLabel10, comboBoxMaxHeight, jLabel11)
+                        .field(warningSpace, labelWarning)
+                        .field(jLabel12, labelWalkingTimes),
+                new SettingsCard("Surface", "What the land is covered with: one terrain type, or the default terrain and layers.")
+                        .row(radioButtonSimpleTerrain, comboBoxSurfaceMaterial)
+                        .row(radioButtonAdvancedTerrain, labelAdvancedTerrain)
+                        .row(checkBoxExtendedBlockIds),
+                new SettingsCard("Minecraft seed", "The seed with which Minecraft generates the land around the map: around an ocean, around land, or one you choose.")
+                        .row(radioButtonOceanSeed, radioButtonLandSeed)
+                        .stretched(radioButtonCustomSeed, fieldSeed, buttonRandomSeed));
+        jPanel2.setLayout(new BorderLayout());
+        jPanel2.add(page, BorderLayout.CENTER);
+        // A preview about as wide as it is high, instead of a strip next to the settings
+        tiledImageViewer1.setPreferredSize(new java.awt.Dimension(UIScale.scale(360), UIScale.scale(360)));
+    }
 
     private void buttonRandomSeedActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonRandomSeedActionPerformed
         fieldSeed.setText(Long.toString(new Random().nextLong()));

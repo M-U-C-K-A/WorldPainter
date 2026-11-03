@@ -26,7 +26,6 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 - [ ] [Simpler node graph](https://github.com/M-U-C-K-A/WorldPainter/issues/17)
 - [ ] [Modern UI: Geist font and workspace presets](https://github.com/M-U-C-K-A/WorldPainter/issues/18)
 - [ ] [Settings: Apply button, settings which stick, and the new options](https://github.com/M-U-C-K-A/WorldPainter/issues/19)
-- [ ] [Clearer settings windows](https://github.com/M-U-C-K-A/WorldPainter/issues/20)
 - [ ] [Translations, and a choice of language](https://github.com/M-U-C-K-A/WorldPainter/issues/13)
 - [ ] [Show trees, objects and floating islands in the 3D view](https://github.com/M-U-C-K-A/WorldPainter/issues/4)
 - [ ] [Large maps: memory and processing in chunks](https://github.com/M-U-C-K-A/WorldPainter/issues/5)
@@ -43,6 +42,7 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 
 ## Done
 
+- [x] [Clearer settings windows](https://github.com/M-U-C-K-A/WorldPainter/issues/20): an illustrated banner, and settings grouped in cards with explanations and badges
 - [x] Preview releases on GitHub, with versions and release notes
 - [x] Brush settings which stay when switching tools, with limits by map selection, by height on a scale you can drag, by several terrain types or layers at once, and by slope, with undo
 - [x] Clearer cards on hover, with what the mouse and keys do and pictures of the brush options

@@ -75,6 +75,16 @@ public class WorldPainterDialog extends JDialog {
         }
     }
 
+    @Override
+    public void setVisible(boolean visible) {
+        if (visible && (! designApplied)) {
+            // A banner which says what the window is for, for the main windows
+            designApplied = true;
+            org.pepsoft.worldpainter.design.DialogDesign.decorate(this);
+        }
+        super.setVisible(visible);
+    }
+
     public final boolean isCancelled() {
         return cancelled;
     }
@@ -125,4 +135,6 @@ public class WorldPainterDialog extends JDialog {
     private boolean cancelled = true;
     
     private static final long serialVersionUID = 1L;
+
+    private boolean designApplied;
 }

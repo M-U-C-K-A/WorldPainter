@@ -29,5 +29,5 @@ WorldPainter Modernised starts from WorldPainter 2.27, which supports Minecraft 
 ## Use
 
 - **[Brush settings](interface.html#where-a-brush-applies)**: they stay when you switch tools, and can limit a brush by map selection, by height on a scale you can drag, by several terrain types or layers at once, and by slope, with undo.
-- **[A new interface](interface.html)**: light and dark themes, clear panels, palettes which fill their panel, tools grouped by what they do, cards with an animation of each tool and a 3D preview of each brush on hover, rectangle selection, a dotted canvas, and a unified title bar on macOS.
+- **[A new interface](interface.html)**: light and dark themes, clear panels, palettes which fill their panel, tools grouped by what they do, cards with an animation of each tool and a 3D preview of each brush on hover, rectangle selection, a dotted canvas, a unified title bar on macOS, and [settings windows](interface.html#settings-windows) with an illustrated banner and their settings grouped in cards.
 - **Java 21**, native applications for macOS, Windows and Linux, and more memory for large maps.

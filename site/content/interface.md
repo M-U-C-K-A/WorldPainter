@@ -70,3 +70,11 @@ For the height limits:
 ## Canvas
 
 The map sits on a dotted canvas instead of a dark blue background. On macOS the toolbar doubles as the title bar.
+
+## Settings windows
+
+The settings windows (Preferences, Edit Surface Properties, Export, New World…) open with a banner: a picture of what they are about, a sentence explaining them and, for windows with tabs, what the selected tab contains.
+
+Their settings are grouped in cards, each with a title and a sentence about what it does. Badges point out the settings which only apply after a restart, after reloading the map, on the next export or to new worlds, and those which are experimental or can be slow.
+
+![Edit Surface Properties, with the ground in cross section in its banner](assets/images/settings-windows.png)
