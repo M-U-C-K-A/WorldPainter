@@ -63,11 +63,38 @@ public class NodePropertiesPanel extends JPanel implements Scrollable {
             c.insets = new Insets(2, 0, 10, 0);
             add(wrappedLabel(node.getCategory().toString().replaceAll("s$", "") + getDescription(node)), c);
             c.insets = new Insets(0, 0, 0, 0);
+            // The main settings first, then the secondary ones, folded away unless the user unfolded them
             for (Parameter<?> parameter: node.getParameters()) {
+                if (! node.isSecondary(parameter)) {
+                    c.gridy++;
+                    final JComponent row = createRow(parameter);
+                    rows.add(new Row(parameter, row, false));
+                    add(row, c);
+                }
+            }
+            moreButton = null;
+            if (node.getParameters().stream().anyMatch(node::isSecondary)) {
                 c.gridy++;
-                final JComponent row = createRow(parameter);
-                rows.add(new Row(parameter, row));
-                add(row, c);
+                c.insets = new Insets(4, -6, 2, 0);
+                c.fill = GridBagConstraints.NONE;
+                moreButton = new JButton();
+                moreButton.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_BORDERLESS);
+                moreButton.setToolTipText("Settings which are seldom changed, such as the amount of detail and the variant");
+                moreButton.addActionListener(e -> {
+                    showSecondary = ! showSecondary;
+                    updateRelevance();
+                });
+                add(moreButton, c);
+                c.insets = new Insets(0, 0, 0, 0);
+                c.fill = GridBagConstraints.HORIZONTAL;
+                for (Parameter<?> parameter: node.getParameters()) {
+                    if (node.isSecondary(parameter)) {
+                        c.gridy++;
+                        final JComponent row = createRow(parameter);
+                        rows.add(new Row(parameter, row, true));
+                        add(row, c);
+                    }
+                }
             }
             updateRelevance();
         }
@@ -289,12 +316,23 @@ public class NodePropertiesPanel extends JPanel implements Scrollable {
 
     private void updateRelevance() {
         boolean changed = false;
+        int secondaryCount = 0;
         for (Row row: rows) {
             final boolean relevant = node.isRelevant(row.parameter);
-            if (row.component.isVisible() != relevant) {
-                row.component.setVisible(relevant);
+            if (row.secondary && relevant) {
+                secondaryCount++;
+            }
+            final boolean visible = relevant && ((! row.secondary) || showSecondary);
+            if (row.component.isVisible() != visible) {
+                row.component.setVisible(visible);
                 changed = true;
             }
+        }
+        if (moreButton != null) {
+            moreButton.setVisible(secondaryCount > 0);
+            moreButton.setText(showSecondary ? "Fewer settings" : ("More settings (" + secondaryCount + ")"));
+            moreButton.setIcon(Icons.get(showSecondary ? "chevron-down" : "chevron-right", 14));
+            changed = true;
         }
         if (changed) {
             revalidate();
@@ -328,8 +366,13 @@ public class NodePropertiesPanel extends JPanel implements Scrollable {
     private final List<Row> rows = new ArrayList<>();
     private Node node;
     private JLabel titleLabel;
+    private JButton moreButton;
 
     private static File lastImageDir;
+    /**
+     * Whether the secondary settings of the nodes are shown, for all nodes while WorldPainter runs.
+     */
+    private static boolean showSecondary;
 
     private static final int SLIDER_RANGE = 1000, WRAP_WIDTH = 290;
     private static final Random RANDOM = new Random();
@@ -344,12 +387,14 @@ public class NodePropertiesPanel extends JPanel implements Scrollable {
     private static final long serialVersionUID = 1L;
 
     private static final class Row {
-        Row(Parameter<?> parameter, JComponent component) {
+        Row(Parameter<?> parameter, JComponent component, boolean secondary) {
             this.parameter = parameter;
             this.component = component;
+            this.secondary = secondary;
         }
 
         final Parameter<?> parameter;
         final JComponent component;
+        final boolean secondary;
     }
 }

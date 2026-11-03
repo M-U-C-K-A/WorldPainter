@@ -71,6 +71,14 @@ public abstract class Node implements Serializable, Cloneable {
     }
 
     /**
+     * Whether a parameter is a secondary one, which the user interface may fold away behind the main ones. By default
+     * the variant, and the parameters for detail, warp and the resolution and iterations of simulations.
+     */
+    public boolean isSecondary(Parameter<?> parameter) {
+        return SECONDARY_KEYS.contains(parameter.getKey());
+    }
+
+    /**
      * The unique ID of the node within its graph.
      */
     public int getId() {
@@ -177,5 +185,6 @@ public abstract class Node implements Serializable, Cloneable {
      */
     public static final NumberParameter VARIANT = new NumberParameter("variant", "Variant", "Change to get a different pattern with the same settings", 0, 0, 9999, 1, false, null);
 
+    private static final java.util.Set<String> SECONDARY_KEYS = java.util.Set.of("variant", "octaves", "warp", "cellSize", "keepDetail", "iterations", "branching", "centreX", "centreY", "smooth");
     private static final long serialVersionUID = 1L;
 }

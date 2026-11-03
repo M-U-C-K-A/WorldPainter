@@ -57,6 +57,9 @@ public final class NodeType {
 
     private static final Random RANDOM = new Random();
     private static final List<NodeType> ALL = List.of(
+            new NodeType("Mountains", "Ranges of sharp, eroded peaks rising from lower land", NodeCategory.LANDFORM, MountainsNode::new),
+            new NodeType("Rolling hills", "Gently rolling hills with rounded tops", NodeCategory.LANDFORM, HillsNode::new),
+            new NodeType("Island", "An island in the middle of the map, with an irregular coast", NodeCategory.LANDFORM, IslandNode::new),
             new NodeType("Perlin noise", "Smooth fractal noise: rolling hills, continents", NodeCategory.GENERATOR, () -> new NoiseNode(NoiseNode.Kind.PERLIN)),
             new NodeType("Ridged noise", "Sharp ridges: mountain ranges", NodeCategory.GENERATOR, () -> new NoiseNode(NoiseNode.Kind.RIDGED)),
             new NodeType("Billow noise", "Rounded, puffy hills", NodeCategory.GENERATOR, () -> new NoiseNode(NoiseNode.Kind.BILLOW)),

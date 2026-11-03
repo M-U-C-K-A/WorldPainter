@@ -630,6 +630,8 @@ public class NodeCanvas extends JComponent {
 
     static Color getCategoryColour(NodeCategory category) {
         switch (category) {
+            case LANDFORM:
+                return ThemeUtils.getColour("WorldPainter.node.landform", new Color(0xb45309));
             case GENERATOR:
                 return ThemeUtils.getColour("WorldPainter.node.generator", new Color(0x0ea5e9));
             case COMBINER:
@@ -682,7 +684,7 @@ public class NodeCanvas extends JComponent {
 
     static final int NODE_WIDTH = 176, HEADER = 32, ROW = 22, PADDING = 8, THUMBNAIL_SIZE = 120;
     private static final double PORT_RADIUS = 5, PORT_HIT_RADIUS = 10, GRID_SPACING = 24, MIN_ZOOM = 0.2, MAX_ZOOM = 2.0;
-    private static final List<NodeCategory> ALL_CATEGORIES = List.of(NodeCategory.GENERATOR, NodeCategory.COMBINER, NodeCategory.FILTER, NodeCategory.WATER, NodeCategory.MASK, NodeCategory.SURFACE, NodeCategory.STRUCTURE);
+    private static final List<NodeCategory> ALL_CATEGORIES = List.of(NodeCategory.LANDFORM, NodeCategory.GENERATOR, NodeCategory.COMBINER, NodeCategory.FILTER, NodeCategory.WATER, NodeCategory.MASK, NodeCategory.SURFACE, NodeCategory.STRUCTURE);
     private static final List<NodeCategory> CONSUMER_CATEGORIES = List.of(NodeCategory.COMBINER, NodeCategory.FILTER, NodeCategory.WATER, NodeCategory.MASK, NodeCategory.SURFACE, NodeCategory.STRUCTURE);
     private static final long serialVersionUID = 1L;
 

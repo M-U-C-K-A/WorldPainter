@@ -5,6 +5,11 @@ package org.pepsoft.worldpainter.nodes;
  */
 public enum NodeCategory {
     /**
+     * Ready made landscapes in one node, such as mountains or an island, made of a few nodes which are often wired
+     * together.
+     */
+    LANDFORM("Landforms"),
+    /**
      * Nodes without inputs which create a height field, such as noise.
      */
     GENERATOR("Generators"),

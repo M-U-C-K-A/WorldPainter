@@ -9,7 +9,7 @@ WorldPainter Modernised starts from WorldPainter 2.27, which supports Minecraft 
 
 ## Generate
 
-- **[Node graph](node-graph.html)**: generate complete worlds from noise, erosion, rivers, lakes, masks and painters, with a live preview. 36 kinds of nodes, and examples to start from.
+- **[Node graph](node-graph.html)**: generate complete worlds from noise, erosion, rivers, lakes, masks and painters, with a live preview. 39 kinds of nodes, including [landforms](node-graph.html#landforms) (mountains, rolling hills, an island) ready made in one node, with the seldom used settings folded away, and examples to start from.
 - **[Floating islands](tutorial-floating-islands.html)**: a node which builds islands in the sky.
 - **[Procedural terrain](node-graph.html#procedural-terrain)**: a simpler dialog with stacked noise layers and eight presets.
 - **[Edge blending](edge-blending.html)**: the map no longer ends in a cliff; its edges go over smoothly into the land around it.

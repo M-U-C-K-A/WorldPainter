@@ -31,7 +31,7 @@ The value of a node depends only on where it is on the map, so the whole map is 
 | <kbd>⌘</kbd> <kbd>C</kbd>, <kbd>⌘</kbd> <kbd>V</kbd>, <kbd>⌘</kbd> <kbd>D</kbd>, <kbd>Delete</kbd> | Copy, paste, duplicate and delete nodes |
 | <kbd>F</kbd> | Fit the whole graph in view |
 
-Select a node to change its settings on the right. The preview above shows the result as **Relief**, **Surface** (terrain types, water and vegetation), **Biomes**, or the output of the selected **Node**, for the whole map or a part of it.
+Select a node to change its settings on the right. The settings which are seldom changed, such as the amount of detail, the warp and the variant, are folded away under **More settings**; it stays open for the other nodes once you open it. The preview above shows the result as **Relief**, **Surface** (terrain types, water and vegetation), **Biomes**, or the output of the selected **Node**, for the whole map or a part of it.
 
 The toolbar starts a **New empty graph**, opens and saves graphs as `.wpgraph` files (to reuse them in other worlds), loads the **Examples**, and sets the **Seed**: the same graph with another seed gives another world of the same kind.
 
@@ -43,6 +43,18 @@ At the bottom:
 - **Paint surface** turns the painters on or off.
 
 ## Nodes
+
+### Landforms
+
+Ready made landscapes in one node, for the most common starting points. Each is a few of the nodes below, wired and set up as you would do yourself, with only the settings which matter most:
+
+| Node | Makes | Made of |
+|---|---|---|
+| Mountains | Ranges of sharp, eroded peaks rising from lower land | Ridged noise where a broad Perlin noise is high, on top of lowlands, carved by gullies |
+| Rolling hills | Gently rolling hills with rounded tops | Perlin noise shaped by a soft curve |
+| Island | An island in the middle of the map, with an irregular coast | A radial falloff to the edges of the map, made irregular by noise, shaped by a curve into a sea floor, a coast and land |
+
+Connect a landform to the **Output**, or use it as a starting point for filters, masks and painters, like any other node. The coast of the **Island** and the foot of the **Rolling hills** are set for the output of a new graph, which turns 0.2 into the water level.
 
 ### Generators
 
