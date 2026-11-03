@@ -54,7 +54,9 @@ packaging/package.sh deb        # Linux (also: rpm)
 packaging/package.sh msi        # Windows installer (requires the WiX toolset; also: exe)
 ```
 
-On Windows, run the script from Git Bash. The application is not code signed: on macOS, open it the first time with
+On macOS the script also needs the Xcode command line tools (`xcode-select --install`): it adds a Quick Look extension,
+in `packaging/macos`, which shows the map of a world as the icon of its `.world` file in the Finder. On Windows, run the
+script from Git Bash. The application is not code signed: on macOS, open it the first time with
 right-click > Open, or remove the quarantine flag with `xattr -dr com.apple.quarantine WorldPainter.app`.
 
 The GitHub Actions workflow in `.github/workflows/build.yml` runs the tests and builds packages for macOS (Apple Silicon

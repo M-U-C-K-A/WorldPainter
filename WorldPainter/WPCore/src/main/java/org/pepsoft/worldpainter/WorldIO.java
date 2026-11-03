@@ -56,6 +56,17 @@ public class WorldIO {
     }
 
     /**
+     * Set the picture of the world which {@link #save(OutputStream)} puts at the start of the file, for the file
+     * browser of the operating system to show.
+     *
+     * @param thumbnail A JPEG image made by {@link WorldThumbnail#encode(java.awt.image.BufferedImage)}, or
+     *     {@code null} to save the world without one.
+     */
+    public void setThumbnail(byte[] thumbnail) {
+        this.thumbnail = thumbnail;
+    }
+
+    /**
      * Save the world to a binary stream, such that it can later be loaded using
      * {@link #load(InputStream)}. The stream is closed before returning.
      *
@@ -63,7 +74,11 @@ public class WorldIO {
      * @throws IOException If an I/O error occurred saving the world.
      */
     public void save(OutputStream out) throws IOException {
-        try (ObjectOutputStream wrappedOut = new ObjectOutputStream(new GZIPOutputStream(out))) {
+        out = new BufferedOutputStream(out, 65536);
+        if (thumbnail != null) {
+            out = WorldThumbnail.withThumbnail(out, thumbnail);
+        }
+        try (ObjectOutputStream wrappedOut = new ObjectOutputStream(new GZIPOutputStream(out, 8192))) {
             wrappedOut.writeObject(getMetadata());
             wrappedOut.writeObject(world);
         }
@@ -247,4 +262,5 @@ public class WorldIO {
     }
 
     private World2 world;
+    private byte[] thumbnail;
 }

@@ -22,6 +22,8 @@ On macOS, open the disk image and drag **WorldPainter** to **Applications**. On 
 
 > [!WARNING] The application is not signed yet. On macOS, open it the first time with right-click › **Open**, then confirm; if macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/WorldPainter.app` in Terminal. On Windows, SmartScreen may ask you to confirm with **More info** › **Run anyway**.
 
+On macOS, the Finder shows the map of a world as the icon of its `.world` file, from the first time WorldPainter is opened. Worlds saved with older versions keep the plain icon until you save them again.
+
 > [!NOTE] WorldPainter Modernised keeps its settings apart from the original WorldPainter, so both can be installed side by side. Worlds saved with it may not open in the original WorldPainter: keep backups of the worlds you care about.
 
 The latest, untested build of every change is also available from the [Build workflow](https://github.com/M-U-C-K-A/WorldPainter/actions/workflows/build.yml): open its latest successful run and download the file for your system under **Artifacts**.
@@ -50,7 +52,7 @@ mvn -pl WPGUI exec:exec       # run
 To build the native application for your system, in `dist/`:
 
 ```bash
-packaging/package.sh          # macOS: dist/WorldPainter.app
+packaging/package.sh          # macOS: dist/WorldPainter.app (needs the Xcode command line tools)
 packaging/package.sh dmg      # a disk image to share
 ```
 

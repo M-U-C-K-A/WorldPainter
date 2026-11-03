@@ -2405,6 +2405,7 @@ public final class App extends JFrame implements BrushControl,
             }
 
             final Configuration config = Configuration.getInstance();
+            final Set<Layer> hiddenLayers = new HashSet<>(view.getHiddenLayers());
             ProgressDialog.executeTask(this, new ProgressTask<java.lang.Void>() {
                 @Override
                 public String getName() {
@@ -2420,6 +2421,7 @@ public final class App extends JFrame implements BrushControl,
                         // Save the world to a temporary file first, to ensure that there is enough space
                         world.addHistoryEntry(HistoryEntry.WORLD_SAVED, normalisedFile);
                         final WorldIO worldIO = new WorldIO(world);
+                        worldIO.setThumbnail(createThumbnail(hiddenLayers));
                         worldIO.save(new FileOutputStream(tempFile));
 
                         // If that succeeded, move the existing file out of the way by rotating (if enabled) or deleting
@@ -6705,6 +6707,29 @@ public final class App extends JFrame implements BrushControl,
         final List<Integer> allBiomes = getAllBiomes(world.getPlatform(), customBiomeManager);
         final FillDialog dialog = new FillDialog(App.this, dimension, allLayers.toArray(new Layer[allLayers.size()]), selectedColourScheme, allBiomes.toArray(new Integer[allBiomes.size()]), customBiomeManager, view, selectionState);
         dialog.setVisible();
+    }
+
+    /**
+     * Draw the surface of the world as a small picture to save at the start of the file, which the Finder shows
+     * instead of a blank page. May be called on a background thread.
+     *
+     * @param hiddenLayers The layers hidden in the editor, which the picture leaves out too.
+     * @return The picture as a JPEG image, or {@code null} if it could not be made; the world is then saved without it.
+     */
+    private byte[] createThumbnail(Set<Layer> hiddenLayers) {
+        try {
+            final Dimension surface = world.getDimension(NORMAL_DETAIL);
+            if ((surface == null) || (surface.getTileCount() == 0)) {
+                return null;
+            }
+            final long start = System.currentTimeMillis();
+            final byte[] thumbnail = WorldThumbnail.encode(WorldThumbnail.render(surface, selectedColourScheme, customBiomeManager, hiddenLayers));
+            logger.debug("Drawing the thumbnail took {} ms", System.currentTimeMillis() - start);
+            return thumbnail;
+        } catch (RuntimeException | IOException e) {
+            logger.warn("Could not draw the thumbnail of the world; saving it without one", e);
+            return null;
+        }
     }
 
     private void exportImage() {

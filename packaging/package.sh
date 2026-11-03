@@ -9,7 +9,8 @@
 #         by jpackage on the current OS: dmg or pkg (macOS), exe or msi (Windows, requires the WiX toolset), deb or rpm
 #         (Linux).
 #
-# Requirements: JDK 21 or later (with jpackage) and Maven. JAVA_HOME is used if set, otherwise the JDK on the PATH.
+# Requirements: JDK 21 or later (with jpackage) and Maven. JAVA_HOME is used if set, otherwise the JDK on the PATH. On
+# macOS also the Xcode command line tools, for the Quick Look extension (see macos/finish-app.sh).
 # The result is written to the dist directory at the root of the repository.
 
 set -euo pipefail
@@ -55,7 +56,6 @@ mkdir -p "$DEST"
 rm -rf "$DEST/WorldPainter" "$DEST/WorldPainter.app"
 
 ARGS=(
-    --type "$TYPE"
     --name WorldPainter
     --app-version "$APP_VERSION"
     --vendor "WorldPainter contributors"
@@ -70,7 +70,8 @@ ARGS=(
     --java-options "-XX:+UseStringDeduplication"
     --java-options "-Dfile.encoding=UTF-8"
 )
-if [[ "$TYPE" != "app-image" ]]; then
+if [[ "$TYPE" != "app-image" ]] && [[ "$OS" != mac ]]; then
+    # On macOS finish-app.sh declares the file type, together with the Quick Look extension which draws its thumbnails
     ARGS+=(--file-associations "$ROOT/packaging/world-file.properties")
 fi
 
@@ -96,5 +97,16 @@ case "$OS" in
 esac
 
 echo "Packaging WorldPainter $APP_VERSION ($TYPE) for $OS..."
-"$JPACKAGE" "${ARGS[@]}"
+if [[ "$OS" == mac ]]; then
+    # Make the application first and finish it, since jpackage cannot add the Quick Look extension, then package it
+    "$JPACKAGE" --type app-image "${ARGS[@]}"
+    "$ROOT/packaging/macos/finish-app.sh" "$DEST/WorldPainter.app" "$APP_VERSION"
+    if [[ "$TYPE" != "app-image" ]]; then
+        "$JPACKAGE" --type "$TYPE" --app-image "$DEST/WorldPainter.app" --name WorldPainter --app-version "$APP_VERSION" \
+            --vendor "WorldPainter contributors" --dest "$DEST" --mac-package-identifier org.pepsoft.worldpainter \
+            --mac-package-name WorldPainter
+    fi
+else
+    "$JPACKAGE" --type "$TYPE" "${ARGS[@]}"
+fi
 echo "Done: $(ls -d "$DEST"/WorldPainter* | tr '\n' ' ')"
