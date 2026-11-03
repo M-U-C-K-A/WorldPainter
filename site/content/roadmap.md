@@ -24,7 +24,6 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 - [ ] [Auto-paint and auto-biome rules](https://github.com/M-U-C-K-A/WorldPainter/issues/15)
 - [ ] [Remove the old Procedural Terrain dialog](https://github.com/M-U-C-K-A/WorldPainter/issues/16)
 - [ ] [Simpler node graph](https://github.com/M-U-C-K-A/WorldPainter/issues/17)
-- [ ] [Modern UI: Geist font and workspace presets](https://github.com/M-U-C-K-A/WorldPainter/issues/18)
 - [ ] [Settings: Apply button, settings which stick, and the new options](https://github.com/M-U-C-K-A/WorldPainter/issues/19)
 - [ ] [Translations, and a choice of language](https://github.com/M-U-C-K-A/WorldPainter/issues/13)
 - [ ] [Show trees, objects and floating islands in the 3D view](https://github.com/M-U-C-K-A/WorldPainter/issues/4)
@@ -42,6 +41,7 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 
 ## Done
 
+- [x] [Modern UI](https://github.com/M-U-C-K-A/WorldPainter/issues/18): the Geist typeface, workspaces for terraforming, painting, the node graph or only the map, and panels at the bottom
 - [x] [Clearer settings windows](https://github.com/M-U-C-K-A/WorldPainter/issues/20): an illustrated banner, and settings grouped in cards with explanations and badges
 - [x] Preview releases on GitHub, with versions and release notes
 - [x] Brush settings which stay when switching tools, with limits by map selection, by height on a scale you can drag, by several terrain types or layers at once, and by slope, with undo

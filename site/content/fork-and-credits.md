@@ -14,7 +14,7 @@ It is not an official release of WorldPainter, and it is not supported by its au
 ## Under the hood
 
 - Java 21, and native applications built with jpackage for macOS, Windows and Linux
-- The interface uses FlatLaf, with custom light and dark themes, Inter and Lucide icons
+- The interface uses FlatLaf, with custom light and dark themes, the Geist typeface and Lucide icons
 - The biomes Minecraft generates are computed by a Java port of Cubiomes
 - The node graph, the 3D view, the paths and the floating islands are new code, in the `nodes`, `view3d`, `paths` and `vanilla` packages
 
@@ -28,6 +28,6 @@ WorldPainter Modernised is free software, under the [GNU General Public Licence,
 - **Cubiomes**: [Cubitect](https://github.com/Cubitect/cubiomes) (MIT), for the biome generation
 - **FlatLaf**: [FormDev](https://www.formdev.com/flatlaf/) (Apache 2.0)
 - **Lucide** icons ([ISC](https://lucide.dev/license))
-- **Inter** and **Geist** typefaces (SIL Open Font Licence)
+- **Geist** typeface by [Vercel](https://vercel.com/font) (SIL Open Font Licence), in the application and on this site
 
 Minecraft is a trademark of Mojang. WorldPainter Modernised is not affiliated with Mojang or Microsoft.

@@ -9,7 +9,7 @@ description: The redesigned interface of WorldPainter Modernised.
 
 ## Themes
 
-Light and dark themes in the style of shadcn/ui (zinc greys, an orange accent, rounded corners, hairline separators), with the Inter typeface. The automatic mode follows the system; the sun and moon button in the toolbar switches theme at once.
+Light and dark themes in the style of shadcn/ui (zinc greys, an orange accent, rounded corners, hairline separators), with the Geist typeface. The automatic mode follows the system; the sun and moon button in the toolbar switches theme at once.
 
 ## Panels
 
@@ -27,9 +27,23 @@ The palettes of terrain types, biomes and colours use the whole width of their p
 
 Hover over a mix of blocks or a plant layer to see what it is made of: each block or plant with its icon and its share.
 
-Panels can be resized, grouped in tabs, detached into a window of their own, and shown again with **View › Panels**.
+Panels can be resized, grouped in tabs, detached into a window of their own, and shown again with **View › Panels**. Right click on the title or the tab of a panel to move it to the other side or to the bottom, below the map.
 
-To make room for the map, the buttons at either end of the toolbar (two panel icons) fold away all the panels on the left or on the right, and bring them back. Showing a panel from **View › Panels** unfolds its side again.
+To make room for the map, the panel buttons in the toolbar fold away all the panels on the left, at the bottom or on the right, and bring them back. Showing a panel from **View › Panels** unfolds its side again.
+
+## Workspaces
+
+The workspace button in the toolbar, next to *Map* and *3D*, arranges the panels for a kind of work, and keeps their sizes:
+
+| Workspace | Shows |
+|---|---|
+| **Default** | All the panels, as when WorldPainter starts |
+| **Terraforming** | The tools and the brushes, to shape the land, without the palettes |
+| **Painting** | Terrain, layers and biomes next to the tools and the brushes |
+| **Node graph** | Opens the [node graph](node-graph.html), with the layers, the surroundings and the info next to the map |
+| **Minimal** | Only the map, with all the panels folded away |
+
+The same workspaces are in **View › Workspace layout**, where the arrangement of your own can also be saved and loaded again.
 
 ## Tools
 

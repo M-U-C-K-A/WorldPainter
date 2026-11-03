@@ -4631,6 +4631,14 @@ public final class App extends JFrame implements BrushControl,
 
         JMenu workspaceLayoutMenu = new JMenu("Workspace layout");
 
+        for (WorkspacePreset preset: WorkspacePreset.values()) {
+            menuItem = new JMenuItem(preset.title, Icons.get(preset.icon, 16));
+            menuItem.setToolTipText(preset.description);
+            menuItem.addActionListener(e -> applyWorkspacePreset(preset));
+            workspaceLayoutMenu.add(menuItem);
+        }
+        workspaceLayoutMenu.addSeparator();
+
         menuItem = new JMenuItem(ACTION_RESET_DOCKS);
         menuItem.setMnemonic('r');
         workspaceLayoutMenu.add(menuItem);
@@ -5284,8 +5292,14 @@ public final class App extends JFrame implements BrushControl,
 //        toolBar.add(Box.createHorizontalGlue());
 //        toolBar.add(ACTION_SHOW_HELP_PICKER);
 
-        // Map/3D switch, zoom and theme controls on the right
+        // Workspace presets, map/3D switch, zoom and theme controls on the right
         final JToolBar rightToolBar = createHeaderToolBar();
+        workspacePresetButton = new JButton(Icons.muted("chevron-down", 14));
+        workspacePresetButton.setHorizontalTextPosition(SwingConstants.LEADING);
+        workspacePresetButton.addActionListener(e -> createWorkspacePresetMenu().show(workspacePresetButton, 0, workspacePresetButton.getHeight()));
+        updateWorkspacePresetButton();
+        rightToolBar.add(workspacePresetButton);
+        rightToolBar.addSeparator();
         final ButtonGroup workspaceGroup = new ButtonGroup();
         mapViewButton = new JToggleButton("Map", Icons.get("map", 16), true);
         mapViewButton.setToolTipText(richToolTip("Map", "Paint and edit the map from above", null));
@@ -5314,9 +5328,16 @@ public final class App extends JFrame implements BrushControl,
         eastPanelsButton = new JToggleButton(Icons.get("panel-right", 18), true);
         eastPanelsButton.setToolTipText(richToolTip("Right panels", "Show or hide the panels on the right, to make room for the map", null));
         eastPanelsButton.addActionListener(e -> dockingManager.setCollapsed(Side.EAST, ! eastPanelsButton.isSelected()));
+        southPanelsButton = new JToggleButton(Icons.get("panel-bottom", 18), true);
+        southPanelsButton.setToolTipText(richToolTip("Bottom panels", "Show or hide the panels at the bottom. Move a panel there with a right click on its title or tab", null));
+        southPanelsButton.addActionListener(e -> dockingManager.setCollapsed(Side.SOUTH, ! southPanelsButton.isSelected()));
+        southPanelsButton.setEnabled(false);
         dockingManager.setCollapseListener(() -> {
             westPanelsButton.setSelected(! dockingManager.isCollapsed(Side.WEST));
             eastPanelsButton.setSelected(! dockingManager.isCollapsed(Side.EAST));
+            southPanelsButton.setSelected(! dockingManager.isCollapsed(Side.SOUTH));
+            // Only of use when there are panels at the bottom
+            southPanelsButton.setEnabled(dockingManager.hasDockedFrames(Side.SOUTH));
         });
         if (ThemeUtils.isModernTheme()) {
             rightToolBar.addSeparator();
@@ -5326,6 +5347,7 @@ public final class App extends JFrame implements BrushControl,
             rightToolBar.add(themeToggleButton);
         }
         rightToolBar.addSeparator();
+        rightToolBar.add(southPanelsButton);
         rightToolBar.add(eastPanelsButton);
 
         headerTitleLabel = new JLabel("WorldPainter", SwingConstants.CENTER);
@@ -5792,6 +5814,68 @@ public final class App extends JFrame implements BrushControl,
         button.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
         button.setMargin(new Insets(6, 6, 6, 6));
         button.setFocusable(false);
+    }
+
+    /**
+     * Arrange the panels for a kind of work, keeping their sizes.
+     */
+    private void applyWorkspacePreset(WorkspacePreset preset) {
+        final Set<String> keys = new LinkedHashSet<>();
+        dockingManager.getFrames().forEach(frame -> keys.add(frame.getKey()));
+        // The 3D view is moved into and out of a panel of its own with the 3D button
+        keys.remove(FRAME_3D);
+        final Set<String> hidden = new HashSet<>();
+        switch (preset) {
+            case TERRAFORMING:
+                hidden.addAll(asList("terrain", "layers", "biomes", "packs", "annotations", "surroundings", "customTerrain"));
+                break;
+            case PAINTING:
+                hidden.addAll(asList("annotations", "surroundings"));
+                break;
+            case NODE_GRAPH:
+                hidden.addAll(keys);
+                hidden.removeAll(asList("layers", "surroundings", "infoPanel"));
+                break;
+        }
+        final Set<String> docked = new LinkedHashSet<>(keys);
+        docked.removeAll(hidden);
+        dockingManager.arrange(docked, hidden, (preset == WorkspacePreset.MINIMAL) ? EnumSet.allOf(Side.class) : EnumSet.noneOf(Side.class));
+        switch (preset) {
+            case TERRAFORMING:
+                dockingManager.showFrame("brushSettings");
+                break;
+            case PAINTING:
+                dockingManager.showFrame("terrain");
+                dockingManager.showFrame("brushSettings");
+                break;
+            case NODE_GRAPH:
+                dockingManager.showFrame("surroundings");
+                // The node graph is where the work is done
+                SwingUtilities.invokeLater(this::showNodeGraph);
+                break;
+        }
+        workspacePreset = preset;
+        updateWorkspacePresetButton();
+    }
+
+    private JPopupMenu createWorkspacePresetMenu() {
+        final JPopupMenu menu = new JPopupMenu();
+        final ButtonGroup buttonGroup = new ButtonGroup();
+        for (WorkspacePreset preset: WorkspacePreset.values()) {
+            final JRadioButtonMenuItem menuItem = new JRadioButtonMenuItem("<html><b>" + preset.title + "</b><br><span style=\"color: #a1a1aa\">" + preset.description + "</span></html>", Icons.get(preset.icon, 18), preset == workspacePreset);
+            menuItem.setIconTextGap(10);
+            menuItem.addActionListener(e -> applyWorkspacePreset(preset));
+            buttonGroup.add(menuItem);
+            menu.add(menuItem);
+        }
+        return menu;
+    }
+
+    private void updateWorkspacePresetButton() {
+        if (workspacePresetButton != null) {
+            workspacePresetButton.setText(workspacePreset.title);
+            workspacePresetButton.setToolTipText(richToolTip("Workspace", "Arrange the panels for a kind of work: shaping the land, painting, the node graph, or only the map", null));
+        }
     }
 
     /**
@@ -7780,9 +7864,31 @@ public final class App extends JFrame implements BrushControl,
     private JLabel headerTitleLabel, headerZoomLabel, surroundingsNoteLabel;
     private JPanel workspaceCards;
     private Terrain3DPanel terrain3DPanel;
-    private JToggleButton threeDeeButton, westPanelsButton, eastPanelsButton;
+    private JToggleButton threeDeeButton, westPanelsButton, eastPanelsButton, southPanelsButton;
+    private JButton workspacePresetButton;
+    private WorkspacePreset workspacePreset = WorkspacePreset.DEFAULT;
     private boolean detached3D;
     private static final String FRAME_3D = "view3d";
+
+    /**
+     * Ways to arrange the panels for a kind of work, chosen with the button in the toolbar or from View › Workspace
+     * layout.
+     */
+    private enum WorkspacePreset {
+        DEFAULT("Default", "layout-dashboard", "All the panels, as when WorldPainter starts"),
+        TERRAFORMING("Terraforming", "mountain", "The tools and the brushes, to shape the land"),
+        PAINTING("Painting", "brush", "Terrain, layers and biomes next to the tools and brushes"),
+        NODE_GRAPH("Node graph", "workflow", "Opens the node graph, with the layers and surroundings by the map"),
+        MINIMAL("Minimal", "maximize", "Only the map, with all the panels folded away");
+
+        WorkspacePreset(String title, String icon, String description) {
+            this.title = title;
+            this.icon = icon;
+            this.description = description;
+        }
+
+        final String title, icon, description;
+    }
     private JToggleButton mapViewButton;
     private boolean showing3D;
     private static final String WORKSPACE_MAP = "map", WORKSPACE_3D = "3d";

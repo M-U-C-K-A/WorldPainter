@@ -2,7 +2,6 @@ package org.pepsoft.worldpainter.util;
 
 import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.extras.FlatAnimatedLafChange;
-import com.formdev.flatlaf.fonts.inter.FlatInterFont;
 import org.pepsoft.util.SystemUtils;
 import org.pepsoft.worldpainter.Configuration;
 import org.pepsoft.worldpainter.laf.WorldPainterDarkLaf;
@@ -152,8 +151,13 @@ public final class ThemeUtils {
             System.setProperty("flatlaf.uiScale", Float.toString(uiScale));
         }
         if (! fontInstalled) {
-            FlatInterFont.install();
-            FlatLaf.setPreferredFontFamily(FlatInterFont.FAMILY);
+            if (GeistFont.install()) {
+                FlatLaf.setPreferredFontFamily(GeistFont.FAMILY);
+                FlatLaf.setPreferredLightFontFamily(GeistFont.FAMILY_LIGHT);
+                FlatLaf.setPreferredSemiboldFontFamily(GeistFont.FAMILY_SEMIBOLD);
+            } else {
+                logger.warn("Could not install the Geist font; using the default font of the system");
+            }
             fontInstalled = true;
         }
         if (dark) {

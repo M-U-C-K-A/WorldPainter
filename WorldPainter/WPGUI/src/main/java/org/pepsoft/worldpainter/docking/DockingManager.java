@@ -21,20 +21,26 @@ import static javax.swing.SwingConstants.VERTICAL;
 
 /**
  * A lightweight, dependency free docking framework. It manages a workspace in the centre, surrounded by a column of
- * {@link DockableFrame}s on the left and on the right. Each column consists of vertically stacked groups which the user
- * can resize; a group contains one or more frames, shown as tabs if there is more than one. Frames can be floated in
- * their own window, hidden and shown again, and moved to the other side. The layout can be persisted with
+ * {@link DockableFrame}s on the left and on the right, and a row of them at the bottom. Each column consists of
+ * vertically stacked groups, and the row of groups side by side, which the user can resize; a group contains one or
+ * more frames, shown as tabs if there is more than one. Frames can be floated in their own window, hidden and shown
+ * again, and moved to another side. The layout can be persisted with
  * {@link #getLayoutRawData()} and restored with {@link #loadLayoutFrom(byte[])}.
  */
 public class DockingManager {
     public DockingManager(Window owner) {
         this.owner = owner;
         workspace = new JPanel(new BorderLayout());
-        columns.put(Side.WEST, new DockColumn(Side.WEST));
-        columns.put(Side.EAST, new DockColumn(Side.EAST));
+        for (Side side: Side.values()) {
+            columns.put(side, new DockColumn(side));
+        }
+        // The row at the bottom is only as wide as the workspace, between the columns on either side
+        final JPanel centre = new JPanel(new BorderLayout());
+        centre.add(workspace, BorderLayout.CENTER);
+        centre.add(columns.get(Side.SOUTH), BorderLayout.SOUTH);
         mainContainer = new JPanel(new BorderLayout());
         mainContainer.add(columns.get(Side.WEST), BorderLayout.WEST);
-        mainContainer.add(workspace, BorderLayout.CENTER);
+        mainContainer.add(centre, BorderLayout.CENTER);
         mainContainer.add(columns.get(Side.EAST), BorderLayout.EAST);
     }
 
@@ -180,9 +186,6 @@ public class DockingManager {
     public void setCollapsed(Side side, boolean collapsed) {
         if (collapsed ? collapsedSides.add(side) : collapsedSides.remove(side)) {
             rebuild();
-            if (collapseListener != null) {
-                collapseListener.run();
-            }
         }
     }
 
@@ -191,7 +194,44 @@ public class DockingManager {
     }
 
     /**
-     * Set something to run when a side is collapsed or expanded, for instance to update the buttons which do it.
+     * Whether any frames are docked on a side, whether or not it is collapsed.
+     */
+    public boolean hasDockedFrames(Side side) {
+        return frames.values().stream().anyMatch(info -> (info.placement.state == State.DOCKED) && (info.placement.side == side));
+    }
+
+    /**
+     * Arrange the frames for a kind of work: put some back at their initial location, hide others, and collapse some
+     * sides. Frames which are not mentioned, such as one which the application floats itself, are left alone. The
+     * sizes of the columns and groups are kept.
+     *
+     * @param docked The keys of the frames to dock at their initial location.
+     * @param hidden The keys of the frames to hide.
+     * @param collapsed The sides to collapse; the others are expanded.
+     */
+    public void arrange(Collection<String> docked, Collection<String> hidden, Collection<Side> collapsed) {
+        for (String key: docked) {
+            final FrameInfo info = frames.get(key);
+            if (info != null) {
+                closeFloatingWindow(info);
+                info.placement = new Placement(info.frame.getInitSide(), info.frame.getInitIndex(), State.DOCKED, info.placement.floatingBounds);
+            }
+        }
+        for (String key: hidden) {
+            final FrameInfo info = frames.get(key);
+            if (info != null) {
+                closeFloatingWindow(info);
+                info.placement = info.placement.withState(State.HIDDEN);
+            }
+        }
+        collapsedSides.clear();
+        collapsedSides.addAll(collapsed);
+        rebuild();
+    }
+
+    /**
+     * Set something to run when a side is collapsed or expanded, or frames are moved, for instance to update the
+     * buttons which collapse the sides.
      */
     public void setCollapseListener(Runnable collapseListener) {
         this.collapseListener = collapseListener;
@@ -372,6 +412,9 @@ public class DockingManager {
         }
         mainContainer.revalidate();
         mainContainer.repaint();
+        if (collapseListener != null) {
+            collapseListener.run();
+        }
     }
 
     private void openFloatingWindow(FrameInfo info) {
@@ -447,10 +490,13 @@ public class DockingManager {
         menuItem.addActionListener(e -> hideFrame(key));
         menu.add(menuItem);
         menu.addSeparator();
-        final Side otherSide = info.placement.side.opposite();
-        menuItem = new JMenuItem((otherSide == Side.WEST) ? "Move to left side" : "Move to right side");
-        menuItem.addActionListener(e -> dockFrame(key, otherSide, info.placement.index));
-        menu.add(menuItem);
+        for (Side otherSide: Side.values()) {
+            if (otherSide != info.placement.side) {
+                menuItem = new JMenuItem(otherSide.getMoveText());
+                menuItem.addActionListener(e -> dockFrame(key, otherSide, info.placement.index));
+                menu.add(menuItem);
+            }
+        }
         menuItem = new JMenuItem("Move to own group");
         menuItem.addActionListener(e -> {
             int maxIndex = info.placement.index;
@@ -513,7 +559,7 @@ public class DockingManager {
 
     private static final String MAGIC = "WPDOCK";
     private static final int FORMAT_VERSION = 1;
-    private static final int HANDLE_SIZE = 5, MIN_GROUP_HEIGHT = 48, MIN_COLUMN_WIDTH = 120;
+    private static final int HANDLE_SIZE = 5, MIN_GROUP_HEIGHT = 48, MIN_COLUMN_WIDTH = 120, MIN_ROW_HEIGHT = 80, DEFAULT_ROW_HEIGHT = 220;
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DockingManager.class);
 
     private enum State {DOCKED, FLOATING, HIDDEN}
@@ -556,12 +602,21 @@ public class DockingManager {
             super(null);
             this.side = side;
             setLayout(new ColumnLayout());
-            edgeHandle = new ResizeHandle(HORIZONTAL, delta -> {
-                // The stored width excludes the resize handle itself
-                final int width = Math.max(MIN_COLUMN_WIDTH, getWidth() - HANDLE_SIZE + ((side == Side.WEST) ? delta : -delta));
-                columnWidths.put(side, width);
-                revalidate();
-            });
+            if (side == Side.SOUTH) {
+                edgeHandle = new ResizeHandle(VERTICAL, delta -> {
+                    // The stored height excludes the resize handle itself; dragging it up makes the row taller
+                    final int height = Math.max(MIN_ROW_HEIGHT, getHeight() - HANDLE_SIZE - delta);
+                    columnWidths.put(side, height);
+                    revalidate();
+                });
+            } else {
+                edgeHandle = new ResizeHandle(HORIZONTAL, delta -> {
+                    // The stored width excludes the resize handle itself
+                    final int width = Math.max(MIN_COLUMN_WIDTH, getWidth() - HANDLE_SIZE + ((side == Side.WEST) ? delta : -delta));
+                    columnWidths.put(side, width);
+                    revalidate();
+                });
+            }
             setVisible(false);
         }
 
@@ -577,10 +632,18 @@ public class DockingManager {
                 final DockGroup group = new DockGroup(side, entry.getKey(), entry.getValue());
                 if (! groups.isEmpty()) {
                     final DockGroup groupAbove = groups.get(groups.size() - 1);
-                    add(new ResizeHandle(VERTICAL, delta -> {
-                        groupHeights.put(groupAbove.id, Math.max(MIN_GROUP_HEIGHT, groupAbove.getHeight() + delta));
-                        revalidate();
-                    }));
+                    if (side == Side.SOUTH) {
+                        // In the row at the bottom the groups are side by side, and the stored size is a width
+                        add(new ResizeHandle(HORIZONTAL, delta -> {
+                            groupHeights.put(groupAbove.id, Math.max(MIN_COLUMN_WIDTH, groupAbove.getWidth() + delta));
+                            revalidate();
+                        }));
+                    } else {
+                        add(new ResizeHandle(VERTICAL, delta -> {
+                            groupHeights.put(groupAbove.id, Math.max(MIN_GROUP_HEIGHT, groupAbove.getHeight() + delta));
+                            revalidate();
+                        }));
+                    }
                 }
                 groups.add(group);
                 add(group);
@@ -606,6 +669,14 @@ public class DockingManager {
 
             @Override
             public Dimension preferredLayoutSize(Container parent) {
+                if (side == Side.SOUTH) {
+                    final Integer height = columnWidths.get(side);
+                    int prefHeight = MIN_ROW_HEIGHT;
+                    for (DockGroup group: groups) {
+                        prefHeight = Math.max(prefHeight, group.getPreferredSize().height);
+                    }
+                    return new Dimension(groups.size() * (MIN_COLUMN_WIDTH + HANDLE_SIZE), ((height != null) ? height : Math.min(prefHeight, DEFAULT_ROW_HEIGHT)) + HANDLE_SIZE);
+                }
                 final Integer width = columnWidths.get(side);
                 int prefWidth = MIN_COLUMN_WIDTH, prefHeight = 0;
                 for (DockGroup group: groups) {
@@ -620,11 +691,18 @@ public class DockingManager {
 
             @Override
             public Dimension minimumLayoutSize(Container parent) {
+                if (side == Side.SOUTH) {
+                    return new Dimension(groups.size() * (MIN_COLUMN_WIDTH + HANDLE_SIZE), MIN_ROW_HEIGHT + HANDLE_SIZE);
+                }
                 return new Dimension(MIN_COLUMN_WIDTH + HANDLE_SIZE, groups.size() * (MIN_GROUP_HEIGHT + HANDLE_SIZE));
             }
 
             @Override
             public void layoutContainer(Container parent) {
+                if (side == Side.SOUTH) {
+                    layoutRow(parent);
+                    return;
+                }
                 final int width = parent.getWidth() - HANDLE_SIZE, height = parent.getHeight();
                 final int x = (side == Side.WEST) ? 0 : HANDLE_SIZE;
                 edgeHandle.setBounds((side == Side.WEST) ? width : 0, 0, HANDLE_SIZE, height);
@@ -663,6 +741,50 @@ public class DockingManager {
                     } else {
                         component.setBounds(x, y, width, HANDLE_SIZE);
                         y += HANDLE_SIZE;
+                    }
+                }
+            }
+
+            /**
+             * Lay out the groups of the row at the bottom side by side, below the resize handle at its top. Each group
+             * except the last one gets the width the user dragged it to, or else an equal share; the last group gets
+             * the remaining space.
+             */
+            private void layoutRow(Container parent) {
+                final int width = parent.getWidth(), height = parent.getHeight() - HANDLE_SIZE;
+                edgeHandle.setBounds(0, 0, width, HANDLE_SIZE);
+                final int count = groups.size();
+                if (count == 0) {
+                    return;
+                }
+                final int available = width - (count - 1) * HANDLE_SIZE;
+                final int[] widths = new int[count];
+                int fixedTotal = 0;
+                for (int i = 0; i < count - 1; i++) {
+                    final Integer userWidth = groupHeights.get(groups.get(i).id);
+                    widths[i] = Math.max(MIN_COLUMN_WIDTH, (userWidth != null) ? userWidth : (available / count));
+                    fixedTotal += widths[i];
+                }
+                final int maxFixed = available - MIN_COLUMN_WIDTH;
+                if ((fixedTotal > maxFixed) && (fixedTotal > 0)) {
+                    final float scale = Math.max(0, maxFixed) / (float) fixedTotal;
+                    fixedTotal = 0;
+                    for (int i = 0; i < count - 1; i++) {
+                        widths[i] = Math.round(widths[i] * scale);
+                        fixedTotal += widths[i];
+                    }
+                }
+                widths[count - 1] = Math.max(0, available - fixedTotal);
+                int x = 0, groupIndex = 0;
+                for (Component component: parent.getComponents()) {
+                    if (component == edgeHandle) {
+                        continue;
+                    } else if (component instanceof DockGroup) {
+                        component.setBounds(x, HANDLE_SIZE, widths[groupIndex], height);
+                        x += widths[groupIndex++];
+                    } else {
+                        component.setBounds(x, HANDLE_SIZE, HANDLE_SIZE, height);
+                        x += HANDLE_SIZE;
                     }
                 }
             }
