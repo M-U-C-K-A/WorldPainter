@@ -13,8 +13,6 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 
 - [ ] [Faster export, first as an experimental button](https://github.com/M-U-C-K-A/WorldPainter/issues/14) (in progress)
 - [ ] [Blend edges into seed: forests and biomes](https://github.com/M-U-C-K-A/WorldPainter/issues/21)
-- [ ] [Find a matching seed: a score which means something](https://github.com/M-U-C-K-A/WorldPainter/issues/22)
-- [ ] [3D view: looking at the land from below](https://github.com/M-U-C-K-A/WorldPainter/issues/23)
 - [ ] [Automated export tests in CI](https://github.com/M-U-C-K-A/WorldPainter/issues/1)
 - [ ] [Sign and notarise the macOS app](https://github.com/M-U-C-K-A/WorldPainter/issues/2)
 - [ ] [Merge the latest WorldPainter](https://github.com/M-U-C-K-A/WorldPainter/issues/3)
@@ -23,7 +21,7 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 
 - [ ] [Auto-paint and auto-biome rules](https://github.com/M-U-C-K-A/WorldPainter/issues/15)
 - [ ] [Remove the old Procedural Terrain dialog](https://github.com/M-U-C-K-A/WorldPainter/issues/16)
-- [ ] [Settings: Apply button, settings which stick, and the new options](https://github.com/M-U-C-K-A/WorldPainter/issues/19)
+- [ ] [Settings: Apply button, settings which stick, and the new options](https://github.com/M-U-C-K-A/WorldPainter/issues/19) (the Apply button is done)
 - [ ] [Translations, and a choice of language](https://github.com/M-U-C-K-A/WorldPainter/issues/13)
 - [ ] [Show trees, objects and floating islands in the 3D view](https://github.com/M-U-C-K-A/WorldPainter/issues/4)
 - [ ] [Large maps: memory and processing in chunks](https://github.com/M-U-C-K-A/WorldPainter/issues/5)
@@ -41,8 +39,10 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 ## Done
 
 - [x] [Simpler node graph](https://github.com/M-U-C-K-A/WorldPainter/issues/17): landforms in one node (mountains, rolling hills, an island), and the seldom used settings folded away
-- [x] [Modern UI](https://github.com/M-U-C-K-A/WorldPainter/issues/18): the Geist typeface, workspaces for terraforming, painting, the node graph or only the map, and panels at the bottom
-- [x] [Clearer settings windows](https://github.com/M-U-C-K-A/WorldPainter/issues/20): an illustrated banner, and settings grouped in cards with explanations and badges
+- [x] [Modern UI](https://github.com/M-U-C-K-A/WorldPainter/issues/18): the Geist typeface, workspaces for terraforming, painting, the node graph or only the map, panels at the bottom, and three designs (Modern, Classic and Glass) which change without restarting
+- [x] [Clearer settings windows](https://github.com/M-U-C-K-A/WorldPainter/issues/20): settings grouped in cards with explanations and badges, line icons, and an illustrated banner in the Classic design
+- [x] [Find a matching seed: a score which means something](https://github.com/M-U-C-K-A/WorldPainter/issues/22): the height of the land is scored as well as the biomes, relative to chance
+- [x] [3D view: looking at the land from below](https://github.com/M-U-C-K-A/WorldPainter/issues/23): the model is closed with a floor
 - [x] Preview releases on GitHub, with versions and release notes
 - [x] Brush settings which stay when switching tools, with limits by map selection, by height on a scale you can drag, by several terrain types or layers at once, and by slope, with undo
 - [x] Clearer cards on hover, with what the mouse and keys do and pictures of the brush options

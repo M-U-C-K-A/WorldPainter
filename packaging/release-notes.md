@@ -1,10 +1,23 @@
-**WorldPainter Modernised {{VERSION}}** is a preview of an unofficial, modernised fork of [WorldPainter](https://www.worldpainter.net/), based on WorldPainter 2.27. It is not affiliated with or supported by the original project: please report problems [here](https://github.com/M-U-C-K-A/WorldPainter/issues), not to pepsoft.org.
+**WorldPainter Modernised {{VERSION}}** is a beta preview of an unofficial, modernised fork of [WorldPainter](https://www.worldpainter.net/), based on WorldPainter 2.27. It is not affiliated with or supported by the original project: please report problems [here](https://github.com/M-U-C-K-A/WorldPainter/issues), not to pepsoft.org.
 
 Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
+## New in this beta
+
+- **Three designs**, each light, dark or following the system, which change at once from Preferences, without restarting (Cancel takes the change back): **Modern**, with layered grey surfaces, a blue accent and line icons; **Classic**, the earlier look; and **Glass**, new, with frosted panels on a soft gradient, the map in a pane with rounded corners, translucent cards and pill buttons. Metal, Nimbus and System are gone; settings which used them switch to Classic
+- **Preferences** has an **Apply** button
+- **Settings windows** group their settings in cards with explanations and badges for what needs a restart, a reload or the next export
+- The **Geist** typeface, **workspaces** for terraforming, painting, the node graph or only the map, and panels which dock at the bottom too
+- **Node graph**: mountains, rolling hills and an island ready made in one node, with the seldom used settings folded away
+- **Seed search** scores the height of the land as well as the biomes, relative to chance
+- The **3D view** closes the land with a floor when it is seen from below
+- **Export** (experimental button): the lighting goes through a queue, which is faster on large maps
+
+As a beta, it has had less testing than the previews before it: keep backups of your worlds, and report what goes wrong.
+
 ## What is in it
 
-- A new interface, with light and dark themes, side panels which fold away, palettes which fill their panels, and cards on hover which show what the mouse and keys do, with an animation of each tool, a 3D preview of each brush, pictures of the brush options, and the blocks or plants of each mix and their shares
+- A new interface, with three designs (Modern, Classic and Glass), light or dark, side panels which fold away, palettes which fill their panels, and cards on hover which show what the mouse and keys do, with an animation of each tool, a 3D preview of each brush, pictures of the brush options, and the blocks or plants of each mix and their shares
 - An integrated 3D view which keeps up with the map, with colour modes, 1:1 blocks up to 4096 blocks around the camera, optional shaders (sun and sky light, shadows, moving water), cross sections of the ground on its sides, and a panel of its own to float next to the map
 - A node graph to generate complete worlds, with 36 kinds of nodes, examples and `.wpgraph` files, including a Floating islands node
 - Surroundings drawn like the map, seed search, and blending the edges of the map into a seed (round maps included, with undo)
