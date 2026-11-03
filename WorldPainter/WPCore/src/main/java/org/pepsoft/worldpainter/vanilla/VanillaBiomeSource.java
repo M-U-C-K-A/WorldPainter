@@ -63,6 +63,29 @@ public final class VanillaBiomeSource {
     }
 
     /**
+     * The biome at the surface and the estimated height of the land at a block location, together, since they share
+     * most of the work (see {@link #getSurfaceBiomeAtBlock(int, int)} and {@link #getApproximateSurfaceHeight(int, int)}).
+     *
+     * @param height Where to store the estimated height, in blocks, at index 0.
+     * @return The biome as a cubiomes biome ID.
+     */
+    public int getSurfaceBiomeAndHeightAtBlock(int blockX, int blockZ, float[] height) {
+        final int x = blockX >> 2, z = blockZ >> 2;
+        double px = x, pz = z;
+        px += shift.sample(x, 0, z) * 4.0;
+        pz += shift.sample(z, x, 0) * 4.0;
+        final float c = (float) continentalness.sample(px, 0, pz);
+        final float e = (float) erosion.sample(px, 0, pz);
+        final float w = (float) weirdness.sample(px, 0, pz);
+        final float[] splineParams = {c, e, -3.0F * (Math.abs(Math.abs(w) - 0.6666667F) - 0.33333334F), w};
+        height[0] = (float) (128 * (1 - 83.0 / 160 + spline.get(splineParams) + 0.015F));
+        final float t = (float) temperature.sample(px, 0, pz);
+        final float h = (float) humidity.sample(px, 0, pz);
+        final long[] np = {(long) (10000.0F * t), (long) (10000.0F * h), (long) (10000.0F * c), (long) (10000.0F * e), 0L, (long) (10000.0F * w)};
+        return climateToBiome(np);
+    }
+
+    /**
      * An estimate of the height of the land Minecraft generates at a location in biome coordinates (one quarter of
      * block coordinates): where the terrain "depth" from the continentalness, erosion and weirdness spline reaches zero.
      * It leaves out the small scale noise and the jaggedness of peaks, so it gives the broad shape of the land: low

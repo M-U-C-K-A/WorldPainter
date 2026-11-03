@@ -21,12 +21,12 @@ Type a number, or any text (as in Minecraft), in the **World seed** field and pr
 
 ## Find a matching seed
 
-**Find a matching seed…** looks for a seed for which the land around the map matches what you painted along its edges: a taiga where the map has spruce forest at its edge, an ocean where it has water, and so on.
+**Find a matching seed…** looks for a seed for which the land around the map matches what you painted along its edges: a taiga where the map has spruce forest at its edge, an ocean where it has water, high land next to mountains, and so on. It compares both the biomes and the height of the land.
 
 ![The seed search: the best seeds found, and a preview of the land around the map for the selected one](assets/images/seed-search.png)
 
 - The search runs on half of the cores, so that the computer stays usable, and goes on until you click **Stop**. The status line shows how many seeds have been tested, and how fast.
-- The eight best seeds are listed with how well they match (as a percentage), with the current seed for comparison. Select one to see the land around the map.
+- The eight best seeds are listed with how well they match, with the current seed for comparison. Select one to see the land around the map. The percentage is relative to chance: 0% is what any seed picked at random gets, 100% a perfect match, so even 50% is a seed which fits much better than most.
 - If no seed matches perfectly, choose the closest: the next step makes up the difference.
 
 > [!TIP] Minecraft's biomes are large. A small map whose edges change biome every hundred blocks will rarely match above 70 %; letting the search run longer helps, and so does blending the edges.

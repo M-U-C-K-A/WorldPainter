@@ -33,8 +33,8 @@ public class SeedSearchDialog extends WorldPainterDialog {
 
         final JPanel content = new JPanel(new BorderLayout(12, 12));
         content.setBorder(new EmptyBorder(12, 12, 12, 12));
-        final JLabel intro = new JLabel("<html><div style=\"width: 520px\">Looking for world seeds for which the land Minecraft generates around the map matches the biomes along its edges, so that the map blends in with its surroundings. "
-                + "The best candidates found so far are listed below; select one to preview it.</div></html>");
+        final JLabel intro = new JLabel("<html><div style=\"width: 520px\">Looking for world seeds for which the land Minecraft generates around the map matches its edges, in biomes and in the height of the land, so that the map blends in with its surroundings. "
+                + "0% is what any seed gets, 100% a perfect match. The best candidates found so far are listed below; select one to preview it.</div></html>");
         content.add(intro, BorderLayout.NORTH);
 
         listModel = new DefaultListModel<>();

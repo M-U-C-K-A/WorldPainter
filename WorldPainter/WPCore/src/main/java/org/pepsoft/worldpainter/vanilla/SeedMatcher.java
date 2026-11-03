@@ -14,9 +14,13 @@ import static org.pepsoft.worldpainter.Constants.TILE_SIZE;
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE_BITS;
 
 /**
- * Judges how well the terrain Minecraft generates around a map, for a particular world seed, matches the biomes along
- * the edges of the map, so that a seed can be found for which the map blends in with its surroundings (for instance a
- * desert map surrounded by desert rather than by ocean).
+ * Judges how well the terrain Minecraft generates around a map, for a particular world seed, matches the edges of the
+ * map, so that a seed can be found for which the map blends in with its surroundings: the biomes (a desert map
+ * surrounded by desert rather than by ocean), and the height of the land (mountains next to mountains, the sea next to
+ * the sea).
+ *
+ * <p>The score is calibrated against seeds picked at random: 0 is what any seed gets, 1 a perfect match. A high score
+ * therefore means the seed matches much better than chance, rather than that some of the land happens to agree.
  *
  * <p>The edges of the map are sampled once when the matcher is created; scoring a seed is then fast and thread safe.
  */
@@ -42,8 +46,9 @@ public final class SeedMatcher {
                         insideY = (coords.y << TILE_SIZE_BITS) + along;
                     }
                     final VanillaBiomes.Category expected = getMapCategory(dimension, insideX, insideY);
+                    final float expectedHeight = Math.max(dimension.getHeightAt(insideX, insideY), dimension.getWaterLevelAt(insideX, insideY) - 12);
                     for (int distance: OUTSIDE_DISTANCES) {
-                        allSamples.add(new Sample(insideX + direction[0] * (distance + INSET), insideY + direction[1] * (distance + INSET), expected));
+                        allSamples.add(new Sample(insideX + direction[0] * (distance + INSET), insideY + direction[1] * (distance + INSET), expected, expectedHeight));
                     }
                 }
             }
@@ -55,6 +60,13 @@ public final class SeedMatcher {
         } else {
             samples = allSamples.toArray(new Sample[0]);
         }
+        // What seeds picked at random score, as the zero of the scale
+        final java.util.Random random = new java.util.Random(CALIBRATION_SEED);
+        float total = 0;
+        for (int i = 0; i < CALIBRATION_SEEDS; i++) {
+            total += rawScore(new VanillaBiomeSource(random.nextLong(), largeBiomes), -1);
+        }
+        chance = (samples.length > 0) ? Math.min(0.9f, total / CALIBRATION_SEEDS) : 0;
     }
 
     /**
@@ -83,13 +95,26 @@ public final class SeedMatcher {
         if (samples.length == 0) {
             return 0;
         }
+        final float raw = rawScore(source, (threshold > 0) ? (chance + threshold * (1 - chance)) : -1);
+        return (raw < 0) ? -1 : Math.max(0, (raw - chance) / (1 - chance));
+    }
+
+    /**
+     * The score before calibration: per sample, how alike the biomes are and how close the height of the land is.
+     *
+     * @param threshold The raw score to beat, or a negative number to always work it out completely.
+     * @return The raw score from 0 to 1, or -1 if it was determined early that it would not exceed the threshold.
+     */
+    private float rawScore(VanillaBiomeSource source, float threshold) {
+        final float[] height = new float[1];
         float total = 0;
         for (int i = 0; i < samples.length; i++) {
             final Sample sample = samples[i];
-            final VanillaBiomes.Category actual = VanillaBiomes.getCategory(source.getSurfaceBiomeAtBlock(sample.x, sample.z));
-            total += sample.expected.similarity(actual);
+            final VanillaBiomes.Category actual = VanillaBiomes.getCategory(source.getSurfaceBiomeAndHeightAtBlock(sample.x, sample.z, height));
+            final float heightMatch = Math.max(0, 1 - Math.abs(height[0] - sample.expectedHeight) / HEIGHT_TOLERANCE);
+            total += BIOME_WEIGHT * sample.expected.similarity(actual) + (1 - BIOME_WEIGHT) * heightMatch;
             // Early exit: even if all remaining samples match perfectly, the threshold cannot be beaten
-            if ((i % 4 == 3) && ((total + (samples.length - i - 1)) / samples.length <= threshold)) {
+            if ((threshold >= 0) && (i % 4 == 3) && ((total + (samples.length - i - 1)) / samples.length <= threshold)) {
                 return -1;
             }
         }
@@ -110,18 +135,23 @@ public final class SeedMatcher {
 
     private final boolean largeBiomes;
     private final Sample[] samples;
+    private final float chance;
 
-    private static final int SPACING = 16, INSET = 6, MAX_SAMPLES = 192;
+    private static final int SPACING = 16, INSET = 6, MAX_SAMPLES = 192, CALIBRATION_SEEDS = 40;
+    private static final long CALIBRATION_SEED = 20261103L;
+    private static final float BIOME_WEIGHT = 0.55f, HEIGHT_TOLERANCE = 24f;
     private static final int[] OUTSIDE_DISTANCES = {32, 96};
 
     private static final class Sample {
-        Sample(int x, int z, VanillaBiomes.Category expected) {
+        Sample(int x, int z, VanillaBiomes.Category expected, float expectedHeight) {
             this.x = x;
             this.z = z;
             this.expected = expected;
+            this.expectedHeight = expectedHeight;
         }
 
         final int x, z;
         final VanillaBiomes.Category expected;
+        final float expectedHeight;
     }
 }
