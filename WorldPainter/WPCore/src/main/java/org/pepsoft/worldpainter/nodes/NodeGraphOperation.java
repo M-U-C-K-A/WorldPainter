@@ -24,7 +24,6 @@ import org.pepsoft.worldpainter.layers.Layer;
 import org.pepsoft.worldpainter.layers.plants.PlantLayer;
 import org.pepsoft.worldpainter.layers.plants.PlantLayerPresets;
 import org.pepsoft.worldpainter.procedural.ParallelTileProcessor;
-import org.pepsoft.worldpainter.procedural.ProceduralTerrainOperation.Mode;
 import org.pepsoft.worldpainter.procedural.SelectionWeights;
 import org.pepsoft.worldpainter.selection.SelectionBlock;
 import org.pepsoft.worldpainter.selection.SelectionChunk;
@@ -618,5 +617,38 @@ public class NodeGraphOperation {
         }
 
         private final Map<Point, float[]> heights = new HashMap<>();
+    }
+
+    /**
+     * How the generated heights are combined with the existing terrain.
+     */
+    public enum Mode {
+        /**
+         * Replace the existing terrain height.
+         */
+        REPLACE("Replace"),
+        /**
+         * Add the generated relief (relative to the base height) to the existing terrain.
+         */
+        ADD("Add relief"),
+        /**
+         * Only raise the existing terrain where the generated terrain is higher.
+         */
+        RAISE("Raise only"),
+        /**
+         * Only lower the existing terrain where the generated terrain is lower.
+         */
+        LOWER("Lower only");
+
+        Mode(String displayName) {
+            this.displayName = displayName;
+        }
+
+        @Override
+        public String toString() {
+            return displayName;
+        }
+
+        private final String displayName;
     }
 }

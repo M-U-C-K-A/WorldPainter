@@ -128,7 +128,7 @@ public class EdgeBlendDialog extends WorldPainterDialog {
         form.add(new JLabel("Blend into:"), c);
         c.gridx = 1;
         c.gridwidth = 3;
-        proceduralRadioButton = new JRadioButton("Procedural terrain:", ! lastFlatTarget);
+        proceduralRadioButton = new JRadioButton("Generated terrain:", ! lastFlatTarget);
         final JPanel proceduralPanel = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
         proceduralPanel.add(proceduralRadioButton);
         presetComboBox = new JComboBox<>(ProceduralTerrainSettings.Preset.values());
@@ -145,19 +145,6 @@ public class EdgeBlendDialog extends WorldPainterDialog {
             }
         });
         proceduralPanel.add(presetComboBox);
-        final JButton customiseButton = new JButton("Customise…");
-        customiseButton.addActionListener(e -> {
-            final ProceduralTerrainDialog editor = ProceduralTerrainDialog.createEditor(this, dimension, colourScheme, centre, targetSettings);
-            editor.setVisible(true);
-            if (! editor.isCancelled()) {
-                targetSettings = editor.getSettings();
-                presetComboBox.setSelectedIndex(-1);
-                proceduralRadioButton.setSelected(true);
-                updateTargetLabel();
-                updatePreview();
-            }
-        });
-        proceduralPanel.add(customiseButton);
         targetLabel = new JLabel();
         proceduralPanel.add(targetLabel);
         form.add(proceduralPanel, c);

@@ -69,7 +69,7 @@ For a few pointers, pitfalls and gotchas about developing WorldPainter, see
 
 - The user interface uses [FlatLaf](https://www.formdev.com/flatlaf/) for the modern themes and a small built-in docking
   framework (`org.pepsoft.worldpainter.docking`) for the panels.
-- The procedural terrain and edge blending engine lives in `org.pepsoft.worldpainter.procedural` in WPCore; the dialogs
-  are in the same package in WPGUI.
+- The node graph lives in `org.pepsoft.worldpainter.nodes`, and the edge blending engine in
+  `org.pepsoft.worldpainter.procedural`, in WPCore; their dialogs are in the same packages in WPGUI.
 - To merge the latest changes from the original project: `git fetch upstream && git merge upstream/master` (the
   `upstream` remote points to https://github.com/Captain-Chaos/WorldPainter).

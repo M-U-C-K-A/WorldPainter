@@ -26,7 +26,7 @@
   <a href="#interface">Interface</a> ·
   <a href="#brushes-and-terrain-stamps">Brushes</a> ·
   <a href="#edge-blending">Edges</a> ·
-  <a href="#procedural-generation">Procedural</a> ·
+  <a href="#node-graph">Node graph</a> ·
   <a href="#install">Install</a>
 </p>
 
@@ -170,7 +170,7 @@ A single **Brushes** panel, with no hidden menu:
 **Generate › Blend map edges…**. A 200 × 200 map no longer ends in a sheer cliff: its relief goes over gradually into the land around it.
 
 - **Transition zone** of 16 to 4096 blocks, outside the map (which is then enlarged), inside it (the edge is softened) or across the edge. Round maps are blended too.
-- **Target**: a procedural terrain (*Minecraft-like* by default, close to what Minecraft generates beyond the map) or a flat level.
+- **Target**: generated terrain from a preset (*Minecraft-like* by default, close to what Minecraft generates beyond the map) or a flat level.
 - Adjustable curve shape and **irregularity**; Minecraft then joins up the last few blocks itself with its *chunk blending*.
 
 <img alt="Before and after blending the edges" src="docs/images/edge-blending.png" width="100%">
@@ -180,18 +180,18 @@ A single **Brushes** panel, with no hidden menu:
   <img alt="" src="docs/assets/divider-light.svg" width="100%">
 </picture>
 
-## Procedural generation
+## Node graph
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/procedural-dark.svg">
   <img alt="Stacked layers of noise forming a terrain" src="docs/assets/procedural-light.svg" width="460">
 </picture>
 
-**Generate › Procedural terrain…** (<kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>G</kbd>) to lay down a base relief before painting:
+**Generate › Node graph terrain…** (<kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>N</kbd>) to generate a complete world before painting it by hand:
 
-- a stack of noise layers to combine (gentle relief, ridges, hills, cells, dunes), with terraces, sea level and surface rules (snow up high, rock on the slopes, beaches);
-- 8 presets, a live preview, and applying to the whole map or to the selection with soft edges;
-- computed in parallel on all cores, with no seams between tiles, suited to very large maps.
+- noise, landforms (mountains, rolling hills, an island) in one node, erosion, rivers, lakes, masks, and painters for the terrain, the biomes and the vegetation, wired together with a live preview;
+- examples to start from, from a Minecraft-like world or plains to an archipelago, mesa canyons or floating islands;
+- applied to the whole map or to the selection with soft edges, computed in parallel on all cores with no seams between tiles, suited to very large maps.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/divider-dark.svg">

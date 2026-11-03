@@ -9,7 +9,6 @@ import org.pepsoft.util.swing.ProgressTask;
 import org.pepsoft.worldpainter.*;
 import org.pepsoft.worldpainter.Dimension;
 import org.pepsoft.worldpainter.layers.CustomLayer;
-import org.pepsoft.worldpainter.procedural.ProceduralTerrainOperation;
 import org.pepsoft.worldpainter.util.HairlineBorder;
 import org.pepsoft.worldpainter.util.Icons;
 import org.pepsoft.worldpainter.util.ThemeUtils;
@@ -303,7 +302,7 @@ public class NodeGraphDialog extends WorldPainterDialog {
         panel.setBorder(new HairlineBorder(true, false, false, false, new Insets(10, 12, 10, 12)));
         final JPanel options = new JPanel(new FlowLayout(FlowLayout.LEADING, 6, 0));
         options.add(mutedLabel("Mode"));
-        modeComboBox = new JComboBox<>(ProceduralTerrainOperation.Mode.values());
+        modeComboBox = new JComboBox<>(NodeGraphOperation.Mode.values());
         modeComboBox.setToolTipText("<html><b>Replace</b>: replace the terrain height<br><b>Add relief</b>: add the generated relief (relative to the output's height at 0) to the existing terrain<br><b>Raise only</b> / <b>Lower only</b>: only change the terrain where the generated terrain is higher / lower</html>");
         options.add(modeComboBox);
         options.add(mutedLabel("Strength"));
@@ -673,7 +672,7 @@ public class NodeGraphDialog extends WorldPainterDialog {
             pending.cancel(true);
         }
         final NodeGraphOperation operation = new NodeGraphOperation(graph);
-        operation.setMode((ProceduralTerrainOperation.Mode) modeComboBox.getSelectedItem());
+        operation.setMode((NodeGraphOperation.Mode) modeComboBox.getSelectedItem());
         operation.setStrength(strengthSlider.getValue() / 100f);
         operation.setSelectionOnly(selectionRadioButton.isSelected());
         operation.setFeather((Integer) featherSpinner.getValue());
@@ -746,7 +745,7 @@ public class NodeGraphDialog extends WorldPainterDialog {
     private JSpinner seedSpinner, featherSpinner;
     private JComboBox<String> areaComboBox;
     private JLabel rangeLabel;
-    private JComboBox<ProceduralTerrainOperation.Mode> modeComboBox;
+    private JComboBox<NodeGraphOperation.Mode> modeComboBox;
     private JSlider strengthSlider;
     private JRadioButton selectionRadioButton;
     private JCheckBox applyThemeCheckBox, applyPaintersCheckBox;

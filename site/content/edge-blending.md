@@ -15,7 +15,7 @@ A map of 200 × 200 blocks used to end in a sheer cliff where Minecraft's own la
 | **Transition zone** | Outside the map (which is extended with new tiles), inside it (the edge is softened), or across the edge |
 | **Shape** | The curve of the transition |
 | **Irregularity** | Makes the transition wander instead of running exactly parallel to the edge |
-| **Blend into** | A procedural terrain (*Minecraft-like* by default, close to what Minecraft generates beyond the map) or a flat level |
+| **Blend into** | Generated terrain, from one of eight presets (*Minecraft-like* by default, close to what Minecraft generates beyond the map), or a flat level |
 
 Round maps are blended too: the land outside the circle, which WorldPainter marks as void block by block and as not present chunk by chunk, is filled in with the blend, so no gaps are left in the corners of the chunks along the edge.
 

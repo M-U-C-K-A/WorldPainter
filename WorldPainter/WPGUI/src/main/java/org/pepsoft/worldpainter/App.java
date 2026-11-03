@@ -71,7 +71,6 @@ import org.pepsoft.worldpainter.docking.DockingManager;
 import org.pepsoft.worldpainter.docking.Side;
 import org.pepsoft.worldpainter.nodes.NodeGraphDialog;
 import org.pepsoft.worldpainter.procedural.EdgeBlendDialog;
-import org.pepsoft.worldpainter.procedural.ProceduralTerrainDialog;
 import org.pepsoft.worldpainter.util.*;
 import org.pepsoft.worldpainter.util.BetterAction;
 import org.pepsoft.worldpainter.util.FileFilter;
@@ -4730,13 +4729,7 @@ public final class App extends JFrame implements BrushControl,
         final JMenu menu = new JMenu("Generate");
         menu.setMnemonic('g');
 
-        JMenuItem menuItem = new JMenuItem("Procedural terrain\u2026");
-        menuItem.setToolTipText("Generate terrain from layers of noise, with a live preview, for the whole map or the selection");
-        menuItem.setAccelerator(getKeyStroke(VK_G, PLATFORM_COMMAND_MASK | SHIFT_DOWN_MASK));
-        menuItem.addActionListener(e -> showProceduralTerrain());
-        menu.add(menuItem);
-
-        menuItem = new JMenuItem("Node graph terrain\u2026", Icons.get("workflow"));
+        JMenuItem menuItem = new JMenuItem("Node graph terrain\u2026", Icons.get("workflow"));
         menuItem.setToolTipText("Design a height map by wiring noise, filter and erosion nodes together, with a live preview, and apply it to the whole map or the selection");
         menuItem.setAccelerator(getKeyStroke(VK_N, PLATFORM_COMMAND_MASK | SHIFT_DOWN_MASK));
         menuItem.addActionListener(e -> showNodeGraph());
@@ -4749,19 +4742,6 @@ public final class App extends JFrame implements BrushControl,
 
         menu.putClientProperty(KEY_HELP_KEY, "Menu/Generate");
         return menu;
-    }
-
-    private void showProceduralTerrain() {
-        if ((world == null) || (dimension == null)) {
-            DesktopUtils.beep();
-            return;
-        }
-        cancelPaintSelection();
-        final ProceduralTerrainDialog dialog = new ProceduralTerrainDialog(this, dimension, view, selectedColourScheme, view.getViewCentreInWorldCoords(), selectionState.getValue());
-        dialog.setVisible(true);
-        if ((! dialog.isCancelled()) && (threeDeeFrame != null)) {
-            threeDeeFrame.refresh(true);
-        }
     }
 
     /**

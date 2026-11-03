@@ -114,8 +114,4 @@ Noise nodes have a size (the scale of their features), a number of octaves (deta
 
 ## Examples
 
-The **Examples** menu has complete worlds to start from or learn from: rolling hills, eroded mountains, a tropical archipelago, mesa canyons, desert dunes, a volcanic island, lakes and forests, river valleys, tower karst jungle, red cliffs and spruces, an alpine valley, the continent and the coral archipelago shown on the [home page](index.html), the beginner's archipelago, floating islands, and one which erodes the current map.
-
-## Procedural terrain
-
-**Generate › Procedural terrain…** (<kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>G</kbd>) is a simpler alternative to the node graph: a stack of noise layers (smooth relief, ridges, hills, cells, dunes) with terraces, a sea level and surface rules (snow up high, rock on steep slopes, beaches by the water), eight presets and a live preview.
+The **Examples** menu has complete worlds to start from or learn from: a Minecraft-like world of continents and oceans, plains, rolling hills, eroded mountains, a tropical archipelago, mesa canyons, desert dunes, a volcanic island, lakes and forests, river valleys, tower karst jungle, red cliffs and spruces, an alpine valley, the continent and the coral archipelago shown on the [home page](index.html), the beginner's archipelago, floating islands, and one which erodes the current map.

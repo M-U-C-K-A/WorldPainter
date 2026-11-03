@@ -45,24 +45,6 @@ public class ProceduralTerrainTest {
     }
 
     @Test
-    public void testApplyIsSeamlessAcrossTiles() throws Exception {
-        final Dimension dimension = TestData.createDimension(new Rectangle(0, 0, 4 * TILE_SIZE, 4 * TILE_SIZE), 62);
-        final ProceduralTerrainSettings settings = ProceduralTerrainSettings.create(ProceduralTerrainSettings.Preset.ROLLING_HILLS, 42L);
-        new ProceduralTerrainOperation(settings).apply(dimension, null);
-        final ProceduralTerrain terrain = new ProceduralTerrain(settings);
-        for (int x = 0; x < 4 * TILE_SIZE; x += 7) {
-            for (int y = 0; y < 4 * TILE_SIZE; y += 11) {
-                // Heights are stored with 1/256 precision
-                assertEquals(terrain.getHeight(x, y), dimension.getHeightAt(x, y), 0.01f);
-            }
-        }
-        // No discontinuity at tile boundaries
-        for (int y = 0; y < 4 * TILE_SIZE; y++) {
-            assertTrue(Math.abs(dimension.getHeightAt(TILE_SIZE - 1, y) - dimension.getHeightAt(TILE_SIZE, y)) < 3);
-        }
-    }
-
-    @Test
     public void testEdgeBlendOutside() throws Exception {
         // A 2x2 tile map at height 150, which should be extended with a gradual slope down to 66
         final Dimension dimension = TestData.createDimension(new Rectangle(0, 0, 2 * TILE_SIZE, 2 * TILE_SIZE), 150);

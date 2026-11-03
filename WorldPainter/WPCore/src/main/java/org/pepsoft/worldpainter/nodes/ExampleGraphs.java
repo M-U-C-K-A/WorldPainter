@@ -25,6 +25,60 @@ public final class ExampleGraphs {
         final Builder b = new Builder(example, seed);
         final int w = waterLevel;
         switch (example) {
+            case MINECRAFT_LIKE: {
+                // Wide continents and oceans with hills on the land, close to what Minecraft generates
+                final NoiseNode continents = b.noise(NoiseNode.Kind.PERLIN, 1800, 4, 41, 120, 0);
+                final CurveNode coast = b.add(new CurveNode(0, 0, 0.4f, 0.12f, 0.5f, 0.3f, 0.7f, 0.45f, 1, 0.7f), 1, 0);
+                b.wire(continents, coast);
+                final NoiseNode hills = b.noise(NoiseNode.Kind.PERLIN, 440, 5, 42, 30, 1);
+                final CombineNode land = b.add(new CombineNode(CombineNode.Mode.ADD), 2, 0);
+                land.set(CombineNode.STRENGTH, 0.3);
+                b.wire(coast, land, 0);
+                b.wire(hills, land, 1);
+                b.output(land, 3, 0, w - 40, w + 110, minHeight, maxHeight);
+                // Beaches and gravel by the sea, rock on steep slopes, stone and snow up high, patches of forest
+                final HeightMaskNode beaches = b.height(w - 5, w + 2, 2, 0, 2);
+                b.wire(beaches, b.terrain(Terrain.SAND, 1.2, 1, 2));
+                b.wire(beaches, b.biome(MinecraftBiome.BEACH, 1.2, 2, 2));
+                final HeightMaskNode seabed = b.height(-4096, w - 6, 2, 0, 3);
+                b.wire(seabed, b.terrain(Terrain.GRAVEL, 1, 1, 3));
+                b.wire(seabed, b.biome(MinecraftBiome.OCEAN, 1.2, 2, 3));
+                final SlopeMaskNode cliffs = b.slope(45, 90, 6, 0, 4);
+                b.wire(cliffs, b.terrain(Terrain.ROCK, 1.2, 1, 4));
+                final HeightMaskNode stony = b.height(w + 70, 4096, 8, 0, 5);
+                b.wire(stony, b.terrain(Terrain.STONE_MIX, 1, 1, 5));
+                b.wire(stony, b.biome(MinecraftBiome.WINDSWEPT_HILLS, 1.1, 2, 5));
+                final HeightMaskNode snowline = b.height(w + 105, 4096, 8, 0, 6);
+                b.wire(snowline, b.terrain(Terrain.SNOW, 1.1, 1, 6));
+                b.wire(snowline, b.flora(Vegetation.SNOW, 1, 2, 6));
+                b.wire(snowline, b.biome(MinecraftBiome.SNOWY_SLOPES, 1.2, 3, 6));
+                final NoiseNode woods = b.noise(NoiseNode.Kind.PERLIN, 500, 4, 43, 0, 7);
+                final CurveNode forestMask = b.add(new CurveNode(0, 0, 0.5f, 0, 0.62f, 1, 1, 1), 1, 7);
+                b.wire(woods, forestMask);
+                b.wire(forestMask, b.flora(Vegetation.DECIDUOUS_FOREST, 0.6, 2, 7));
+                b.wire(forestMask, b.biome(MinecraftBiome.FOREST, 1, 3, 7));
+                b.flora(Vegetation.GRASS_AND_FLOWERS, 0.3, 4, 7);
+                b.biome(MinecraftBiome.PLAINS, 0.6, 4, 6);
+                break;
+            }
+            case PLAINS: {
+                // Wide, nearly flat grassland just above the sea, with a few ponds and scattered woods
+                final NoiseNode undulation = b.noise(NoiseNode.Kind.PERLIN, 1000, 4, 51, 0, 0);
+                final CurveNode shape = b.add(new CurveNode(0, 0, 0.3f, 0.35f, 1, 1), 1, 0);
+                b.wire(undulation, shape);
+                b.output(shape, 2, 0, w - 6, w + 18, minHeight, maxHeight);
+                final HeightMaskNode shores = b.height(-4096, w + 1, 1, 0, 1);
+                b.wire(shores, b.terrain(Terrain.BEACHES, 1.2, 1, 1));
+                final NoiseNode woods = b.noise(NoiseNode.Kind.PERLIN, 450, 4, 52, 0, 2);
+                final CurveNode forestMask = b.add(new CurveNode(0, 0, 0.6f, 0, 0.7f, 1, 1, 1), 1, 2);
+                b.wire(woods, forestMask);
+                b.wire(forestMask, b.flora(Vegetation.DECIDUOUS_FOREST, 0.5, 2, 2));
+                b.wire(forestMask, b.biome(MinecraftBiome.FOREST, 1, 3, 2));
+                b.flora(Vegetation.GRASS_AND_FLOWERS, 0.4, 2, 3);
+                b.flora(Vegetation.FLOWERS, 0.03, 3, 3);
+                b.biome(MinecraftBiome.PLAINS, 0.6, 4, 3);
+                break;
+            }
             case ROLLING_HILLS: {
                 final NoiseNode hills = b.noise(NoiseNode.Kind.PERLIN, 768, 5, 1, 0, 0);
                 final CurveNode shape = b.add(new CurveNode(0, 0, 0.5f, 0.35f, 1, 1), 1, 0);
@@ -809,6 +863,8 @@ public final class ExampleGraphs {
     }
 
     public enum Example {
+        MINECRAFT_LIKE("Minecraft-like"),
+        PLAINS("Plains"),
         ROLLING_HILLS("Rolling hills"),
         ERODED_MOUNTAINS("Eroded mountains"),
         ARCHIPELAGO("Tropical archipelago"),
