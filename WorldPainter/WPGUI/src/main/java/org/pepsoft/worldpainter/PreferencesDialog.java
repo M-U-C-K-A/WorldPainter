@@ -140,7 +140,7 @@ public class PreferencesDialog extends WorldPainterDialog {
      * The theme chosen with the design and appearance combo boxes.
      */
     private Configuration.LookAndFeel getSelectedTheme() {
-        return ThemeUtils.theme(comboBoxLookAndFeel.getSelectedIndex() == 1, ThemeUtils.Appearance.values()[comboBoxAppearance.getSelectedIndex()]);
+        return ThemeUtils.theme(ThemeUtils.Style.values()[comboBoxLookAndFeel.getSelectedIndex()], ThemeUtils.Appearance.values()[comboBoxAppearance.getSelectedIndex()]);
     }
 
     /**
@@ -209,7 +209,7 @@ public class PreferencesDialog extends WorldPainterDialog {
                 new SettingsCard("Undo", "How many of your last changes Ctrl+Z can take back. More steps use more memory.")
                         .row(checkBoxUndo)
                         .indented(jLabel5, spinnerUndoLevels),
-                new SettingsCard("Theme", "Modern and Classic are two designs for the whole program, each light, dark or following your system. A change shows at once; Cancel takes it back.")
+                new SettingsCard("Theme", "Modern, Classic and Glass are three designs for the whole program, each light, dark or following your system. A change shows at once; Cancel takes it back.")
                         .field(jLabel30, comboBoxLookAndFeel)
                         .field(new JLabel("Appearance:"), comboBoxAppearance),
                 new SettingsCard("Interface size", "How large the text and controls are, for screens with small or large pixels.", Badge.Kind.RESTART)
@@ -355,7 +355,7 @@ public class PreferencesDialog extends WorldPainterDialog {
             previousMaxHeight = config.getDefaultMaxHeight();
 
             final Configuration.LookAndFeel theme = ThemeUtils.normalise(config.getLookAndFeel());
-            comboBoxLookAndFeel.setSelectedIndex(ThemeUtils.isClassic(theme) ? 1 : 0);
+            comboBoxLookAndFeel.setSelectedIndex(ThemeUtils.getStyle(theme).ordinal());
             comboBoxAppearance.setSelectedIndex(ThemeUtils.getAppearance(theme).ordinal());
             appliedTheme = theme;
             shownTheme = theme;
@@ -927,7 +927,7 @@ public class PreferencesDialog extends WorldPainterDialog {
 
         jLabel30.setText("Visual theme:");
 
-        comboBoxLookAndFeel.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Modern", "Classic" }));
+        comboBoxLookAndFeel.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Modern", "Classic", "Glass" }));
         comboBoxLookAndFeel.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 comboBoxLookAndFeelActionPerformed(evt);

@@ -6,8 +6,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Gives the main windows a banner which says what they are for, and what each of their tabs is for, and the icons of
- * the Modern theme to every window. Windows which are not listed here get no banner.
+ * Gives the main windows a banner which says what they are for, and what each of their tabs is for, and every window
+ * the icons of the Modern theme and the backdrop of the Glass theme. Windows which are not listed here get no banner.
  */
 public final class DialogDesign {
     private DialogDesign() {
@@ -15,24 +15,31 @@ public final class DialogDesign {
     }
 
     /**
-     * Add the banner to a window, if it has one. To be done once, just before it is first shown.
+     * Add the banner to a window, if it has one, put it on the backdrop of the Glass theme, and give it the icons of the
+     * Modern theme. To be done once, just before it is first shown.
      */
     public static void decorate(JDialog dialog) {
         ModernIcons.install(dialog.getRootPane());
         final Spec spec = SPECS.get(dialog.getClass().getSimpleName());
-        if (spec == null) {
-            return;
-        }
-        final String title = dialog.getTitle().replace(" [SNAPSHOT]", "").replace(" [SAFE MODE]", "");
-        final DialogBanner banner = new DialogBanner(spec.illustration, new Color(spec.accent), title, spec.description);
         final Container content = dialog.getContentPane();
         // Taking the default button out of the window, as moving the content does, makes it forget that it is one
         final JButton defaultButton = dialog.getRootPane().getDefaultButton();
-        final JPanel wrapper = new JPanel(new BorderLayout());
-        wrapper.add(banner, BorderLayout.NORTH);
+        final Glass.Backdrop wrapper = new Glass.Backdrop(new BorderLayout());
+        final DialogBanner banner;
+        if (spec != null) {
+            final String title = dialog.getTitle().replace(" [SNAPSHOT]", "").replace(" [SAFE MODE]", "");
+            banner = new DialogBanner(spec.illustration, new Color(spec.accent), title, spec.description);
+            wrapper.add(banner, BorderLayout.NORTH);
+        } else {
+            banner = null;
+        }
         wrapper.add(content, BorderLayout.CENTER);
         dialog.setContentPane(wrapper);
         dialog.getRootPane().setDefaultButton(defaultButton);
+        Glass.update(wrapper);
+        if (banner == null) {
+            return;
+        }
 
         // What the selected tab is for
         final JTabbedPane tabs = findTabs(dialog.getRootPane());

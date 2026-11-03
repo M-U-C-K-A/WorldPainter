@@ -9,12 +9,13 @@ description: The redesigned interface of WorldPainter Modernised.
 
 ## Themes
 
-Two designs, each light, dark or following the system, with the Geist typeface:
+Three designs, each light, dark or following the system, with the Geist typeface:
 
 | Design | Looks like |
 |---|---|
 | **Modern** | A window of soft grey with raised surfaces, a blue accent, softly rounded controls, tabs as a segmented control, line icons, and settings grouped on rounded surfaces with their controls on the right, as in the settings of macOS |
 | **Classic** | White, in the style of shadcn/ui: zinc greys, an orange accent, hairline separators, and settings in boxes |
+| **Glass** | Frosted glass: the panels float on a soft gradient of sage and pearl grey (slate and teal in the dark), the map sits in a pane with rounded corners, settings are grouped on translucent cards with a soft shadow, and buttons and tabs are pills, the selected one black (white in the dark). It keeps the line icons and the layout of Modern |
 
 Choose them in **Preferences › General › Theme**: the change shows at once, without restarting, and **Cancel** takes it back. The sun and moon button in the toolbar switches between light and dark.
 
@@ -94,7 +95,7 @@ The map sits on a dotted canvas instead of a dark blue background. On macOS the 
 
 ## Settings windows
 
-In the Classic design the settings windows (Preferences, Edit Surface Properties, Export, New World…) open with a banner: a picture of what they are about, a sentence explaining them and, for windows with tabs, what the selected tab contains. The Modern design leaves the banner out and starts with the settings, and replaces the old coloured icons with line icons in the colours of the theme. **Preferences** also has an **Apply** button, which puts the changes into effect without closing the window.
+In the Classic design the settings windows (Preferences, Edit Surface Properties, Export, New World…) open with a banner: a picture of what they are about, a sentence explaining them and, for windows with tabs, what the selected tab contains. The Modern and Glass designs leave the banner out and start with the settings, and replace the old coloured icons with line icons in the colours of the theme. **Preferences** also has an **Apply** button, which puts the changes into effect without closing the window.
 
 Their settings are grouped in cards, each with a title and a sentence about what it does. Badges point out the settings which only apply after a restart, after reloading the map, on the next export or to new worlds, and those which are experimental or can be slow.
 

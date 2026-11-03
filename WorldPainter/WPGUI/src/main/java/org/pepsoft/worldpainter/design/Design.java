@@ -18,7 +18,14 @@ public final class Design {
     }
 
     /**
-     * Whether the Modern theme is in use, rather than the Classic one.
+     * Whether the Glass theme is in use. It is a variant of the Modern theme, so {@link #isModern()} is also true.
+     */
+    public static boolean isGlass() {
+        return UIManager.getBoolean("WorldPainter.glass");
+    }
+
+    /**
+     * Whether the Modern theme, or the Glass theme which builds on it, is in use, rather than the Classic one.
      */
     public static boolean isModern() {
         return UIManager.getBoolean("WorldPainter.modern");

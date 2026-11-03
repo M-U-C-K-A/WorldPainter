@@ -2800,6 +2800,9 @@ public final class App extends JFrame implements BrushControl,
         glassPane.setVisible(true);
         TiledImageViewerContainer viewContainer = new TiledImageViewerContainer(privateRootPane);
 
+        // The gradient of the Glass theme shows behind the panels, the tool bar and the status bar
+        setContentPane(new org.pepsoft.worldpainter.design.Glass.Backdrop(new BorderLayout()));
+
         // Set up docking framework
         dockingManager = new DockingManager(this);
         getContentPane().add(dockingManager.getMainContainer(), BorderLayout.CENTER);
@@ -2809,7 +2812,7 @@ public final class App extends JFrame implements BrushControl,
         terrain3DPanel = new Terrain3DPanel();
         terrain3DPanel.setPopOutAction(this::detach3D, false);
         workspaceCards.add(terrain3DPanel, WORKSPACE_3D);
-        dockingManager.getWorkspace().add(workspaceCards, BorderLayout.CENTER);
+        dockingManager.getWorkspace().add(org.pepsoft.worldpainter.design.Glass.frame(workspaceCards), BorderLayout.CENTER);
 
         setJMenuBar(createMenuBar());
         

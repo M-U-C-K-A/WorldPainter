@@ -5,6 +5,8 @@ import com.formdev.flatlaf.extras.FlatAnimatedLafChange;
 import org.pepsoft.util.SystemUtils;
 import org.pepsoft.worldpainter.Configuration;
 import org.pepsoft.worldpainter.laf.WorldPainterDarkLaf;
+import org.pepsoft.worldpainter.laf.WorldPainterGlassDarkLaf;
+import org.pepsoft.worldpainter.laf.WorldPainterGlassLightLaf;
 import org.pepsoft.worldpainter.laf.WorldPainterLightLaf;
 import org.pepsoft.worldpainter.laf.WorldPainterModernDarkLaf;
 import org.pepsoft.worldpainter.laf.WorldPainterModernLightLaf;
@@ -33,7 +35,7 @@ public final class ThemeUtils {
      */
     public static void installLookAndFeel(Configuration.LookAndFeel lookAndFeel, float uiScale) {
         final Configuration.LookAndFeel theme = normalise(lookAndFeel);
-        installFlatLaf(isClassic(theme), isDark(theme), uiScale);
+        installFlatLaf(getStyle(theme), isDark(theme), uiScale);
     }
 
     /**
@@ -42,7 +44,7 @@ public final class ThemeUtils {
     public static void switchTheme(Configuration.LookAndFeel lookAndFeel) {
         final Configuration.LookAndFeel theme = normalise(lookAndFeel);
         FlatAnimatedLafChange.showSnapshot();
-        installFlatLaf(isClassic(theme), isDark(theme), 1.0f);
+        installFlatLaf(getStyle(theme), isDark(theme), 1.0f);
         FlatLaf.updateUI();
         FlatAnimatedLafChange.hideSnapshotWithAnimation();
     }
@@ -53,14 +55,14 @@ public final class ThemeUtils {
      * @return The theme which is now in use.
      */
     public static Configuration.LookAndFeel switchAppearance(boolean dark) {
-        final Configuration.LookAndFeel theme = theme(isClassicTheme(), dark ? Appearance.DARK : Appearance.LIGHT);
+        final Configuration.LookAndFeel theme = theme(getInstalledStyle(), dark ? Appearance.DARK : Appearance.LIGHT);
         switchTheme(theme);
         return theme;
     }
 
     /**
-     * Map {@code null} and the look and feels of earlier versions to the themes which are offered: Modern or Classic,
-     * light, dark or following the system.
+     * Map {@code null} and the look and feels of earlier versions to the themes which are offered: Modern, Classic or
+     * Glass, light, dark or following the system.
      */
     public static Configuration.LookAndFeel normalise(Configuration.LookAndFeel lookAndFeel) {
         if (lookAndFeel == null) {
@@ -81,11 +83,21 @@ public final class ThemeUtils {
     }
 
     /**
-     * Whether a theme is a variant of the Classic theme, rather than the Modern one.
+     * The design of a theme: Modern, Classic or Glass.
      */
-    public static boolean isClassic(Configuration.LookAndFeel lookAndFeel) {
-        final Configuration.LookAndFeel theme = normalise(lookAndFeel);
-        return (theme == Configuration.LookAndFeel.CLASSIC_LIGHT) || (theme == Configuration.LookAndFeel.CLASSIC_DARK) || (theme == Configuration.LookAndFeel.CLASSIC_AUTO);
+    public static Style getStyle(Configuration.LookAndFeel lookAndFeel) {
+        switch (normalise(lookAndFeel)) {
+            case CLASSIC_LIGHT:
+            case CLASSIC_DARK:
+            case CLASSIC_AUTO:
+                return Style.CLASSIC;
+            case GLASS_LIGHT:
+            case GLASS_DARK:
+            case GLASS_AUTO:
+                return Style.GLASS;
+            default:
+                return Style.MODERN;
+        }
     }
 
     /**
@@ -95,9 +107,11 @@ public final class ThemeUtils {
         switch (normalise(lookAndFeel)) {
             case MODERN_LIGHT:
             case CLASSIC_LIGHT:
+            case GLASS_LIGHT:
                 return Appearance.LIGHT;
             case MODERN_DARK:
             case CLASSIC_DARK:
+            case GLASS_DARK:
                 return Appearance.DARK;
             default:
                 return Appearance.SYSTEM;
@@ -105,24 +119,30 @@ public final class ThemeUtils {
     }
 
     /**
-     * The theme with a design (Classic or Modern) and an appearance.
+     * The theme with a design and an appearance.
      */
-    public static Configuration.LookAndFeel theme(boolean classic, Appearance appearance) {
-        switch (appearance) {
-            case LIGHT:
-                return classic ? Configuration.LookAndFeel.CLASSIC_LIGHT : Configuration.LookAndFeel.MODERN_LIGHT;
-            case DARK:
-                return classic ? Configuration.LookAndFeel.CLASSIC_DARK : Configuration.LookAndFeel.MODERN_DARK;
+    public static Configuration.LookAndFeel theme(Style style, Appearance appearance) {
+        switch (style) {
+            case CLASSIC:
+                return (appearance == Appearance.LIGHT) ? Configuration.LookAndFeel.CLASSIC_LIGHT : ((appearance == Appearance.DARK) ? Configuration.LookAndFeel.CLASSIC_DARK : Configuration.LookAndFeel.CLASSIC_AUTO);
+            case GLASS:
+                return (appearance == Appearance.LIGHT) ? Configuration.LookAndFeel.GLASS_LIGHT : ((appearance == Appearance.DARK) ? Configuration.LookAndFeel.GLASS_DARK : Configuration.LookAndFeel.GLASS_AUTO);
             default:
-                return classic ? Configuration.LookAndFeel.CLASSIC_AUTO : Configuration.LookAndFeel.MODERN_AUTO;
+                return (appearance == Appearance.LIGHT) ? Configuration.LookAndFeel.MODERN_LIGHT : ((appearance == Appearance.DARK) ? Configuration.LookAndFeel.MODERN_DARK : Configuration.LookAndFeel.MODERN_AUTO);
         }
     }
 
     /**
-     * Indicates whether the theme which is installed is the Classic one, rather than the Modern one.
+     * The design of the theme which is installed.
      */
-    public static boolean isClassicTheme() {
-        return isModernTheme() && (! UIManager.getBoolean("WorldPainter.modern"));
+    public static Style getInstalledStyle() {
+        if (UIManager.getBoolean("WorldPainter.glass")) {
+            return Style.GLASS;
+        } else if (UIManager.getBoolean("WorldPainter.modern")) {
+            return Style.MODERN;
+        } else {
+            return Style.CLASSIC;
+        }
     }
 
     private static boolean isDark(Configuration.LookAndFeel theme) {
@@ -216,7 +236,7 @@ public final class ThemeUtils {
         return image;
     }
 
-    private static void installFlatLaf(boolean classic, boolean dark, float uiScale) {
+    private static void installFlatLaf(Style style, boolean dark, float uiScale) {
         if (uiScale != 1.0f) {
             System.setProperty("flatlaf.uiScale", Float.toString(uiScale));
         }
@@ -230,16 +250,28 @@ public final class ThemeUtils {
             }
             fontInstalled = true;
         }
-        if (classic) {
-            if (dark) {
-                WorldPainterDarkLaf.setup();
-            } else {
-                WorldPainterLightLaf.setup();
-            }
-        } else if (dark) {
-            WorldPainterModernDarkLaf.setup();
-        } else {
-            WorldPainterModernLightLaf.setup();
+        switch (style) {
+            case CLASSIC:
+                if (dark) {
+                    WorldPainterDarkLaf.setup();
+                } else {
+                    WorldPainterLightLaf.setup();
+                }
+                break;
+            case GLASS:
+                if (dark) {
+                    WorldPainterGlassDarkLaf.setup();
+                } else {
+                    WorldPainterGlassLightLaf.setup();
+                }
+                break;
+            default:
+                if (dark) {
+                    WorldPainterModernDarkLaf.setup();
+                } else {
+                    WorldPainterModernLightLaf.setup();
+                }
+                break;
         }
         // Shorter delays make tooltips feel responsive, as in modern web applications
         ToolTipManager.sharedInstance().setInitialDelay(300);
@@ -260,6 +292,11 @@ public final class ThemeUtils {
      * Whether a theme is light, dark, or follows the setting of the operating system.
      */
     public enum Appearance {SYSTEM, LIGHT, DARK}
+
+    /**
+     * The designs of the themes, in the order in which they are offered.
+     */
+    public enum Style {MODERN, CLASSIC, GLASS}
 
     private static boolean fontInstalled;
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ThemeUtils.class);

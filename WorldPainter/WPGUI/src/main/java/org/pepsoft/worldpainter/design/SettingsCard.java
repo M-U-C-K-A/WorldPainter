@@ -14,7 +14,9 @@ import java.util.List;
  *
  * <p>In the Classic theme the card is a box set off from the window, with the controls after their labels. In the
  * Modern theme the title and the sentence stand above a raised surface with rounded corners, on which the rows are
- * separated by hairlines and the controls line up on the right. The card follows the theme when it is switched.
+ * separated by hairlines and the controls line up on the right. In the Glass theme, which builds on the Modern one,
+ * the whole card is a pane of frosted glass with large rounded corners. The card follows the theme when it is
+ * switched.
  */
 public final class SettingsCard extends JPanel {
     public SettingsCard(String title, String description, Badge.Kind... badges) {
@@ -153,12 +155,17 @@ public final class SettingsCard extends JPanel {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
             final Rectangle bounds = body.getBounds();
-            final float arc = UIScale.scale(12f);
-            final RoundRectangle2D surface = new RoundRectangle2D.Float(bounds.x + 0.5f, bounds.y + 0.5f, bounds.width - 1, bounds.height - 1, arc, arc);
-            g2.setColor(Design.surface());
-            g2.fill(surface);
-            g2.setColor(Design.surfaceBorder());
-            g2.draw(surface);
+            if (glass) {
+                final int margin = UIScale.scale(GLASS_MARGIN);
+                Glass.paintSurface(g2, margin, margin, getWidth() - 2 * margin, getHeight() - 2 * margin, UIScale.scale(22f));
+            } else {
+                final float arc = UIScale.scale(12f);
+                final RoundRectangle2D surface = new RoundRectangle2D.Float(bounds.x + 0.5f, bounds.y + 0.5f, bounds.width - 1, bounds.height - 1, arc, arc);
+                g2.setColor(Design.surface());
+                g2.fill(surface);
+                g2.setColor(Design.surfaceBorder());
+                g2.draw(surface);
+            }
             // A hairline between the settings, but not between a setting and what belongs to it
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
             g2.setColor(Design.separator());
@@ -192,7 +199,16 @@ public final class SettingsCard extends JPanel {
      */
     private void applyStyle() {
         modern = Design.isModern();
-        if (modern) {
+        glass = Design.isGlass();
+        if (glass) {
+            // Room around the glass for its shadow
+            final int margin = UIScale.scale(GLASS_MARGIN);
+            setBorder(BorderFactory.createEmptyBorder(margin + UIScale.scale(14), margin + UIScale.scale(18), margin + UIScale.scale(8), margin + UIScale.scale(18)));
+            ((BorderLayout) getLayout()).setVgap(UIScale.scale(8));
+            header.setBorder(null);
+            body.setBorder(null);
+            titleLabel.setFont(Design.semibold(1f));
+        } else if (modern) {
             setBorder(null);
             ((BorderLayout) getLayout()).setVgap(UIScale.scale(8));
             header.setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(4), 0, UIScale.scale(4)));
@@ -345,9 +361,14 @@ public final class SettingsCard extends JPanel {
     private final List<JTextArea> notes = new ArrayList<>();
     private final List<Entry> entries = new ArrayList<>();
     private int row;
-    private boolean modern;
+    private boolean modern, glass;
 
     private enum Kind {LABEL, INDENTED_LABEL, CONTROLS, STRETCHED, ROW, INDENTED_ROW, NOTE, WHOLE}
 
     private record Entry(JComponent component, Kind kind, int column, int row, boolean continuation) {}
+
+    /**
+     * The room around a card of glass for its shadow.
+     */
+    static final int GLASS_MARGIN = 8;
 }

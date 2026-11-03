@@ -27,10 +27,11 @@ public final class SettingsPage extends JPanel implements Scrollable {
     }
 
     /**
-     * The Modern theme leaves more room around and between the cards.
+     * The Modern theme leaves more room around and between the cards. The cards of the Glass theme have room around
+     * them for their shadows, which is part of that.
      */
     private void applyStyle() {
-        final int padding = UIScale.scale(Design.isModern() ? 16 : 12);
+        final int padding = UIScale.scale(Design.isGlass() ? (16 - SettingsCard.GLASS_MARGIN) : (Design.isModern() ? 16 : 12));
         setBorder(BorderFactory.createEmptyBorder(padding, padding, padding, padding));
     }
 
@@ -43,7 +44,8 @@ public final class SettingsPage extends JPanel implements Scrollable {
      */
     public static JScrollPane of(int preferredWidth, JComponent... cards) {
         final JScrollPane scrollPane = new JScrollPane(new SettingsPage(preferredWidth, cards), ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        scrollPane.setBorder(null);
+        // Not null, which the look and feel would replace with its own border when the theme is switched
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.setOpaque(false);
         scrollPane.getViewport().setOpaque(false);
         scrollPane.getVerticalScrollBar().setUnitIncrement(UIScale.scale(16));
@@ -55,7 +57,8 @@ public final class SettingsPage extends JPanel implements Scrollable {
         // As wide as two columns, and as high as the cards need at that width, within reason
         final int width = UIScale.scale(preferredWidth);
         final int height = ((MasonryLayout) getLayout()).heightFor(this, width);
-        return new Dimension(width, Math.min(height, UIScale.scale(MAX_HEIGHT)));
+        // The cards of the Glass theme take more room, with the room for their shadows
+        return new Dimension(width, Math.min(height, UIScale.scale(Design.isGlass() ? (MAX_HEIGHT + 60) : MAX_HEIGHT)));
     }
 
     @Override
@@ -121,7 +124,7 @@ public final class SettingsPage extends JPanel implements Scrollable {
 
         private int place(Container parent, int width, boolean apply) {
             final Insets insets = parent.getInsets();
-            final int gap = UIScale.scale(Design.isModern() ? MODERN_GAP : GAP), available = width - insets.left - insets.right;
+            final int gap = UIScale.scale(Design.isGlass() ? (MODERN_GAP - 2 * SettingsCard.GLASS_MARGIN) : (Design.isModern() ? MODERN_GAP : GAP)), available = width - insets.left - insets.right;
             final int columns = (available >= 2 * UIScale.scale(COLUMN_WIDTH) + gap) ? 2 : 1;
             final int columnWidth = (available - (columns - 1) * gap) / columns;
             final int[] heights = new int[columns];
