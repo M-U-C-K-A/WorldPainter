@@ -10,7 +10,9 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.IntStream;
 
 /**
@@ -549,6 +551,68 @@ class Terrain3DView extends JComponent {
     private void invalidateMesh() {
         mesh = null;
         blockMesh = null;
+        floorMesh = null;
+    }
+
+    /**
+     * The underside of the model: a flat floor at its base under all of the land, facing down, so that seen from below
+     * the model is a closed block rather than an open surface which shows its inside.
+     */
+    private Mesh getFloorMesh() {
+        if (floorMesh == null) {
+            int stride = 1;
+            // The same grid as the surface, so that its edges meet the walls exactly
+            while (((long) (model.width / stride)) * (model.height / stride) > CELL_BUDGET) {
+                stride *= 2;
+            }
+            final int[] xs = gridLines(model.width, stride), ys = gridLines(model.height, stride);
+            final int nx = xs.length, ny = ys.length;
+            final int[] samples = new int[nx * ny];
+            for (int gy = 0; gy < ny; gy++) {
+                for (int gx = 0; gx < nx; gx++) {
+                    final int sample = ys[gy] * model.width + xs[gx];
+                    samples[gy * nx + gx] = model.present[sample] ? sample : -1;
+                }
+            }
+            // Runs of cells along each row, as one rectangle each
+            final List<int[]> runs = new ArrayList<>();
+            for (int gy = 0; gy < ny - 1; gy++) {
+                int gx = 0;
+                while (gx < nx - 1) {
+                    if (isCell(samples, nx, gx, gy)) {
+                        final int start = gx;
+                        while ((gx < nx - 1) && isCell(samples, nx, gx, gy)) {
+                            gx++;
+                        }
+                        runs.add(new int[] {xs[start], xs[gx], ys[gy], ys[gy + 1]});
+                    } else {
+                        gx++;
+                    }
+                }
+            }
+            final Mesh floor = new Mesh(runs.size() * 4, runs.size() * 2);
+            // The blocks reach to the edges of the outermost blocks, half a block further than the smooth surface
+            final float margin = blocks ? Math.max(0.5f, stride) : 0;
+            floor.kinds = new byte[floor.triangleCount];
+            int v = 0, t = 0;
+            for (int[] run: runs) {
+                // In block mode a little larger than the cells, to reach under the walls of the blocks
+                final float x0 = run[0] + 0.5f - margin, x1 = run[1] + 0.5f + margin, y0 = run[2] + 0.5f - margin, y1 = run[3] + 0.5f + margin;
+                final float[][] corners = {{x0, y0}, {x1, y0}, {x1, y1}, {x0, y1}};
+                for (float[] corner: corners) {
+                    floor.x[v] = corner[0];
+                    floor.y[v] = corner[1];
+                    floor.h[v] = Float.NaN; // The base of the model
+                    floor.colour[v] = FLOOR_COLOUR;
+                    v++;
+                }
+                floor.setTriangle(t++, v - 4, v - 3, v - 2);
+                floor.setTriangle(t++, v - 4, v - 2, v - 1);
+            }
+            floor.floor = getMesh().floor;
+            floorMesh = floor;
+        }
+        return floorMesh;
     }
 
     /**
@@ -958,6 +1022,10 @@ class Terrain3DView extends JComponent {
                     (float) (detail.x0 + detail.width - model.x0) / model.step, (float) (detail.y0 + detail.height - model.y0) / model.step};
         }
         drawMesh(getMesh(), exclude, 0, camera, pixels, w, h, horizon);
+        // From below the base of the model its underside is what is in front
+        if (camera.h < getMesh().floor / model.step) {
+            drawMesh(getFloorMesh(), null, 0, camera, pixels, w, h, horizon);
+        }
         if (blockMesh != null) {
             drawMesh(blockMesh, null, BLOCK_FACES, camera, pixels, w, h, horizon);
             drawBlockEdges(pixels, w, h, camera);
@@ -1440,6 +1508,7 @@ class Terrain3DView extends JComponent {
     private float[] depthBuffer, heightBuffer;
     private int[] faceBuffer;
     private float[] blockXBuffer, blockYBuffer;
+    private Mesh floorMesh;
     private byte[] kindBuffer, shadows, detailShadows, occlusion, detailOcclusion;
     private TerrainModel detailShadowsFor, detailOcclusionFor;
     private int[] basePixels;
@@ -1475,6 +1544,7 @@ class Terrain3DView extends JComponent {
     private static final int BLOCK_FACES = 1 << 30;
     private static final byte KIND_TOP = 0, KIND_SIDE_X = 1, KIND_SIDE_Y = 2, KIND_WATER = 3, KIND_WALL = 4;
     private static final int MAX_SHADOW_STEPS = 600;
+    private static final int FLOOR_COLOUR = 0x2b2a28;
     private static final int SKY_ZENITH = 0x3a78c9, SKY_HORIZON = 0xd9e8f4;
     private static final double SUN_DISC = 0.99975;
     private static final int[] OCCLUSION_DISTANCES = {2, 5, 12, 28};
