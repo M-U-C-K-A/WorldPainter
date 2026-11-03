@@ -22,6 +22,7 @@ import org.pepsoft.worldpainter.themes.SimpleTheme;
 import org.pepsoft.worldpainter.themes.TerrainListCellRenderer;
 import org.pepsoft.worldpainter.util.BackupUtils;
 import org.pepsoft.worldpainter.util.EnumListCellRenderer;
+import org.pepsoft.worldpainter.util.ThemeUtils;
 
 import org.pepsoft.worldpainter.design.Badge;
 import org.pepsoft.worldpainter.design.SettingsCard;
@@ -96,8 +97,18 @@ public class PreferencesDialog extends WorldPainterDialog {
         spinnerManualThreadCount.setValue(logicalProcessorCount);
 
         designPages();
+        designButtons();
 
         loadSettings();
+        // Changing the theme shows it at once; closing the window without OK or Apply takes it back
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosed(java.awt.event.WindowEvent e) {
+                if (isCancelled() && (shownTheme != appliedTheme)) {
+                    ThemeUtils.switchTheme(appliedTheme);
+                }
+            }
+        });
         
         rootPane.setDefaultButton(buttonOK);
         scaleToUI();
@@ -108,6 +119,62 @@ public class PreferencesDialog extends WorldPainterDialog {
     public void ok() {
         saveSettings();
         super.ok();
+    }
+
+    /**
+     * Set something to run when the settings are put into effect with the Apply button, without closing the window.
+     */
+    public void setApplyListener(Runnable applyListener) {
+        this.applyListener = applyListener;
+    }
+
+    private void apply() {
+        saveSettings();
+        appliedTheme = shownTheme;
+        if (applyListener != null) {
+            applyListener.run();
+        }
+    }
+
+    /**
+     * The theme chosen with the design and appearance combo boxes.
+     */
+    private Configuration.LookAndFeel getSelectedTheme() {
+        return ThemeUtils.theme(comboBoxLookAndFeel.getSelectedIndex() == 1, ThemeUtils.Appearance.values()[comboBoxAppearance.getSelectedIndex()]);
+    }
+
+    /**
+     * Show the chosen theme at once.
+     */
+    private void previewTheme() {
+        if (programmaticChange || (comboBoxAppearance == null) || (shownTheme == null)) {
+            return;
+        }
+        final Configuration.LookAndFeel theme = getSelectedTheme();
+        if (theme != shownTheme) {
+            shownTheme = theme;
+            // After the combo box has closed its list
+            SwingUtilities.invokeLater(() -> ThemeUtils.switchTheme(theme));
+        }
+    }
+
+    /**
+     * Put OK, Cancel and Apply in a row of their own at the bottom.
+     */
+    private void designButtons() {
+        final JButton buttonApply = new JButton("Apply");
+        buttonApply.setToolTipText("Put the changes into effect without closing the window");
+        buttonApply.addActionListener(e -> apply());
+        final JPanel buttons = new JPanel(new FlowLayout(FlowLayout.TRAILING, 8, 0));
+        buttons.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 6));
+        buttons.add(buttonOK);
+        buttons.add(buttonCancel);
+        buttons.add(buttonApply);
+        final Container content = getContentPane();
+        content.removeAll();
+        content.setLayout(new BorderLayout());
+        content.add(jTabbedPane1, BorderLayout.CENTER);
+        content.add(buttons, BorderLayout.SOUTH);
     }
 
     private static Color linkColour() {
@@ -133,13 +200,18 @@ public class PreferencesDialog extends WorldPainterDialog {
         jLabel23.setText("height:");
         jLabel25.setText("%");
 
+        jLabel30.setText("Design:");
+        comboBoxAppearance = new JComboBox<>(new String[] {"Follow the system", "Light", "Dark"});
+        comboBoxAppearance.addActionListener(e -> previewTheme());
+
         final JLabel uiScaleLabel = jLabel2;
         jTabbedPane1.setComponentAt(0, SettingsPage.of(
                 new SettingsCard("Undo", "How many of your last changes Ctrl+Z can take back. More steps use more memory.")
                         .row(checkBoxUndo)
                         .indented(jLabel5, spinnerUndoLevels),
-                new SettingsCard("Look", "The theme of the whole program. Modern follows the light or dark setting of your system.")
-                        .field(jLabel30, comboBoxLookAndFeel),
+                new SettingsCard("Theme", "Modern and Classic are two designs for the whole program, each light, dark or following your system. A change shows at once; Cancel takes it back.")
+                        .field(jLabel30, comboBoxLookAndFeel)
+                        .field(new JLabel("Appearance:"), comboBoxAppearance),
                 new SettingsCard("Interface size", "How large the text and controls are, for screens with small or large pixels.", Badge.Kind.RESTART)
                         .field(uiScaleLabel, radioButtonUIScaleAuto, labelUIScale)
                         .field(new JLabel(), radioButtonUIScaleManual, sliderUIScale),
@@ -282,7 +354,11 @@ public class PreferencesDialog extends WorldPainterDialog {
 
             previousMaxHeight = config.getDefaultMaxHeight();
 
-            comboBoxLookAndFeel.setSelectedIndex(LOOK_AND_FEEL_OPTIONS.indexOf(normaliseLookAndFeel(config.getLookAndFeel())));
+            final Configuration.LookAndFeel theme = ThemeUtils.normalise(config.getLookAndFeel());
+            comboBoxLookAndFeel.setSelectedIndex(ThemeUtils.isClassic(theme) ? 1 : 0);
+            comboBoxAppearance.setSelectedIndex(ThemeUtils.getAppearance(theme).ordinal());
+            appliedTheme = theme;
+            shownTheme = theme;
             if (config.getUiScale() == 0.0f) {
                 radioButtonUIScaleAuto.setSelected(true);
                 sliderUIScale.setValue((int) (GUIUtils.SYSTEM_UI_SCALE_FLOAT * 100));
@@ -416,7 +492,7 @@ public class PreferencesDialog extends WorldPainterDialog {
         config.setDefaultGameType((GameType) comboBoxMode.getSelectedItem());
         config.setDefaultAllowCheats(checkBoxCheats.isSelected());
 
-        config.setLookAndFeel(LOOK_AND_FEEL_OPTIONS.get(comboBoxLookAndFeel.getSelectedIndex()));
+        config.setLookAndFeel(getSelectedTheme());
         if (radioButtonUIScaleAuto.isSelected()) {
             config.setUiScale(0.0f);
         } else {
@@ -851,7 +927,7 @@ public class PreferencesDialog extends WorldPainterDialog {
 
         jLabel30.setText("Visual theme:");
 
-        comboBoxLookAndFeel.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Modern (follow system)", "Modern light", "Modern dark", "System", "Metal", "Nimbus" }));
+        comboBoxLookAndFeel.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Modern", "Classic" }));
         comboBoxLookAndFeel.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 comboBoxLookAndFeelActionPerformed(evt);
@@ -2009,29 +2085,16 @@ public class PreferencesDialog extends WorldPainterDialog {
     }//GEN-LAST:event_sliderUIScaleStateChanged
 
     private void comboBoxLookAndFeelActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboBoxLookAndFeelActionPerformed
-        // Do nothing
+        previewTheme();
     }//GEN-LAST:event_comboBoxLookAndFeelActionPerformed
 
+    private JComboBox<String> comboBoxAppearance;
+    private Runnable applyListener;
     /**
-     * Map {@code null} and the legacy look and feels to the ones offered in the user interface.
+     * The theme which is in effect (as in the configuration), and the one which is shown, which differs from it while
+     * the user tries another theme.
      */
-    private static Configuration.LookAndFeel normaliseLookAndFeel(Configuration.LookAndFeel lookAndFeel) {
-        if (lookAndFeel == null) {
-            return Configuration.LookAndFeel.MODERN_AUTO;
-        }
-        switch (lookAndFeel) {
-            case DARK_METAL:
-            case DARK_NIMBUS:
-                return Configuration.LookAndFeel.MODERN_DARK;
-            default:
-                return lookAndFeel;
-        }
-    }
-
-    /**
-     * The look and feels offered in the combo box, in order.
-     */
-    private static final java.util.List<Configuration.LookAndFeel> LOOK_AND_FEEL_OPTIONS = java.util.List.of(Configuration.LookAndFeel.MODERN_AUTO, Configuration.LookAndFeel.MODERN_LIGHT, Configuration.LookAndFeel.MODERN_DARK, Configuration.LookAndFeel.SYSTEM, Configuration.LookAndFeel.METAL, Configuration.LookAndFeel.NIMBUS);
+    private Configuration.LookAndFeel appliedTheme, shownTheme;
 
     private void checkBoxAutoDeleteBackupsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxAutoDeleteBackupsActionPerformed
         setControlStates();

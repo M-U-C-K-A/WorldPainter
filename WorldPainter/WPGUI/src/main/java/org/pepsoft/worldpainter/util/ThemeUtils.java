@@ -6,6 +6,8 @@ import org.pepsoft.util.SystemUtils;
 import org.pepsoft.worldpainter.Configuration;
 import org.pepsoft.worldpainter.laf.WorldPainterDarkLaf;
 import org.pepsoft.worldpainter.laf.WorldPainterLightLaf;
+import org.pepsoft.worldpainter.laf.WorldPainterModernDarkLaf;
+import org.pepsoft.worldpainter.laf.WorldPainterModernLightLaf;
 
 import javax.swing.*;
 import java.awt.*;
@@ -24,41 +26,119 @@ public final class ThemeUtils {
     }
 
     /**
-     * Install the specified look and feel. The legacy dark themes are mapped to the modern dark theme.
+     * Install the specified theme. The look and feels of earlier versions are mapped to the Classic theme.
      *
-     * @param lookAndFeel The look and feel to install.
+     * @param lookAndFeel The theme to install.
      * @param uiScale     The UI scale to apply, in case the look and feel can scale itself.
      */
-    public static void installLookAndFeel(Configuration.LookAndFeel lookAndFeel, float uiScale) throws ClassNotFoundException, UnsupportedLookAndFeelException, InstantiationException, IllegalAccessException {
+    public static void installLookAndFeel(Configuration.LookAndFeel lookAndFeel, float uiScale) {
+        final Configuration.LookAndFeel theme = normalise(lookAndFeel);
+        installFlatLaf(isClassic(theme), isDark(theme), uiScale);
+    }
+
+    /**
+     * Switch to another theme while the application is running, with a short cross-fade.
+     */
+    public static void switchTheme(Configuration.LookAndFeel lookAndFeel) {
+        final Configuration.LookAndFeel theme = normalise(lookAndFeel);
+        FlatAnimatedLafChange.showSnapshot();
+        installFlatLaf(isClassic(theme), isDark(theme), 1.0f);
+        FlatLaf.updateUI();
+        FlatAnimatedLafChange.hideSnapshotWithAnimation();
+    }
+
+    /**
+     * Switch between the light and dark variants of the current theme while the application is running.
+     *
+     * @return The theme which is now in use.
+     */
+    public static Configuration.LookAndFeel switchAppearance(boolean dark) {
+        final Configuration.LookAndFeel theme = theme(isClassicTheme(), dark ? Appearance.DARK : Appearance.LIGHT);
+        switchTheme(theme);
+        return theme;
+    }
+
+    /**
+     * Map {@code null} and the look and feels of earlier versions to the themes which are offered: Modern or Classic,
+     * light, dark or following the system.
+     */
+    public static Configuration.LookAndFeel normalise(Configuration.LookAndFeel lookAndFeel) {
+        if (lookAndFeel == null) {
+            return Configuration.LookAndFeel.MODERN_AUTO;
+        }
         switch (lookAndFeel) {
             case SYSTEM:
-                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-                break;
+                return Configuration.LookAndFeel.CLASSIC_AUTO;
             case METAL:
-                UIManager.setLookAndFeel("javax.swing.plaf.metal.MetalLookAndFeel");
-                break;
             case NIMBUS:
-                UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
-                break;
-            case MODERN_LIGHT:
-                installFlatLaf(false, uiScale);
-                break;
-            case MODERN_DARK:
+                return Configuration.LookAndFeel.CLASSIC_LIGHT;
             case DARK_METAL:
             case DARK_NIMBUS:
-                installFlatLaf(true, uiScale);
-                break;
-            case MODERN_AUTO:
-                installFlatLaf(isSystemDark(), uiScale);
-                break;
+                return Configuration.LookAndFeel.CLASSIC_DARK;
             default:
-                throw new InternalError("Unknown look and feel " + lookAndFeel);
+                return lookAndFeel;
         }
     }
 
     /**
-     * Indicates whether the currently installed look and feel is one of the modern (FlatLaf) themes, which scale
-     * themselves.
+     * Whether a theme is a variant of the Classic theme, rather than the Modern one.
+     */
+    public static boolean isClassic(Configuration.LookAndFeel lookAndFeel) {
+        final Configuration.LookAndFeel theme = normalise(lookAndFeel);
+        return (theme == Configuration.LookAndFeel.CLASSIC_LIGHT) || (theme == Configuration.LookAndFeel.CLASSIC_DARK) || (theme == Configuration.LookAndFeel.CLASSIC_AUTO);
+    }
+
+    /**
+     * Whether a theme is light, dark or follows the system.
+     */
+    public static Appearance getAppearance(Configuration.LookAndFeel lookAndFeel) {
+        switch (normalise(lookAndFeel)) {
+            case MODERN_LIGHT:
+            case CLASSIC_LIGHT:
+                return Appearance.LIGHT;
+            case MODERN_DARK:
+            case CLASSIC_DARK:
+                return Appearance.DARK;
+            default:
+                return Appearance.SYSTEM;
+        }
+    }
+
+    /**
+     * The theme with a design (Classic or Modern) and an appearance.
+     */
+    public static Configuration.LookAndFeel theme(boolean classic, Appearance appearance) {
+        switch (appearance) {
+            case LIGHT:
+                return classic ? Configuration.LookAndFeel.CLASSIC_LIGHT : Configuration.LookAndFeel.MODERN_LIGHT;
+            case DARK:
+                return classic ? Configuration.LookAndFeel.CLASSIC_DARK : Configuration.LookAndFeel.MODERN_DARK;
+            default:
+                return classic ? Configuration.LookAndFeel.CLASSIC_AUTO : Configuration.LookAndFeel.MODERN_AUTO;
+        }
+    }
+
+    /**
+     * Indicates whether the theme which is installed is the Classic one, rather than the Modern one.
+     */
+    public static boolean isClassicTheme() {
+        return isModernTheme() && (! UIManager.getBoolean("WorldPainter.modern"));
+    }
+
+    private static boolean isDark(Configuration.LookAndFeel theme) {
+        switch (getAppearance(theme)) {
+            case LIGHT:
+                return false;
+            case DARK:
+                return true;
+            default:
+                return isSystemDark();
+        }
+    }
+
+    /**
+     * Indicates whether the currently installed look and feel is one of the WorldPainter (FlatLaf) themes, Modern or
+     * Classic, which scale themselves.
      */
     public static boolean isModernTheme() {
         return UIManager.getLookAndFeel() instanceof FlatLaf;
@@ -103,16 +183,6 @@ public final class ThemeUtils {
     }
 
     /**
-     * Switch between the modern light and dark themes while the application is running, with a short cross-fade.
-     */
-    public static void switchModernTheme(boolean dark) {
-        FlatAnimatedLafChange.showSnapshot();
-        installFlatLaf(dark, 1.0f);
-        FlatLaf.updateUI();
-        FlatAnimatedLafChange.hideSnapshotWithAnimation();
-    }
-
-    /**
      * Get a colour from the current theme.
      */
     public static Color getColour(String key, Color fallback) {
@@ -146,7 +216,7 @@ public final class ThemeUtils {
         return image;
     }
 
-    private static void installFlatLaf(boolean dark, float uiScale) {
+    private static void installFlatLaf(boolean classic, boolean dark, float uiScale) {
         if (uiScale != 1.0f) {
             System.setProperty("flatlaf.uiScale", Float.toString(uiScale));
         }
@@ -160,10 +230,16 @@ public final class ThemeUtils {
             }
             fontInstalled = true;
         }
-        if (dark) {
-            WorldPainterDarkLaf.setup();
+        if (classic) {
+            if (dark) {
+                WorldPainterDarkLaf.setup();
+            } else {
+                WorldPainterLightLaf.setup();
+            }
+        } else if (dark) {
+            WorldPainterModernDarkLaf.setup();
         } else {
-            WorldPainterLightLaf.setup();
+            WorldPainterModernLightLaf.setup();
         }
         // Shorter delays make tooltips feel responsive, as in modern web applications
         ToolTipManager.sharedInstance().setInitialDelay(300);
@@ -179,6 +255,11 @@ public final class ThemeUtils {
         }
         return new String(output, UTF_8);
     }
+
+    /**
+     * Whether a theme is light, dark, or follows the setting of the operating system.
+     */
+    public enum Appearance {SYSTEM, LIGHT, DARK}
 
     private static boolean fontInstalled;
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ThemeUtils.class);

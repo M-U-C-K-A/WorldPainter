@@ -2819,6 +2819,13 @@ public final class App extends JFrame implements BrushControl,
 
         scrollController.install();
 
+        // Bring the map up to date when the theme is switched
+        UIManager.addPropertyChangeListener(event -> {
+            if ("lookAndFeel".equals(event.getPropertyName())) {
+                SwingUtilities.invokeLater(this::themeChanged);
+            }
+        });
+
         dockingManager.addFrame(new DockableFrameBuilder(createToolPanel(), "Tools", Side.WEST, 1).withIcon(Icons.get("pencil-ruler")).build());
 
         dockingManager.addFrame(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", Side.WEST, 2).withIcon(Icons.get("sliders-horizontal")).expand().scrollable().build());
@@ -4519,26 +4526,34 @@ public final class App extends JFrame implements BrushControl,
     }
 
     private void openPreferences() {
-        final Configuration config = Configuration.getInstance();
         final PreferencesDialog dialog = new PreferencesDialog(App.this, selectedColourScheme);
+        dialog.setApplyListener(this::applyPreferences);
         dialog.setVisible(true);
         if (! dialog.isCancelled()) {
-            setMaxRadius(config.getMaximumBrushSize());
-            if (! config.isAutosaveInhibited()) {
-                if (config.isAutosaveEnabled()) {
-                    autosaveTimer.setInitialDelay(config.getAutosaveDelay());
-                    autosaveTimer.setDelay(config.getAutosaveDelay() / 2);
-                    if (! autosaveTimer.isRunning()) {
-                        autosaveTimer.start();
-                    }
-                } else {
-                    autosaveTimer.stop();
-                    try {
-                        rotateAutosaveFile();
-                    } catch (RuntimeException | Error e2) {
-                        logger.error("An exception occurred while trying to rotate the autosave", e2);
-                        beepAndShowWarning(this, "An error occurred while trying to clear the autosave.\nWorldPainter may try to load the autosave on the next start.\nIf this keeps happening, please report it to the author.", "Clearing Autosave Failed");
-                    }
+            applyPreferences();
+        }
+    }
+
+    /**
+     * Put the preferences into effect, after they have been changed with OK or Apply.
+     */
+    private void applyPreferences() {
+        final Configuration config = Configuration.getInstance();
+        setMaxRadius(config.getMaximumBrushSize());
+        if (! config.isAutosaveInhibited()) {
+            if (config.isAutosaveEnabled()) {
+                autosaveTimer.setInitialDelay(config.getAutosaveDelay());
+                autosaveTimer.setDelay(config.getAutosaveDelay() / 2);
+                if (! autosaveTimer.isRunning()) {
+                    autosaveTimer.start();
+                }
+            } else {
+                autosaveTimer.stop();
+                try {
+                    rotateAutosaveFile();
+                } catch (RuntimeException | Error e2) {
+                    logger.error("An exception occurred while trying to rotate the autosave", e2);
+                    beepAndShowWarning(this, "An error occurred while trying to clear the autosave.\nWorldPainter may try to load the autosave on the next start.\nIf this keeps happening, please report it to the author.", "Clearing Autosave Failed");
                 }
             }
         }
@@ -5483,13 +5498,20 @@ public final class App extends JFrame implements BrushControl,
     }
 
     /**
-     * Switch between the modern light and dark themes, and remember the choice.
+     * Switch between the light and dark variants of the theme, and remember the choice.
      */
     private void toggleTheme() {
-        final boolean dark = ! ThemeUtils.isDarkTheme();
-        ThemeUtils.switchModernTheme(dark);
-        Configuration.getInstance().setLookAndFeel(dark ? Configuration.LookAndFeel.MODERN_DARK : Configuration.LookAndFeel.MODERN_LIGHT);
-        updateThemeToggleButton();
+        Configuration.getInstance().setLookAndFeel(ThemeUtils.switchAppearance(! ThemeUtils.isDarkTheme()));
+    }
+
+    /**
+     * Bring what the theme does not update by itself up to date after the theme has been switched, whether with the
+     * button in the toolbar or in the preferences.
+     */
+    private void themeChanged() {
+        if (themeToggleButton != null) {
+            updateThemeToggleButton();
+        }
         applyCanvasStyle();
         if (dimension != null) {
             view.refreshTiles();

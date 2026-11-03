@@ -1715,8 +1715,9 @@ public class NewWorldDialog extends WorldPainterDialog {
                         .stretched(radioButtonCustomSeed, fieldSeed, buttonRandomSeed));
         jPanel2.setLayout(new BorderLayout());
         jPanel2.add(page, BorderLayout.CENTER);
-        // A preview about as wide as it is high, instead of a strip next to the settings
+        // A preview about as wide as it is high, instead of a strip next to the settings, in a plain rounded frame
         tiledImageViewer1.setPreferredSize(new java.awt.Dimension(UIScale.scale(360), UIScale.scale(360)));
+        jPanel3.setBorder(new com.formdev.flatlaf.ui.FlatLineBorder(new Insets(1, 1, 1, 1), UIManager.getColor("Component.borderColor"), 1, 12));
     }
 
     private void buttonRandomSeedActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonRandomSeedActionPerformed

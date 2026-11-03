@@ -3,8 +3,8 @@ package org.pepsoft.worldpainter.laf;
 import com.formdev.flatlaf.FlatLightLaf;
 
 /**
- * The modern light theme of WorldPainter: a neutral zinc palette with an orange accent, rounded corners and hairline
- * borders. The colours are defined in {@code WorldPainterLightLaf.properties}.
+ * The light variant of the Classic theme of WorldPainter: a neutral zinc palette with an orange accent, rounded
+ * corners and hairline borders. The colours are defined in {@code WorldPainterLightLaf.properties}.
  */
 public class WorldPainterLightLaf extends FlatLightLaf {
     public static boolean setup() {

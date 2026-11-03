@@ -17,6 +17,35 @@ public final class Design {
         return ThemeUtils.isDarkTheme();
     }
 
+    /**
+     * Whether the Modern theme is in use, rather than the Classic one.
+     */
+    public static boolean isModern() {
+        return UIManager.getBoolean("WorldPainter.modern");
+    }
+
+    /**
+     * The background of the raised surfaces on which the Modern theme groups settings.
+     */
+    public static Color surface() {
+        return colour("WorldPainter.surface", cardBackground());
+    }
+
+    public static Color surfaceBorder() {
+        return colour("WorldPainter.surfaceBorder", border());
+    }
+
+    /**
+     * The colour of the hairlines between rows of settings.
+     */
+    public static Color separator() {
+        return colour("Separator.foreground", border());
+    }
+
+    public static Color accent() {
+        return colour("Component.accentColor", new Color(0x0071e3));
+    }
+
     public static Color background() {
         return colour("Panel.background", Color.DARK_GRAY);
     }
@@ -43,6 +72,18 @@ public final class Design {
     public static Font font(float relativeSize, int style) {
         final Font base = UIManager.getFont("Label.font");
         return base.deriveFont(style, base.getSize2D() + relativeSize);
+    }
+
+    /**
+     * The semibold weight of the font of the theme, or bold if it has none.
+     */
+    public static Font semibold(float relativeSize) {
+        final Font semibold = UIManager.getFont("semibold.font");
+        if (semibold == null) {
+            return font(relativeSize, Font.BOLD);
+        }
+        final Font base = UIManager.getFont("Label.font");
+        return semibold.deriveFont(base.getSize2D() + relativeSize);
     }
 
     public static Color mix(Color from, Color to, float amount) {

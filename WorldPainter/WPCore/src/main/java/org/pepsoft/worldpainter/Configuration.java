@@ -1367,7 +1367,11 @@ public final class Configuration implements Serializable, EventLogger, Minecraft
      * The look and feel of the user interface. {@code DARK_METAL} and {@code DARK_NIMBUS} are legacy values which are
      * mapped to {@code MODERN_DARK}; the {@code MODERN_*} values use FlatLaf.
      */
-    public enum LookAndFeel {SYSTEM, METAL, NIMBUS, DARK_METAL, DARK_NIMBUS, MODERN_LIGHT, MODERN_DARK, MODERN_AUTO}
+    /**
+     * The visual theme. The Modern and Classic themes come in a light and a dark variant, or follow the system. The
+     * others are no longer offered, and are mapped to the Classic theme.
+     */
+    public enum LookAndFeel {SYSTEM, METAL, NIMBUS, DARK_METAL, DARK_NIMBUS, MODERN_LIGHT, MODERN_DARK, MODERN_AUTO, CLASSIC_LIGHT, CLASSIC_DARK, CLASSIC_AUTO}
 
     public enum OverlayType {SCALE_ON_LOAD, OPTIMISE_ON_LOAD, SCALE_ON_PAINT}
 

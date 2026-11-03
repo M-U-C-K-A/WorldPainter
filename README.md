@@ -121,7 +121,7 @@ The world seed can be changed directly in the **Surroundings** panel (a number, 
 </picture>
 
 - **Self-explaining panels**: *Terrain* (the block type of the ground), *Layers* (what goes on top: trees, snow, ores, caves…), *Biomes* and *Annotations* (coloured markings to plan the map, not exported unless enabled on export) each have a header saying what they are for.
-- **Light and dark themes** inspired by shadcn/ui (zinc palette, orange accent, thin separators), the **Geist** font, and an **automatic mode which follows the system**. Switch on the fly with the sun/moon button in the toolbar.
+- **Two designs, Modern and Classic**, each light, dark or **following the system**, with the **Geist** font: Modern has layered grey surfaces, a blue accent and grouped settings in the style of macOS; Classic is white with an orange accent, in the style of shadcn/ui. They change at once in the preferences, without restarting; the sun/moon button in the toolbar switches between light and dark.
 - **[Lucide](https://lucide.dev) icons** for the toolbar, the tools, the layers and the panels, and a new application icon.
 - **Explanatory cards** when hovering over each tool (name, shortcut, explanation) instead of the old yellow tooltips.
 - A **dotted grid canvas** around the map.

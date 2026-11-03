@@ -441,7 +441,7 @@ public class Main {
                     } else if (ThemeUtils.isDarkTheme()) {
                         VoidRenderer.setColour(UIManager.getColor("Panel.background").getRGB() & 0xffffff);
                     }
-                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {
+                } catch (RuntimeException e) {
                     logger.warn("Could not install selected look and feel", e);
                 }
 

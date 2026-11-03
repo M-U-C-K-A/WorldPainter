@@ -36,6 +36,9 @@ public final class Badge extends JComponent {
     @Override
     public Dimension getPreferredSize() {
         final FontMetrics metrics = getFontMetrics(font());
+        if (Design.isModern()) {
+            return new Dimension(metrics.stringWidth(kind.text) + UIScale.scale(16), metrics.getHeight() + UIScale.scale(4));
+        }
         return new Dimension(metrics.stringWidth(kind.text.toUpperCase()) + UIScale.scale(10), metrics.getHeight() + UIScale.scale(2));
     }
 
@@ -50,6 +53,17 @@ public final class Badge extends JComponent {
         try {
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             final Color colour = kind.colour;
+            if (Design.isModern()) {
+                // A soft pill with the text in the colour of the badge
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(colour.getRed(), colour.getGreen(), colour.getBlue(), Design.isDark() ? 56 : 30));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
+                g2.setFont(font());
+                g2.setColor(Design.isDark() ? Design.mix(colour, Color.WHITE, 0.45f) : Design.mix(colour, Color.BLACK, 0.25f));
+                final FontMetrics metrics = g2.getFontMetrics();
+                g2.drawString(kind.text, UIScale.scale(8), (getHeight() + metrics.getAscent() - metrics.getDescent()) / 2);
+                return;
+            }
             g2.setColor(new Color(colour.getRed(), colour.getGreen(), colour.getBlue(), 40));
             g2.fillRect(0, 0, getWidth(), getHeight());
             g2.setColor(new Color(colour.getRed(), colour.getGreen(), colour.getBlue(), 140));
@@ -64,6 +78,9 @@ public final class Badge extends JComponent {
     }
 
     private static Font font() {
+        if (Design.isModern()) {
+            return Design.semibold(-2f);
+        }
         final Font base = UIManager.getFont("Label.font");
         return base.deriveFont(Font.BOLD, base.getSize2D() - 3f);
     }

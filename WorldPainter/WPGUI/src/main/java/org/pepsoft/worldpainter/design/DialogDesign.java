@@ -25,10 +25,13 @@ public final class DialogDesign {
         final String title = dialog.getTitle().replace(" [SNAPSHOT]", "").replace(" [SAFE MODE]", "");
         final DialogBanner banner = new DialogBanner(spec.illustration, new Color(spec.accent), title, spec.description);
         final Container content = dialog.getContentPane();
+        // Taking the default button out of the window, as moving the content does, makes it forget that it is one
+        final JButton defaultButton = dialog.getRootPane().getDefaultButton();
         final JPanel wrapper = new JPanel(new BorderLayout());
         wrapper.add(banner, BorderLayout.NORTH);
         wrapper.add(content, BorderLayout.CENTER);
         dialog.setContentPane(wrapper);
+        dialog.getRootPane().setDefaultButton(defaultButton);
 
         // What the selected tab is for
         final JTabbedPane tabs = findTabs(dialog.getRootPane());

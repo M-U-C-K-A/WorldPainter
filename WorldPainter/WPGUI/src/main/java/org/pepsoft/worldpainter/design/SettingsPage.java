@@ -13,10 +13,25 @@ public final class SettingsPage extends JPanel implements Scrollable {
         super(new MasonryLayout());
         this.preferredWidth = preferredWidth;
         setOpaque(false);
-        setBorder(BorderFactory.createEmptyBorder(UIScale.scale(12), UIScale.scale(12), UIScale.scale(12), UIScale.scale(12)));
+        applyStyle();
         for (JComponent card: cards) {
             add(card);
         }
+    }
+
+    @Override
+    public void updateUI() {
+        super.updateUI();
+        setOpaque(false);
+        applyStyle();
+    }
+
+    /**
+     * The Modern theme leaves more room around and between the cards.
+     */
+    private void applyStyle() {
+        final int padding = UIScale.scale(Design.isModern() ? 16 : 12);
+        setBorder(BorderFactory.createEmptyBorder(padding, padding, padding, padding));
     }
 
     public static JScrollPane of(JComponent... cards) {
@@ -106,7 +121,7 @@ public final class SettingsPage extends JPanel implements Scrollable {
 
         private int place(Container parent, int width, boolean apply) {
             final Insets insets = parent.getInsets();
-            final int gap = UIScale.scale(GAP), available = width - insets.left - insets.right;
+            final int gap = UIScale.scale(Design.isModern() ? MODERN_GAP : GAP), available = width - insets.left - insets.right;
             final int columns = (available >= 2 * UIScale.scale(COLUMN_WIDTH) + gap) ? 2 : 1;
             final int columnWidth = (available - (columns - 1) * gap) / columns;
             final int[] heights = new int[columns];
@@ -164,6 +179,6 @@ public final class SettingsPage extends JPanel implements Scrollable {
             }
         }
 
-        private static final int COLUMN_WIDTH = 400, GAP = 12;
+        private static final int COLUMN_WIDTH = 400, GAP = 12, MODERN_GAP = 16;
     }
 }
