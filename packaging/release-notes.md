@@ -1,22 +1,22 @@
-**WorldPainter Modernised {{VERSION}}** is a beta preview of an unofficial, modernised fork of [WorldPainter](https://www.worldpainter.net/), based on WorldPainter 2.27. It is not affiliated with or supported by the original project: please report problems [here](https://github.com/M-U-C-K-A/WorldPainter/issues), not to pepsoft.org.
+**WorldPainter Modernised {{VERSION}}** is a preview of an unofficial, modernised fork of [WorldPainter](https://www.worldpainter.net/), based on WorldPainter 2.27. It is not affiliated with or supported by the original project: please report problems [here](https://github.com/M-U-C-K-A/WorldPainter/issues), not to pepsoft.org.
 
 Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
-## New in this beta
+## New in this version
+
+- **Half Blocks tool**: next to Smooth, it smooths the land like Smooth and builds it in half blocks in Minecraft where you drag it: slabs on stone, cobblestone, sandstone and the like (waterlogged under water), snow layers on snow blocks, so that gentle slopes go up by half a block instead of a whole block every other column. Right-drag goes back to whole blocks; the map shows where it applies with amber stripes. Grass, dirt and sand have no slab and stay whole
+- **Two export buttons again**: *Export FAST*, about a third faster on large maps, and the classic *Export*, as WorldPainter always exported; both give exactly the same blocks and light
+
+## New in the betas before it
 
 - **Fix**: a second map shown in an area of another workspace no longer brings up an error window when the map changes (painting, undo, opening another world); it draws again when it is shown
 - The **editor type menu** shows the useful part of each page in its pictures: the palettes without their introduction and search field, the map and the 3D view without their bars, and the 3D view even before it was first opened, sharp on high resolution screens
-
-## New in the previous beta
-
 - **Areas as in Blender**: the window is divided into areas, which you resize by dragging the gaps between them, split and join from their corners, move by their header, maximise with Ctrl+Space and detach into windows of their own. The button at the top left of each one chooses what it shows, with a card and a picture of each page. The **map and the 3D view can be shown in several areas at once**, each with a view of its own. Hold **Shift** to close areas with one click
 - **Workspace tabs** (Layout, Sculpting, Painting, 3D, Minimal and your own) replace the workspace button and the Map/3D switch
-- **Faster export**, now the only one: about a third faster on large maps, with the same blocks and the same light
+- **Faster export**: about a third faster on large maps, with the same blocks and the same light
 - **Map thumbnails**: on macOS the Finder shows the map of a world as the icon of its `.world` file
 - **Node graph**: new Minecraft-like and Plains examples; the old Procedural Terrain dialog is gone, the node graph does all it did
 - What is under the mouse and the zoom are at the foot of the map; the buttons of the 3D view go on to more rows in a narrow area; the close button of the window works again in Run Script, Merge, Rotate and Shift
-
-As a beta, it has had less testing than the previews before it: keep backups of your worlds, and report what goes wrong.
 
 ## What is in it
 

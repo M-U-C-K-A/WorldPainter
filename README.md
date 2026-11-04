@@ -127,7 +127,8 @@ The world seed can be changed directly in the **Surroundings** panel (a number, 
 - A **dotted grid canvas** around the map.
 - **Areas as in Blender**: the window is divided into areas, which are resized by dragging the gaps between them, split and joined from their corners, moved and swapped by dragging their header, maximised with <kbd>Ctrl</kbd>+<kbd>Space</kbd> and detached into a window which floats over the main one. The button at the top left of each area chooses what it shows (the map and the 3D view can be shown in several areas, each with its own view), and **workspace tabs** keep several arrangements (Layout, Sculpting, Painting, 3D, Minimal, and your own). Hold <kbd>Shift</kbd> to close areas with one click; hover over a choice of the editor type menu for a card with a picture of the page.
 - On macOS, the toolbar doubles as a **unified title bar**, and the Finder shows the **map of a world as the icon of its `.world` file**.
-- A **faster export**: about a third faster on large maps, with exactly the same blocks and light.
+- A **faster export**: *Export FAST*, next to the classic *Export*, is about a third faster on large maps, with exactly the same blocks and light.
+- **Half blocks**: the **Half Blocks** tool, next to Smooth, smooths the land like Smooth and builds it in half blocks in Minecraft where you drag it: slabs on stone, cobblestone, sandstone and the like (waterlogged under water), snow layers on snow blocks, so that gentle slopes go up by half a block instead of a whole block every other column. Right-drag goes back to whole blocks; the map shows where it applies with amber stripes. Grass, dirt and sand have no slab and stay whole.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/divider-dark.svg">

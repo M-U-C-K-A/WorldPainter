@@ -36,6 +36,12 @@ public final class ToolCards {
                 card = card(name, "Softens rough or jagged land without changing its overall shape.", shortcut, demo)
                         .action("Drag", "Smooth the land");
                 break;
+            case "SmoothHalfBlocks":
+                card = card(name, "Smooths the land like Smooth, and builds it in half blocks in Minecraft: gentle slopes go up by half a block instead of a whole block every other column.", shortcut, demo)
+                        .action("Drag", "Smooth and build in half blocks")
+                        .action("Right-drag", "Back to whole blocks")
+                        .tip("Slabs on stone, cobblestone, sandstone and the like, snow layers on snow blocks. Grass, dirt and sand have no slab and stay whole.");
+                break;
             case "RaiseMountain":
                 card = card(name, "Grows a mountain with ridges under the brush.", shortcut, demo)
                         .action("Hold", "Grow the mountain")

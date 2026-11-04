@@ -17,7 +17,12 @@ import java.util.Arrays;
  */
 public class Smooth extends AbstractBrushOperation {
     public Smooth(WorldPainter view) {
-        super("Smooth", "Smooth the terrain out", view, 100, "operation.smooth");
+        this("Smooth", "Smooth the terrain out", "<p>Click to smooth the terrain out", view, "operation.smooth");
+    }
+
+    protected Smooth(String name, String description, String help, WorldPainter view, String statisticsKey) {
+        super(name, description, view, 100, statisticsKey);
+        optionsPanel = new TerrainShapingOptionsPanel(name, help, options);
     }
 
     @Override
@@ -84,7 +89,7 @@ public class Smooth extends AbstractBrushOperation {
     }
     
     private final TerrainShapingOptions<Smooth> options = new TerrainShapingOptions<>();
-    private final TerrainShapingOptionsPanel optionsPanel = new TerrainShapingOptionsPanel("Smooth", "<p>Click to smooth the terrain out", options);
+    private final TerrainShapingOptionsPanel optionsPanel;
     private float[][] totals, currentHeights;
     private int[][] sampleCounts;
 }

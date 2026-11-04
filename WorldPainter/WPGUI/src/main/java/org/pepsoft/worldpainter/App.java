@@ -3344,6 +3344,7 @@ public final class App extends JFrame implements BrushControl,
         sculptPanel.add(createButtonForOperation(new Height(view), 'h'));
         sculptPanel.add(createButtonForOperation(new Flatten(view), 'a'));
         sculptPanel.add(createButtonForOperation(new Smooth(view), 's'));
+        sculptPanel.add(createButtonForOperation(new SmoothHalfBlocks(view)));
         sculptPanel.add(createButtonForOperation(new RaiseMountain(view), 'm'));
         sculptPanel.add(createButtonForOperation(new RaisePyramid(view)));
         sculptPanel.add(createButtonForOperation(new RaiseRotatedPyramid(view)));
@@ -5737,6 +5738,7 @@ public final class App extends JFrame implements BrushControl,
             case "Height": return org.pepsoft.worldpainter.help.ToolDemo.RAISE;
             case "Flatten": return org.pepsoft.worldpainter.help.ToolDemo.FLATTEN;
             case "Smooth": return org.pepsoft.worldpainter.help.ToolDemo.SMOOTH;
+            case "SmoothHalfBlocks": return org.pepsoft.worldpainter.help.ToolDemo.SMOOTH;
             case "RaiseMountain": return org.pepsoft.worldpainter.help.ToolDemo.MOUNTAIN;
             case "SetSpawnPoint": return org.pepsoft.worldpainter.help.ToolDemo.SPAWN;
             case "RaiseRotatedPyramid": return org.pepsoft.worldpainter.help.ToolDemo.ROTATED_PYRAMID;
@@ -5760,6 +5762,7 @@ public final class App extends JFrame implements BrushControl,
             case "Height": return "chevrons-up-down";
             case "Flatten": return "equal";
             case "Smooth": return "waves";
+            case "SmoothHalfBlocks": return "stairs-half";
             case "RaiseMountain": return "mountain-snow";
             case "SetSpawnPoint": return "flag";
             case "RaiseRotatedPyramid": return "diamond";
@@ -5783,6 +5786,7 @@ public final class App extends JFrame implements BrushControl,
         switch (layer.getName()) {
             case "Water/Lava": return "droplets";
             case "Frost": return "snowflake";
+            case "Half Blocks": return "stairs-half";
             case "Caves": return "pickaxe";
             case "Caverns": return "drill";
             case "Chasms": return "chevrons-down";
