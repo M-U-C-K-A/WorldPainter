@@ -1190,7 +1190,12 @@ public final class Configuration implements Serializable, EventLogger, Minecraft
     }
 
     public static synchronized Configuration load(File configFile) throws IOException, ClassNotFoundException {
-        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(configFile))) {
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(configFile)) {
+            @Override
+            protected ObjectStreamClass readClassDescriptor() throws IOException, ClassNotFoundException {
+                return WorldIO.tolerate(super.readClassDescriptor());
+            }
+        }) {
             return (Configuration) in.readObject();
         }
     }

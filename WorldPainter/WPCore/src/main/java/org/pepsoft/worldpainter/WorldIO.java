@@ -18,6 +18,7 @@ import org.pepsoft.worldpainter.plugins.WPPluginManager;
 import org.pepsoft.worldpainter.vo.EventVO;
 
 import java.io.*;
+import org.pepsoft.worldpainter.exporting.BlockBasedExportSettings;
 import java.util.*;
 import java.util.zip.*;
 
@@ -122,12 +123,32 @@ public class WorldIO {
      *     world. If metadata was present and could be loaded it will be stored
      *     in the exception.
      */
+    /**
+     * Accept classes saved by development builds with a different serial version, where the class has not changed in a
+     * way which matters: a build of 2.27.2-modernised.10 under development gave {@link BlockBasedExportSettings}, which
+     * has no fields, another serial version, so that it could not load the worlds saved before, and the worlds it saved
+     * could not be loaded by the other versions.
+     */
+    public static ObjectStreamClass tolerate(ObjectStreamClass descriptor) {
+        if ((descriptor != null)
+                && (descriptor.getSerialVersionUID() == 8469794408813700814L)
+                && descriptor.getName().equals(BlockBasedExportSettings.class.getName())) {
+            return ObjectStreamClass.lookup(BlockBasedExportSettings.class);
+        }
+        return descriptor;
+    }
+
     @SuppressWarnings("unchecked") // Guaranteed by WorldPainter
     public void load(InputStream in) throws IOException, UnloadableWorldException {
         Map<String, Object> metadata = null;
         world = null;
         try {
-            try (WPCustomObjectInputStream wrappedIn = new WPCustomObjectInputStream(new GZIPInputStream(in), PluginManager.getPluginClassLoader(), AbstractObject.class)) {
+            try (WPCustomObjectInputStream wrappedIn = new WPCustomObjectInputStream(new GZIPInputStream(in), PluginManager.getPluginClassLoader(), AbstractObject.class) {
+                @Override
+                protected ObjectStreamClass readClassDescriptor() throws IOException, ClassNotFoundException {
+                    return tolerate(super.readClassDescriptor());
+                }
+            }) {
                 Object object = wrappedIn.readObject();
                 if (object instanceof Map) {
                     metadata = (Map<String, Object>) object;
