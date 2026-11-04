@@ -24,13 +24,17 @@ final class TerrainModel {
      * Sample the whole dimension, as finely as the sample budget allows.
      */
     TerrainModel(Dimension dimension, ColourScheme colourScheme, ProgressReceiver progressReceiver) throws OperationCancelled {
-        this(dimension, colourScheme, progressReceiver, getBlockExtent(dimension), getStep(getBlockExtent(dimension)));
+        this(dimension, colourScheme, progressReceiver, getBlockExtent(dimension), getStep(getBlockExtent(dimension)), true);
     }
 
     /**
-     * Sample an area of the dimension (in blocks) every {@code step} blocks.
+     * Sample an area of the dimension (in blocks) every {@code step} blocks, without its trees.
      */
     TerrainModel(Dimension dimension, ColourScheme colourScheme, ProgressReceiver progressReceiver, Rectangle area, int step) throws OperationCancelled {
+        this(dimension, colourScheme, progressReceiver, area, step, false);
+    }
+
+    private TerrainModel(Dimension dimension, ColourScheme colourScheme, ProgressReceiver progressReceiver, Rectangle area, int step, boolean withTrees) throws OperationCancelled {
         x0 = area.x;
         y0 = area.y;
         this.step = step;
@@ -113,6 +117,7 @@ final class TerrainModel {
                 normalShades[i] = (float) Math.max(0.25, Math.min(1.15, 0.35 + light * 0.85));
             }
         }
+        trees = withTrees ? TreeSamples.sample(dimension, area) : TreeSamples.NONE;
         if (progressReceiver != null) {
             progressReceiver.setProgress(1.0f);
         }
@@ -186,4 +191,9 @@ final class TerrainModel {
     final boolean[] present;
 
     private static final long MAX_SAMPLES = 1_048_576;
+
+    /**
+     * The trees painted on the land, to be drawn as simple shapes.
+     */
+    final TreeSamples trees;
 }

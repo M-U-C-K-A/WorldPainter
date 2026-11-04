@@ -40,7 +40,11 @@ Hover over the land to see, in the card at the top left:
 | **Biome** | The biome of every column |
 | **Relief** | Plain shaded relief, to judge the shape of the land |
 
-The toolbar also turns the water and the contour lines (one every 8 blocks) on and off.
+The toolbar also turns the water, the trees and the contour lines (one every 8 blocks) on and off.
+
+## Trees
+
+The trees painted on the land are shown as simple shapes, where the forest layers (Deciduous, Pine, Jungle, Swamp) and the trees of the tree pack are, with their density, size and colour: layered conifers, round or flat crowns, palms, bushes and bare dead trees. Minecraft's trees are only decided when the map is exported, so they stand where the layers are, as densely, but not one for one. Custom objects with leaves are shown as round crowns of their size.
 
 ![The Slope mode: steep slopes in red, flat land in blue](assets/images/view3d-slope.jpg)
 
@@ -66,4 +70,4 @@ The **Shaders** button (the sun) lights the land like a shader pack would:
 
 The panel at the bottom right sets the **direction** the sun shines from and its **height**, or a time of day: **Morning**, **Noon** or **Evening**. The land looks best with the sun to the side of or behind the camera; looking towards the sun, you mostly see the shaded side of the land.
 
-> [!NOTE] The 3D view shows the terrain, water and colours of the map. It does not show custom objects, trees or floating islands yet.
+> [!NOTE] The 3D view shows the terrain, water, colours and trees of the map. It does not show other custom objects or floating islands yet.

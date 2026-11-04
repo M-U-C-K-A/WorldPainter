@@ -69,6 +69,10 @@ public class Terrain3DPanel extends JPanel {
             sunControl.setVisible(shadersButton.isSelected());
         });
         display.add(shadersButton);
+        final JToggleButton treesButton = new JToggleButton(Icons.get("trees", 18), true);
+        treesButton.setToolTipText(App.richToolTip("Trees", "Show the trees painted on the land, as simple shapes where the forest layers and the tree pack are, with their density", null));
+        treesButton.addActionListener(e -> view.setShowTrees(treesButton.isSelected()));
+        display.add(treesButton);
         final JToggleButton contoursButton = new JToggleButton(Icons.get("chart-spline", 18));
         contoursButton.setToolTipText(App.richToolTip("Contour lines", "Draw a line every " + Terrain3DView.CONTOUR_INTERVAL + " blocks of height", null));
         contoursButton.addActionListener(e -> view.setShowContours(contoursButton.isSelected()));

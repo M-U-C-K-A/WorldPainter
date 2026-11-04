@@ -194,6 +194,11 @@ class Terrain3DView extends JComponent {
         requestRender();
     }
 
+    void setShowTrees(boolean showTrees) {
+        this.showTrees = showTrees;
+        requestRender();
+    }
+
     void setShowContours(boolean showContours) {
         this.showContours = showContours;
         requestRender();
@@ -552,6 +557,78 @@ class Terrain3DView extends JComponent {
         mesh = null;
         blockMesh = null;
         floorMesh = null;
+        treeMesh = null;
+    }
+
+    /**
+     * The trees, as simple shapes made of boxes: a trunk under a crown which is round, flat, layered for conifers, or
+     * fanned out for palms. {@code null} if there are none.
+     */
+    private Mesh getTreeMesh() {
+        if ((treeMesh == null) && (model.trees.count > 0)) {
+            final TreeSamples trees = model.trees;
+            final QuadList quads = new QuadList();
+            final float unit = 1.0f / model.step; // A block in model coordinates
+            for (int i = 0; i < trees.count; i++) {
+                final float x = (trees.x[i] - model.x0) * unit, y = (trees.y[i] - model.y0) * unit;
+                if ((x < 0) || (y < 0) || (x >= model.width) || (y >= model.height)) {
+                    continue;
+                }
+                final float base = trees.base[i] - model.lowestHeight, height = trees.height[i], width = trees.width[i] * unit;
+                final float trunkWidth = Math.max(1.0f, trees.width[i] * 0.14f) * unit;
+                final int leaves = trees.leaves[i], trunk = trees.trunk[i];
+                switch (trees.shape[i]) {
+                    case TreeSamples.CONIFER:
+                        addBox(quads, x, y, trunkWidth, base, base + height * 0.35f, trunk);
+                        for (int tier = 0; tier < 3; tier++) {
+                            final float bottom = base + height * (0.22f + tier * 0.25f), top = bottom + height * 0.32f;
+                            addBox(quads, x, y, width * (1.0f - tier * 0.3f), bottom, top, shade(leaves, 1.0f - tier * 0.04f));
+                        }
+                        addBox(quads, x, y, Math.max(unit, width * 0.15f), base + height * 0.95f, base + height * 1.08f, leaves);
+                        break;
+                    case TreeSamples.ROUND:
+                        addBox(quads, x, y, trunkWidth, base, base + height * 0.55f, trunk);
+                        addBox(quads, x, y, width, base + height * 0.42f, base + height * 0.92f, leaves);
+                        addBox(quads, x, y, width * 0.62f, base + height * 0.85f, base + height * 1.05f, leaves);
+                        addBox(quads, x, y, width * 0.62f, base + height * 0.32f, base + height * 0.45f, shade(leaves, 0.9f));
+                        break;
+                    case TreeSamples.FLAT:
+                        addBox(quads, x, y, trunkWidth, base, base + height * 0.8f, trunk);
+                        addBox(quads, x, y, width, base + height * 0.78f, base + height * 0.93f, leaves);
+                        addBox(quads, x, y, width * 0.6f, base + height * 0.9f, base + height, leaves);
+                        break;
+                    case TreeSamples.PALM:
+                        addBox(quads, x, y, unit, base, base + height * 0.92f, trunk);
+                        addBox(quads, x, y, width * 0.35f, base + height * 0.86f, base + height, leaves);
+                        addBox(quads, x, y, width, base + height * 0.8f, base + height * 0.88f, shade(leaves, 0.92f));
+                        break;
+                    case TreeSamples.BUSH:
+                        addBox(quads, x, y, width, base, base + height, leaves);
+                        break;
+                    default:
+                        addBox(quads, x, y, trunkWidth, base, base + height, trunk);
+                        break;
+                }
+            }
+            treeMesh = quads.toMesh();
+            treeMesh.wallTriangleStart = treeMesh.triangleCount;
+            treeMesh.floor = getMesh().floor;
+        }
+        return treeMesh;
+    }
+
+    /**
+     * A box standing on its bottom, centred on a point: its top and four sides (the bottom is never seen), lit like the
+     * blocks, and a little darker at the bottom of the sides.
+     */
+    private static void addBox(QuadList quads, float x, float y, float width, float bottom, float top, int colour) {
+        final float x1 = x - width / 2, x2 = x + width / 2, y1 = y - width / 2, y2 = y + width / 2;
+        final int upper = colour, lower = shade(colour, 0.78f);
+        quads.add(KIND_TOP, x1, y1, top, x2, y1, top, x2, y2, top, x1, y2, top, shade(colour, 1.08f), shade(colour, 1.08f));
+        quads.add(KIND_SIDE_Y, x1, y1, top, x2, y1, top, x2, y1, bottom, x1, y1, bottom, upper, lower);
+        quads.add(KIND_SIDE_Y, x2, y2, top, x1, y2, top, x1, y2, bottom, x2, y2, bottom, upper, lower);
+        quads.add(KIND_SIDE_X, x1, y2, top, x1, y1, top, x1, y1, bottom, x1, y2, bottom, upper, lower);
+        quads.add(KIND_SIDE_X, x2, y1, top, x2, y2, top, x2, y2, bottom, x2, y1, bottom, upper, lower);
     }
 
     /**
@@ -1037,6 +1114,10 @@ class Terrain3DView extends JComponent {
             drawMesh(blockMesh, null, BLOCK_FACES, camera, pixels, w, h, horizon);
             drawBlockEdges(pixels, w, h, camera);
         }
+        final Mesh treeMesh = showTrees ? getTreeMesh() : null;
+        if (treeMesh != null) {
+            drawMesh(treeMesh, null, TREE_FACES, camera, pixels, w, h, horizon);
+        }
         if (showContours) {
             drawContours(pixels, w, h);
         }
@@ -1510,7 +1591,7 @@ class Terrain3DView extends JComponent {
     }
 
     private TerrainModel model, detail;
-    private Mesh mesh, blockMesh;
+    private Mesh mesh, blockMesh, treeMesh;
     private volatile Camera camera;
     private float[] depthBuffer, heightBuffer;
     private int[] faceBuffer;
@@ -1530,7 +1611,7 @@ class Terrain3DView extends JComponent {
     });
     private BufferedImage image;
     private Mode mode = Mode.TERRAIN;
-    private boolean showWater = true, showContours, interacting, orthographic, blocks;
+    private boolean showWater = true, showContours, showTrees = true, interacting, orthographic, blocks;
     private float exaggeration = 1.0f;
     private double targetX, targetY, targetH, yaw, pitch, distance = 200, maxDistance = 1000;
     private HoverListener hoverListener;
@@ -1548,7 +1629,7 @@ class Terrain3DView extends JComponent {
     /**
      * The face numbers of the block mesh start here, to tell them apart from those of the smooth surface.
      */
-    private static final int BLOCK_FACES = 1 << 30;
+    private static final int BLOCK_FACES = 1 << 30, TREE_FACES = 1 << 29;
     private static final byte KIND_TOP = 0, KIND_SIDE_X = 1, KIND_SIDE_Y = 2, KIND_WATER = 3, KIND_WALL = 4;
     private static final int MAX_SHADOW_STEPS = 600;
     private static final int FLOOR_COLOUR = 0x2b2a28;

@@ -64,7 +64,7 @@ The **3D** workspace shows a 3D view of the dimension next to the map, in the sa
 
 - **Details of the block under the cursor**: X / Z position, Y height, slope, terrain, biome (painted or automatic), water depth and the layers present.
 - **5 display modes**: *Terrain* (block colours), *Height* (altitude gradient), *Slope* (from blue for flat ground to red for slopes of 60° and more), *Biome* and *Relief* (shading and contour lines), each with its legend.
-- **Water** and **contour lines** can be switched on, and the **relief exaggeration** adjusted.
+- **Water**, **trees** (the forest layers and the tree pack, as simple shapes with their density) and **contour lines** can be switched on, and the **relief exaggeration** adjusted.
 - True **perspective** or **orthographic** projection (no distortion, so distances stay comparable), low, high or **top down** view facing north.
 - Navigation: drag to rotate, <kbd>⇧</kbd> + drag to pan, scroll to zoom, double-click to centre on a point; buttons to rotate and to fit the view.
 - The map is shown as a model on a base, rendered as a 3D mesh on all cores (about 10 ms per frame); very large maps are simplified to stay smooth.

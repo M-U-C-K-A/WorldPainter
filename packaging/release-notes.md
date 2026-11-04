@@ -6,6 +6,9 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 - **Half Blocks tool**: next to Smooth, it smooths the land like Smooth and builds it in half blocks in Minecraft where you drag it: slabs on stone, cobblestone, sandstone and the like (waterlogged under water), snow layers on snow blocks, so that gentle slopes go up by half a block instead of a whole block every other column. Right-drag goes back to whole blocks; the map shows where it applies with amber stripes. Snow lying on rock (Snow on Rock, Frost) is made as thick as the slope asks, so rock and snow follow the same slope. Grass, dirt and sand have no slab and stay whole
 - **The land Minecraft generates around the map meets it smoothly** (Minecraft 1.19 and later): the chunks of the map are marked for Minecraft's *chunk blending*, which it uses for worlds made before 1.18, so that it blends the new land into the edge of the map instead of leaving a step; this also smooths the outer edge of the band added by *Blend edges into this seed*
+- **Trees in the 3D view**: the forest layers and the trees of the tree pack are shown as simple shapes, with their density, size and colour; a button turns them off
+- **Fuller trees in the tree pack**: conifers have close tiers, and the crowns of oaks, cherry trees, willows and pale oaks are no longer cut off at the edges; worlds painted with the earlier trees get the new ones when they are opened
+- **Blending into the seed** only adds the transition: beyond it Minecraft generates its own land, instead of meeting an estimate of it along the straight edges of the added tiles; and no more beach sand high up where the transition carries the land above the sea
 - **Two export buttons again**: *Export FAST*, about a third faster on large maps, and the classic *Export*, as WorldPainter always exported; both give exactly the same blocks and light
 
 ## New in the betas before it
