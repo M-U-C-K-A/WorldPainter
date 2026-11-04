@@ -40,6 +40,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.pepsoft.worldpainter.util.PerlinColumnBound;
+
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 import static org.pepsoft.minecraft.ChunkFactory.Stage.*;
@@ -115,6 +117,10 @@ public abstract class AbstractWorldExporter implements WorldExporter {
         }
 
         long start = System.currentTimeMillis();
+
+        // The fast export skips the noise of ores and stone patches where it cannot matter; the classic one asks it
+        // everywhere, as WorldPainter always did
+        PerlinColumnBound.setEnabled(worldExportSettings.isFast());
 
         final Anchor anchor = dimension.getAnchor();
         final int dim = anchor.dim;
@@ -676,15 +682,18 @@ public abstract class AbstractWorldExporter implements WorldExporter {
     }
 
     protected void blockPropertiesPass(MinecraftWorld minecraftWorld, Point regionCoords, BlockBasedExportSettings exportSettings, ProgressReceiver progressReceiver) throws OperationCancelled {
+        float maxIterations = 0;
         final StringBuilder nounsBuilder = new StringBuilder();
         if (exportSettings.isCalculateSkyLight() || exportSettings.isCalculateBlockLight()) {
             nounsBuilder.append("lighting");
+            maxIterations = 16;
         }
         if (exportSettings.isCalculateLeafDistance()) {
             if (nounsBuilder.length() > 0) {
                 nounsBuilder.append(" and ");
             }
             nounsBuilder.append("leaf distances");
+            maxIterations = Math.max(maxIterations, 7);
         }
         final String nouns = nounsBuilder.toString();
         if (progressReceiver != null) {
@@ -724,7 +733,18 @@ public abstract class AbstractWorldExporter implements WorldExporter {
 
             // Calculate secondary light
             calculator.setDirtyArea(new Box((regionCoords.x << 9) - 16, ((regionCoords.x + 1) << 9) + 16, lowMark, highMark + 1, (regionCoords.y << 9) - 16, ((regionCoords.y + 1) << 9) + 16));
-            calculator.propagate();
+            if (worldExportSettings.isFast()) {
+                // Through a queue, only where the light changes
+                calculator.propagate();
+            } else {
+                // Over the whole region again and again until nothing changes, as WorldPainter always did
+                int iteration = 1;
+                while (calculator.secondPass()) {
+                    if (progressReceiver != null) {
+                        progressReceiver.setProgress(0.2f + 0.8f * (iteration++ / maxIterations));
+                    }
+                }
+            }
             calculator.finalise();
         }
 

@@ -33,6 +33,20 @@ public final class PerlinColumnBound {
      *
      * @return The bound, or {@code null} if it cannot be worked out for this generator.
      */
+    /**
+     * Whether the exporters should use the bounds: they do for the fast export, and not for the classic one, which asks
+     * the noise everywhere as WorldPainter always did. Both give the same blocks.
+     */
+    public static boolean isEnabled() {
+        return enabled;
+    }
+
+    public static void setEnabled(boolean enabled) {
+        PerlinColumnBound.enabled = enabled;
+    }
+
+    private static volatile boolean enabled = true;
+
     public static PerlinColumnBound create(PerlinNoise noise) {
         try {
             final Object fastPerlin = FAST_PERLIN.get(noise);

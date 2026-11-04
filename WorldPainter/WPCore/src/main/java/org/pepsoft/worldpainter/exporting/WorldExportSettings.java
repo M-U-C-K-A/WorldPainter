@@ -46,6 +46,23 @@ public class WorldExportSettings implements Serializable {
     }
 
     /**
+     * Whether to use the fast export: ores and stone patches which skip the noise where it cannot matter, and the light
+     * spread through a queue. It gives the same blocks and light as the classic export, about a third faster.
+     */
+    public boolean isFast() {
+        return fast;
+    }
+
+    public void setFast(boolean fast) {
+        this.fast = fast;
+    }
+
+    /**
+     * Only for this export, so this is not remembered with the world.
+     */
+    private transient boolean fast;
+
+    /**
      * The dimension(s) to export. If this is {@code null} then <em>all</em> dimensions must be exported.
      */
     private Set<Integer> dimensionsToExport;

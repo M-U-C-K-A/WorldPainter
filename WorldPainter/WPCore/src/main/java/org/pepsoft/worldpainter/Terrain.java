@@ -1101,8 +1101,8 @@ public enum Terrain {
             }
             // Ask the noise only where the bounds of the noise along the column (which are kept for the current
             // column and seed on each thread) do not rule out the patch; this gives exactly the same result
-            PerlinColumnBound[] bounds = BOUNDS.get();
-            if ((bounds == null) || (BOUNDS_SEED.get() != seed)) {
+            PerlinColumnBound[] bounds = PerlinColumnBound.isEnabled() ? BOUNDS.get() : NO_BOUNDS;
+            if ((bounds == null) || ((bounds != NO_BOUNDS) && (BOUNDS_SEED.get() != seed))) {
                 bounds = new PerlinColumnBound[] {PerlinColumnBound.create(graniteNoise), PerlinColumnBound.create(dioriteNoise), PerlinColumnBound.create(andesiteNoise)};
                 if ((bounds[0] == null) || (bounds[1] == null) || (bounds[2] == null)) {
                     bounds = NO_BOUNDS;

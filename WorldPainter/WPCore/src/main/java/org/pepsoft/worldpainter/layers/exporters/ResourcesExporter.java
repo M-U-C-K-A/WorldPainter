@@ -37,7 +37,7 @@ import static org.pepsoft.worldpainter.layers.exporters.ResourcesExporter.Resour
  */
 public class ResourcesExporter extends AbstractLayerExporter<Resources> implements FirstPassLayerExporter {
     public ResourcesExporter(Dimension dimension, Platform platform, ExporterSettings settings) {
-        this(dimension, platform, settings, true);
+        this(dimension, platform, settings, PerlinColumnBound.isEnabled());
     }
 
     /**
