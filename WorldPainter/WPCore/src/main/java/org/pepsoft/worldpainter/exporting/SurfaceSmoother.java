@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.pepsoft.minecraft.Constants.*;
+import static org.pepsoft.minecraft.Material.AIR;
 import static org.pepsoft.minecraft.Material.LAYERS;
 import static org.pepsoft.minecraft.Material.LEVEL;
 import static org.pepsoft.minecraft.Material.SNOW;
@@ -22,7 +23,8 @@ import static org.pepsoft.worldpainter.DefaultPlugin.ATTRIBUTE_MC_VERSION;
  * every other column (1, 1, 2, 2...). Snow blocks become snow layers, which go by eighths of a block.
  *
  * <p>It is done where the {@link org.pepsoft.worldpainter.layers.HalfBlocks} layer is painted, with the Half Blocks
- * tool. Only the top of the land is changed, in the open air or under water (where the slabs are waterlogged), and only
+ * tool. Where snow lies on the land (Snow on Rock, the Frost layer), it is the snow which is made as thick as the precise
+ * height asks. Only the top of the land is changed, in the open air or under water (where the slabs are waterlogged), and only
  * where nothing stands on it, so that plants, trees, objects and the snow of the Frost layer (which is already as thick
  * as the precise height asks) stay as they are. Blocks without a slab, such as grass, dirt and sand, stay whole.
  */
@@ -69,7 +71,12 @@ public final class SurfaceSmoother {
                     continue;
                 }
                 final Material surface = world.getMaterialAt(x, y, surfaceHeight);
-                if (surface.isNamed(MC_SNOW_BLOCK)) {
+                if (world.getMaterialAt(x, y, surfaceHeight + 1).isNamed(MC_SNOW) && (! surface.isNamed(MC_SNOW))) {
+                    // Snow on the land (Snow on Rock, the Frost layer): it is the snow which follows the precise height
+                    if (smoothSnowCover(world, x, y, height, surfaceHeight)) {
+                        changed++;
+                    }
+                } else if (surface.isNamed(MC_SNOW_BLOCK)) {
                     if (smoothSnow(world, x, y, height, surfaceHeight)) {
                         changed++;
                     }
@@ -134,6 +141,37 @@ public final class SurfaceSmoother {
     }
 
     /**
+     * Snow on the land goes by eighths of a block too, with at least one layer so that it is still there: it is made
+     * as thick as the precise height asks, on the block at the surface if the height was rounded down, or in place of
+     * it if the height was rounded up. So rock under snow (Snow on Rock, the Frost layer) follows the same slope as
+     * snow blocks next to it.
+     */
+    private boolean smoothSnowCover(MinecraftWorld world, int x, int y, float height, int surfaceHeight) {
+        final int eighths = Math.round(height * 8);
+        final int top = Math.floorDiv(eighths, 8);
+        final int layers = Math.max(eighths - top * 8, 1);
+        final int snowHeight = top + 1;
+        if (surfaceHeight == top) {
+            // Only the thickness of the snow changes
+            final Material snow = SNOW.withProperty(LAYERS, layers);
+            if (world.getMaterialAt(x, y, snowHeight) == snow) {
+                return false;
+            }
+            world.setMaterialAt(x, y, snowHeight, snow);
+        } else if (surfaceHeight == snowHeight) {
+            // The block at the surface makes way for the snow, which lies on the block below it
+            if ((! canHoldSnowLayers(world.getMaterialAt(x, y, top))) || (! world.getMaterialAt(x, y, snowHeight + 2).air)) {
+                return false;
+            }
+            world.setMaterialAt(x, y, snowHeight, SNOW.withProperty(LAYERS, layers));
+            world.setMaterialAt(x, y, snowHeight + 1, AIR);
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Snow goes by eighths of a block: replace the top snow block with snow layers if the height was rounded up, or put
      * snow layers on it if it was rounded down. Only in the open air, as snow layers cannot be waterlogged.
      */
@@ -146,7 +184,7 @@ public final class SurfaceSmoother {
         }
         final int snowHeight = top + 1;
         if (surfaceHeight == snowHeight) {
-            if (! world.getMaterialAt(x, y, snowHeight + 1).air) {
+            if ((! world.getMaterialAt(x, y, snowHeight + 1).air) || (! canHoldSnowLayers(world.getMaterialAt(x, y, top)))) {
                 return false;
             }
         } else if (surfaceHeight == top) {
@@ -158,6 +196,13 @@ public final class SurfaceSmoother {
         }
         world.setMaterialAt(x, y, snowHeight, SNOW.withProperty(LAYERS, layers));
         return true;
+    }
+
+    /**
+     * Whether snow layers can lie on a block: Minecraft does not keep them on ice or packed ice.
+     */
+    private static boolean canHoldSnowLayers(Material material) {
+        return material.canSupportSnow && (! material.leafBlock) && (! material.isNamedOneOf(MC_ICE, MC_PACKED_ICE));
     }
 
     private static boolean isStillWater(Material material) {

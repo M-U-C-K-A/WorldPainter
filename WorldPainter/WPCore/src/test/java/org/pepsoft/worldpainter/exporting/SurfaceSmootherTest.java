@@ -57,6 +57,38 @@ public class SurfaceSmootherTest {
     }
 
     /**
+     * Rock with a layer of snow on it (Snow on Rock, the Frost layer) follows the same slope as snow blocks, with at
+     * least one layer of snow.
+     */
+    @Test
+    public void testSnowOnRockGoesByEighths() {
+        final Fixture fixture = new Fixture(x -> 60 + x * 0.125f, STONE);
+        for (int x = 0; x < 32; x++) {
+            fixture.world.set(x, Math.round(60 + x * 0.125f) + 1, SNOW);
+        }
+        fixture.smooth();
+        for (int x = 0; x < 32; x++) {
+            final float expected = 61 + x * 0.125f + (((x % 8) == 0) ? 0.125f : 0.0f);
+            assertEquals("column " + x, expected, fixture.top(x), 0.0f);
+            assertTrue(fixture.world.get(x, (int) Math.floor(expected - 0.01f)).isNamed(MC_SNOW));
+        }
+    }
+
+    /**
+     * Snow layers are not put on ice, where Minecraft does not keep them.
+     */
+    @Test
+    public void testNoSnowLayersOnIce() {
+        final Fixture fixture = new Fixture(x -> 60.75f, SNOW_BLOCK);
+        fixture.world.set(0, 60, PACKED_ICE);
+        fixture.world.set(1, 60, ICE);
+        fixture.smooth();
+        assertSame(SNOW_BLOCK, fixture.world.get(0, 61));
+        assertSame(SNOW_BLOCK, fixture.world.get(1, 61));
+        assertTrue(fixture.world.get(2, 61).isNamed(MC_SNOW));
+    }
+
+    /**
      * Grass has no slab, and what stands on the land (here a flower) is left alone.
      */
     @Test
