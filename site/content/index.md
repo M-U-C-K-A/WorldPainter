@@ -15,8 +15,8 @@ description: A modernised fork of WorldPainter, the Minecraft map editor: an int
 </div>
 
 <figure>
-  <img src="assets/images/screenshot-dark.png" alt="The WorldPainter Modernised editor, with the land Minecraft will generate around the map shown faintly around it" class="hidden dark:block">
-  <img src="assets/images/screenshot-light.png" alt="The WorldPainter Modernised editor, with the land Minecraft will generate around the map shown faintly around it" class="dark:hidden">
+  <img src="assets/images/screenshot-dark.png" alt="The WorldPainter Modernised editor in its Layout workspace: the tools, the map of a continent and the brushes" class="hidden dark:block">
+  <img src="assets/images/screenshot-light.png" alt="The WorldPainter Modernised editor in its Layout workspace: the tools, the map of a continent and the brushes" class="dark:hidden">
 </figure>
 
 ## What it does

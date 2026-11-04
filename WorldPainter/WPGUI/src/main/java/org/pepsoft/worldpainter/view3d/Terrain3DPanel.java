@@ -201,6 +201,7 @@ public class Terrain3DPanel extends JPanel {
         layers.add(sunControl, JLayeredPane.PALETTE_LAYER);
         layers.add(statusLabel, JLayeredPane.MODAL_LAYER);
         add(layers, BorderLayout.CENTER);
+        pictureArea = layers;
     }
 
     /**
@@ -266,6 +267,20 @@ public class Terrain3DPanel extends JPanel {
      * Set what the detach button does, and whether the view is detached (in a panel of its own) or not, for the tooltip
      * of the button.
      */
+    /**
+     * The part of the panel which shows the land, without the buttons above it.
+     */
+    public JComponent getPictureArea() {
+        return pictureArea;
+    }
+
+    /**
+     * Whether it shows the land yet (it only loads it when it is first shown).
+     */
+    public boolean isReady() {
+        return view.hasModel();
+    }
+
     /**
      * Stop updating, when the panel is thrown away.
      */
@@ -462,6 +477,7 @@ public class Terrain3DPanel extends JPanel {
         }
     }
 
+    private JComponent pictureArea;
     private final Timer autoRefreshTimer = new Timer(1200, e -> autoRefresh());
     private volatile boolean building;
     private long lastSeenChange = -1;

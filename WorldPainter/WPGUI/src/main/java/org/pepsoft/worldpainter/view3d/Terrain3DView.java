@@ -943,6 +943,13 @@ class Terrain3DView extends JComponent {
         return (gx >= 0) && (gy >= 0) && (gx < nx - 1) && (gy < ny - 1) && isCell(samples, nx, gx, gy);
     }
 
+    /**
+     * Whether there is land to draw: the map has been loaded into the view.
+     */
+    boolean hasModel() {
+        return model != null;
+    }
+
     // Rendering
 
     @Override

@@ -41,7 +41,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshot-dark.png">
-  <img alt="The WorldPainter editor, with the biomes Minecraft will generate around the map shown in transparency" src="docs/images/screenshot-light.png" width="100%">
+  <img alt="The WorldPainter editor in its Layout workspace: the tools on the left, the map of a continent, the brushes on the right" src="docs/images/screenshot-light.png" width="100%">
 </picture>
 
 WorldPainter lets you "paint" Minecraft landscapes with tools much like those of a drawing program: sculpt the relief, paint the materials, the trees, the snow, the biomes… then export a playable map. This fork starts from the latest version of the original project, [Captain-Chaos/WorldPainter](https://github.com/Captain-Chaos/WorldPainter) 2.27, compatible with **Minecraft 1.20.5 to 26.x**. It makes it easier to pick up and adds what was missing to create a complete map quickly: seeing the result in 3D, knowing what will lie around it, and choosing the right seed.
@@ -71,7 +71,7 @@ The **3D** workspace shows a 3D view of the dimension next to the map, in the sa
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/view3d-dark.png">
-  <img alt="The 3D view in Terrain mode" src="docs/images/view3d-light.png" width="100%">
+  <img alt="The 3D workspace: the map and, next to it, the 3D view of the whole continent" src="docs/images/view3d-light.png" width="100%">
 </picture>
 
 <img alt="The 3D view in Slope mode: steep slopes in red" src="docs/images/view3d-slope.png" width="100%">
@@ -125,8 +125,9 @@ The world seed can be changed directly in the **Surroundings** panel (a number, 
 - **[Lucide](https://lucide.dev) icons** for the toolbar, the tools, the layers and the panels, and a new application icon.
 - **Explanatory cards** when hovering over each tool (name, shortcut, explanation) instead of the old yellow tooltips.
 - A **dotted grid canvas** around the map.
-- **Areas as in Blender**: the window is divided into areas, which are resized by dragging the gaps between them, split and joined from their corners, moved and swapped by dragging their header, maximised with <kbd>Ctrl</kbd>+<kbd>Space</kbd> and detached into a window which floats over the main one. The button at the top left of each area chooses what it shows (the map and the 3D view can be shown in several areas, each with its own view), and **workspace tabs** keep several arrangements (Layout, Sculpting, Painting, 3D, Minimal, and your own).
-- On macOS, the toolbar doubles as a **unified title bar**.
+- **Areas as in Blender**: the window is divided into areas, which are resized by dragging the gaps between them, split and joined from their corners, moved and swapped by dragging their header, maximised with <kbd>Ctrl</kbd>+<kbd>Space</kbd> and detached into a window which floats over the main one. The button at the top left of each area chooses what it shows (the map and the 3D view can be shown in several areas, each with its own view), and **workspace tabs** keep several arrangements (Layout, Sculpting, Painting, 3D, Minimal, and your own). Hold <kbd>Shift</kbd> to close areas with one click; hover over a choice of the editor type menu for a card with a picture of the page.
+- On macOS, the toolbar doubles as a **unified title bar**, and the Finder shows the **map of a world as the icon of its `.world` file**.
+- A **faster export**: about a third faster on large maps, with exactly the same blocks and light.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/divider-dark.svg">

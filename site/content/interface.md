@@ -37,6 +37,8 @@ Hover over a mix of blocks or a plant layer to see what it is made of: each bloc
 
 ## Areas
 
+![Two maps side by side, one zoomed in and one showing the whole continent, between the tools and the brushes](assets/images/areas.png)
+
 The window is divided into areas, as in Blender. At the left of the header of each one, the **editor type** button chooses what it shows: the map, the 3D view, the tools, their settings, the brushes, the brush settings, the terrain, the layers, the biomes, the packs, the annotations, the surroundings or the info. Pages of the same kind share the tabs down the side of their area, like the tabs of the Properties editor of Blender: the terrain, the layers, the biomes, the packs and the annotations are one kind, the brushes and your custom brushes another. Hover over a choice to see what it is for and a picture of it. The map and the 3D view can be shown in several areas at once, each with its own view, as the editors of Blender can: choosing one of them while it is shown elsewhere opens another one, moved and zoomed on its own, in which the current tool works too. Any other page is shown once: choosing one which is already shown in another area swaps the two.
 
 - **Resize** two areas by dragging the gap between them.

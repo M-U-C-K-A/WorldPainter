@@ -42,6 +42,7 @@ final class MapCopy {
         page.setDescription("Another view of the map, which you can move and zoom on its own");
         page.add(org.pepsoft.worldpainter.design.Glass.frame(container), BorderLayout.CENTER);
         page.add(createFoot(), BorderLayout.SOUTH);
+        page.putClientProperty(org.pepsoft.worldpainter.docking.PagePreview.KEY_AREA, container);
 
         final MouseAdapter mouseAdapter = new MouseAdapter() {
             @Override

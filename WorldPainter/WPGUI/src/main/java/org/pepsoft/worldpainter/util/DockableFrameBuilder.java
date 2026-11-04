@@ -125,6 +125,8 @@ public class DockableFrameBuilder {
             final JLabel header = new JLabel("<html><div style=\"width: " + Math.round(170 * getUIScale()) + "px\">" + description + "</div></html>");
             header.putClientProperty("FlatLaf.style", "font: -1; foreground: $WorldPainter.mutedForeground");
             header.setBorder(new HairlineBorder(false, false, true, false, new Insets(6, 8, 6, 8)));
+            // The card of the editor type menu says it already
+            header.putClientProperty(org.pepsoft.worldpainter.docking.PagePreview.KEY_SKIP, Boolean.TRUE);
             dockableFrame.add(header, BorderLayout.NORTH);
         }
 

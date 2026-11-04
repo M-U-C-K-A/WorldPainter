@@ -43,6 +43,7 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 - [x] [3D view: looking at the land from below](https://github.com/M-U-C-K-A/WorldPainter/issues/23): the model is closed with a floor
 - [x] [Remove the old Procedural Terrain dialog](https://github.com/M-U-C-K-A/WorldPainter/issues/16): the node graph is the one way to generate land, with Minecraft-like and Plains examples in place of its presets
 - [x] [Faster export](https://github.com/M-U-C-K-A/WorldPainter/issues/14): lighting through a queue, and ores and stone patches which skip the noise where it cannot matter, for the same blocks about a third faster
+- [x] Areas as in Blender: split, join, move and detach them, workspace tabs, two maps or two 3D views at once, Shift to close an area
 - [x] Map thumbnails: the Finder shows the map of a world as the icon of its `.world` file
 - [x] Preview releases on GitHub, with versions and release notes
 - [x] Brush settings which stay when switching tools, with limits by map selection, by height on a scale you can drag, by several terrain types or layers at once, and by slope, with undo

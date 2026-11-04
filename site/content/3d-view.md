@@ -7,7 +7,7 @@ description: The integrated 3D view of the map, with colour modes, a block by bl
 
 The **3D** workspace, in the tabs below the toolbar, shows the 3D view next to the map; any area can show it too, with the editor type button at the left of its header (see [Areas](interface.html#areas)). The 3D view is built from the map when you open it, and rebuilt by itself a moment after you stop changing the map; **Refresh** rebuilds it straight away.
 
-![The 3D view in Terrain mode](assets/images/view3d-light.jpg)
+![The 3D workspace: the map, and the 3D view of the whole continent next to it](assets/images/view3d-light.jpg)
 
 ## Moving around
 
@@ -46,7 +46,7 @@ The toolbar also turns the water and the contour lines (one every 8 blocks) on a
 
 ## In a panel of its own
 
-Like any area, the 3D view can be detached into a window of its own with the button in its header, to float next to the map so that you can paint and watch the result at the same time, or be put on any side of the map by dragging its header there.
+Like any area, the 3D view can be detached into a window of its own with the button in its header, to float next to the map so that you can paint and watch the result at the same time, or be put on any side of the map by dragging its header there. To look at the land from two sides at once, choose the 3D view in another area too: each one has a camera of its own.
 
 ## The sides
 

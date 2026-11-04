@@ -68,6 +68,7 @@ import org.pepsoft.worldpainter.vanilla.VanillaBiomeSource;
 import org.pepsoft.worldpainter.vanilla.VanillaBiomes;
 import org.pepsoft.worldpainter.docking.DockableFrame;
 import org.pepsoft.worldpainter.docking.AreaManager;
+import org.pepsoft.worldpainter.docking.PagePreview;
 import org.pepsoft.worldpainter.docking.Side;
 import org.pepsoft.worldpainter.nodes.NodeGraphDialog;
 import org.pepsoft.worldpainter.procedural.EdgeBlendDialog;
@@ -2721,6 +2722,16 @@ public final class App extends JFrame implements BrushControl,
     }
 
     /**
+     * Show the land in the card of a 3D view in the editor type menu, or a picture which comes with WorldPainter as
+     * long as it has not been opened yet.
+     */
+    private static void preview3D(DockableFrame page, Terrain3DPanel panel) {
+        page.putClientProperty(PagePreview.KEY_AREA, panel.getPictureArea());
+        page.putClientProperty(PagePreview.KEY_READY, (java.util.function.BooleanSupplier) panel::isReady);
+        page.putClientProperty(PagePreview.KEY_FALLBACK, "view3d");
+    }
+
+    /**
      * What the mouse wheel does on the map other than zooming (changing the size or the rotation of the brush), for
      * the other views of the map.
      */
@@ -2832,6 +2843,7 @@ public final class App extends JFrame implements BrushControl,
         // What is under the mouse, and the zoom, belong to the map, so they are at its foot rather than at the bottom
         // of the window
         mapPage.add(createStatusBar(), BorderLayout.SOUTH);
+        mapPage.putClientProperty(PagePreview.KEY_AREA, viewContainer);
         areaManager.addPage(mapPage);
         terrain3DPanel = new Terrain3DPanel();
         // The header of its area detaches it
@@ -2842,6 +2854,7 @@ public final class App extends JFrame implements BrushControl,
         threeDeePage.setGroup(GROUP_3D);
         threeDeePage.setDescription("See the map in perspective, with height, slope, biome and relief views and details of every block");
         threeDeePage.add(terrain3DPanel, BorderLayout.CENTER);
+        preview3D(threeDeePage, terrain3DPanel);
         areaManager.addPage(threeDeePage);
         // Build the 3D view when it comes into sight
         areaManager.addPageVisibilityListener((key, shown) -> {
@@ -3026,6 +3039,7 @@ public final class App extends JFrame implements BrushControl,
             page.setGroup(GROUP_3D);
             page.setDescription("Another 3D view of the map, with a camera of its own");
             page.add(panel, BorderLayout.CENTER);
+            preview3D(page, panel);
             terrain3DCopies.put(key, panel);
             if (dimension != null) {
                 SwingUtilities.invokeLater(() -> {
