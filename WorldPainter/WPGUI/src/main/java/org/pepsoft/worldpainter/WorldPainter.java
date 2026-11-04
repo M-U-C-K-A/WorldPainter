@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.HierarchyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
 import java.awt.geom.AffineTransform;
@@ -65,6 +66,36 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
         setOpaque(true);
         addMouseMotionListener(this);
         enableInputMethods(false);
+        // A view which is not in a window (in an area of another workspace, say) cannot draw tiles, so it only notes
+        // that the map changed meanwhile, and draws everything again when it is shown
+        addHierarchyListener(event -> {
+            if (((event.getChangeFlags() & HierarchyEvent.DISPLAYABILITY_CHANGED) != 0) && isDisplayable() && changedWhileHidden) {
+                changedWhileHidden = false;
+                SwingUtilities.invokeLater(() -> {
+                    if (isDisplayable()) {
+                        refreshTiles();
+                    }
+                });
+            }
+        });
+    }
+
+    @Override
+    public void refresh(org.pepsoft.util.swing.TileProvider tileProvider, int x, int y) {
+        if (isDisplayable()) {
+            super.refresh(tileProvider, x, y);
+        } else {
+            changedWhileHidden = true;
+        }
+    }
+
+    @Override
+    public void refresh(org.pepsoft.util.swing.TileProvider tileProvider, Set<Point> coords) {
+        if (isDisplayable()) {
+            super.refresh(tileProvider, coords);
+        } else {
+            changedWhileHidden = true;
+        }
     }
 
     public WorldPainter(Dimension dimension, ColourScheme colourScheme, CustomBiomeManager customBiomeManager) {
@@ -1143,6 +1174,11 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
     private static final int DAY_WALK_DISTANCE_RADIUS = 3328;
     private static final int DAY_NIGHT_WALK_DISTANCE_RADIUS = 5120;
     private static final Font NORMAL_FONT = new Font("SansSerif", Font.PLAIN, 10);
+    /**
+     * Whether the map changed while the view was not in a window, so that it must draw everything again when it is.
+     */
+    private boolean changedWhileHidden;
+
     private static final Logger logger = LoggerFactory.getLogger(WorldPainter.class);
     private static final long serialVersionUID = 1L;
 
