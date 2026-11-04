@@ -328,6 +328,31 @@ public class EdgeBlendOperation {
             }
         }
         applyTerrainAndWater(context, tile, heights, targetWeights, edgeTerrains, missing);
+        if (vanillaTarget != null) {
+            leaveBeyondTransitionToMinecraft(tile, targetWeights, missing);
+        }
+    }
+
+    /**
+     * When blending into the land Minecraft generates, the chunks of an added tile which lie wholly beyond the
+     * transition are left out of the map, so that Minecraft generates its own land there (blending it into the edge of
+     * the transition) instead of meeting an estimate of it along the straight edges of the tiles.
+     */
+    private void leaveBeyondTransitionToMinecraft(Tile tile, float[] targetWeights, boolean[] missing) {
+        for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
+            for (int chunkY = 0; chunkY < TILE_SIZE; chunkY += 16) {
+                boolean beyond = true;
+                for (int x = chunkX; (x < chunkX + 16) && beyond; x++) {
+                    for (int y = chunkY; (y < chunkY + 16) && beyond; y++) {
+                        final int i = x | (y << TILE_SIZE_BITS);
+                        beyond = ((missing == null) || missing[i]) && (targetWeights[i] >= 1.0f);
+                    }
+                }
+                if (beyond) {
+                    tile.setBitLayerValue(NotPresent.INSTANCE, chunkX, chunkY, true);
+                }
+            }
+        }
     }
 
     /**
@@ -473,6 +498,12 @@ public class EdgeBlendOperation {
     public static Terrain vanillaTerrain(VanillaBiomes.Category category, float height, float slope) {
         if (slope > 50) {
             return Terrain.ROCK;
+        }
+        // Where the transition carries the land of the map well above the sea, the beaches and sea floors of the seed
+        // would put sand high up on slopes: the land there gets what Minecraft puts inland instead
+        if (((category == VanillaBiomes.Category.OCEAN) || (category == VanillaBiomes.Category.RIVER) || (category == VanillaBiomes.Category.BEACH))
+                && (height > VANILLA_SEA_LEVEL + 4)) {
+            return (slope > 35) ? Terrain.STONE_MIX : Terrain.GRASS;
         }
         switch (category) {
             case OCEAN:
