@@ -4,6 +4,11 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 ## New in this beta
 
+- **Fix**: a second map shown in an area of another workspace no longer brings up an error window when the map changes (painting, undo, opening another world); it draws again when it is shown
+- The **editor type menu** shows the useful part of each page in its pictures: the palettes without their introduction and search field, the map and the 3D view without their bars, and the 3D view even before it was first opened, sharp on high resolution screens
+
+## New in the previous beta
+
 - **Areas as in Blender**: the window is divided into areas, which you resize by dragging the gaps between them, split and join from their corners, move by their header, maximise with Ctrl+Space and detach into windows of their own. The button at the top left of each one chooses what it shows, with a card and a picture of each page. The **map and the 3D view can be shown in several areas at once**, each with a view of its own. Hold **Shift** to close areas with one click
 - **Workspace tabs** (Layout, Sculpting, Painting, 3D, Minimal and your own) replace the workspace button and the Map/3D switch
 - **Faster export**, now the only one: about a third faster on large maps, with the same blocks and the same light
