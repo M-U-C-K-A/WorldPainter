@@ -4,22 +4,20 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 ## New in this beta
 
-- **Three designs**, each light, dark or following the system, which change at once from Preferences, without restarting (Cancel takes the change back): **Modern**, with layered grey surfaces, a blue accent and line icons; **Classic**, the earlier look; and **Glass**, new, with frosted panels on a soft gradient, the map in a pane with rounded corners, translucent cards and pill buttons. Metal, Nimbus and System are gone; settings which used them switch to Classic
-- **Preferences** has an **Apply** button
-- **Settings windows** group their settings in cards with explanations and badges for what needs a restart, a reload or the next export
-- The **Geist** typeface, **workspaces** for terraforming, painting, the node graph or only the map, and panels which dock at the bottom too
-- **Node graph**: mountains, rolling hills and an island ready made in one node, with the seldom used settings folded away
-- **Seed search** scores the height of the land as well as the biomes, relative to chance
-- The **3D view** closes the land with a floor when it is seen from below
-- **Export** (experimental button): the lighting goes through a queue, which is faster on large maps
+- **Areas as in Blender**: the window is divided into areas, which you resize by dragging the gaps between them, split and join from their corners, move by their header, maximise with Ctrl+Space and detach into windows of their own. The button at the top left of each one chooses what it shows, with a card and a picture of each page. The **map and the 3D view can be shown in several areas at once**, each with a view of its own. Hold **Shift** to close areas with one click
+- **Workspace tabs** (Layout, Sculpting, Painting, 3D, Minimal and your own) replace the workspace button and the Map/3D switch
+- **Faster export**, now the only one: about a third faster on large maps, with the same blocks and the same light
+- **Map thumbnails**: on macOS the Finder shows the map of a world as the icon of its `.world` file
+- **Node graph**: new Minecraft-like and Plains examples; the old Procedural Terrain dialog is gone, the node graph does all it did
+- What is under the mouse and the zoom are at the foot of the map; the buttons of the 3D view go on to more rows in a narrow area; the close button of the window works again in Run Script, Merge, Rotate and Shift
 
 As a beta, it has had less testing than the previews before it: keep backups of your worlds, and report what goes wrong.
 
 ## What is in it
 
-- A new interface, with three designs (Modern, Classic and Glass), light or dark, side panels which fold away, palettes which fill their panels, and cards on hover which show what the mouse and keys do, with an animation of each tool, a 3D preview of each brush, pictures of the brush options, and the blocks or plants of each mix and their shares
-- An integrated 3D view which keeps up with the map, with colour modes, 1:1 blocks up to 4096 blocks around the camera, optional shaders (sun and sky light, shadows, moving water), cross sections of the ground on its sides, and a panel of its own to float next to the map
-- A node graph to generate complete worlds, with 36 kinds of nodes, examples and `.wpgraph` files, including a Floating islands node
+- A new interface, with three designs (Modern, Classic and Glass), light or dark, areas which can be split, joined, moved and detached as in Blender, workspace tabs, palettes which fill their panels, and cards on hover which show what the mouse and keys do, with an animation of each tool, a 3D preview of each brush, pictures of the brush options, and the blocks or plants of each mix and their shares
+- An integrated 3D view which keeps up with the map, with colour modes, 1:1 blocks up to 4096 blocks around the camera, optional shaders (sun and sky light, shadows, moving water) and cross sections of the ground on its sides
+- A node graph to generate complete worlds, with 39 kinds of nodes, examples and `.wpgraph` files, including landforms ready made in one node and a Floating islands node
 - Surroundings drawn like the map, seed search, and blending the edges of the map into a seed (round maps included, with undo)
 - Paths from point to point with bridges on piers and tunnels, surfaces mixed at random or adapted to the land (beta), in three widths with an optional dynamic width, which clear the trees on their way and can be lined with fences, hedges, walls, lanterns or flowers; and rectangle selection
 - Brush settings which stay when switching tools: limits by map selection, by height on a scale you can drag, by several terrain types or layers at once, and by slope, with undo
