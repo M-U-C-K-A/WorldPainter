@@ -116,6 +116,12 @@ public class Bo2Layer extends CustomLayer {
             gridX = 1;
             gridY = 1;
         }
+
+        // The trees of WorldPainter's own tree pack are made again if they were made by an earlier version of it
+        final Bo2ObjectProvider upgraded = org.pepsoft.worldpainter.layers.bo2.TreePack.upgrade(this);
+        if (upgraded != null) {
+            objectProvider = upgraded;
+        }
     }
     
     private Bo2ObjectProvider objectProvider;
