@@ -241,6 +241,12 @@ public final class MC118AnvilChunk extends MCNamedBlocksChunk implements Section
         setBoolean(REGION, TAG_IS_LIGHT_ON_, lightOn);
         setLong(REGION, TAG_INHABITED_TIME, inhabitedTime);
         setList(REGION, TAG_FLUID_TICKS_, CompoundTag.class, fluidTicks);
+        if (blendWithGeneratedLand) {
+            // As Minecraft marks the chunks of worlds made before 1.18, over the whole height of the chunk
+            setMap(REGION, TAG_BLENDING_DATA, ImmutableMap.of(
+                    TAG_MIN_SECTION, new IntTag(TAG_MIN_SECTION, -undergroundSections),
+                    TAG_MAX_SECTION, new IntTag(TAG_MAX_SECTION, maxHeight >> 4)));
+        }
 
         if (extraTags != null) {
             extraTags.forEach((type, tags) -> tags.forEach((name, tag) -> setTag(type, name, tag)));
@@ -782,6 +788,16 @@ public final class MC118AnvilChunk extends MCNamedBlocksChunk implements Section
     final List<Entity> entities;
     final List<TileEntity> blockEntities;
     final Map<String, long[]> heightMaps;
+    /**
+     * Have Minecraft blend the land it generates next to this chunk into it, as it does for the chunks of worlds made
+     * before 1.18: it works out the height of the land along the edges of the chunk, and makes the new land meet it
+     * smoothly over a few chunks, instead of in a cliff. Understood by Minecraft 1.19 and later, in the Overworld.
+     */
+    public void setBlendWithGeneratedLand(boolean blendWithGeneratedLand) {
+        this.blendWithGeneratedLand = blendWithGeneratedLand;
+    }
+
+    private boolean blendWithGeneratedLand;
     final List<CompoundTag> fluidTicks = new ArrayList<>();
     final Map<DataType, Map<String, Tag>> extraTags;
     final Integer inputDataVersion;
@@ -791,6 +807,7 @@ public final class MC118AnvilChunk extends MCNamedBlocksChunk implements Section
     String status;
 
     public static final int LIGHT_ARRAY_SIZE = 2048;
+    private static final String TAG_BLENDING_DATA = "blending_data", TAG_MIN_SECTION = "min_section", TAG_MAX_SECTION = "max_section";
     private static final Random RANDOM = new Random();
     private static final Map<DataType, Set<String>> KNOWN_TAGS = ImmutableMap.of(
             REGION, ImmutableSet.of(TAG_DATA_VERSION, TAG_SECTIONS_, TAG_HEIGHT_MAPS, TAG_BLOCK_ENTITIES_, TAG_LAST_UPDATE, TAG_X_POS_, TAG_Z_POS_, TAG_STATUS, TAG_IS_LIGHT_ON_, TAG_INHABITED_TIME, TAG_FLUID_TICKS_),

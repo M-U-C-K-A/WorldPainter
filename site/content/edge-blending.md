@@ -19,6 +19,6 @@ A map of 200 × 200 blocks used to end in a sheer cliff where Minecraft's own la
 
 Round maps are blended too: the land outside the circle, which WorldPainter marks as void block by block and as not present chunk by chunk, is filled in with the blend, so no gaps are left in the corners of the chunks along the edge.
 
-Minecraft then blends the last few blocks itself, with its *chunk blending*, when it generates the chunks around the map.
+WorldPainter marks the chunks of the map so that Minecraft (1.19 and later, in the Overworld, when the map has no border or wall) blends the land it generates around them into them, as it does for worlds made before 1.18: the new land meets the edge of the map smoothly over a hundred blocks or so, instead of in a step. The height WorldPainter estimates for the seed is only approximate, so this is what makes the last few blocks meet.
 
 > [!TIP] To blend into the land Minecraft will actually generate for your seed, with its biomes, use **Blend edges into this seed…** in the [Surroundings](surroundings-and-seeds.html#blend-the-edges-into-the-seed) panel instead.

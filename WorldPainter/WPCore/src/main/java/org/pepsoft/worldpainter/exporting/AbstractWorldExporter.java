@@ -49,6 +49,7 @@ import static org.pepsoft.minecraft.Constants.*;
 import static org.pepsoft.util.ExceptionUtils.chainContains;
 import static org.pepsoft.util.mdc.MDCUtils.doWithMdcContext;
 import static org.pepsoft.worldpainter.Constants.*;
+import static org.pepsoft.worldpainter.DefaultPlugin.ATTRIBUTE_MC_VERSION;
 import static org.pepsoft.worldpainter.DefaultPlugin.JAVA_ANVIL;
 import static org.pepsoft.worldpainter.DefaultPlugin.JAVA_MCREGION;
 import static org.pepsoft.worldpainter.Dimension.Role.DETAIL;
@@ -859,6 +860,31 @@ public abstract class AbstractWorldExporter implements WorldExporter {
         }, "region.coords", regionCoords);
     }
 
+    /**
+     * Whether Minecraft should blend the land it generates around the map into it (see
+     * {@link MC118AnvilChunk#setBlendWithGeneratedLand(boolean)}): in the Overworld, from Minecraft 1.19, when nothing
+     * (a border or a wall) stands between the map and the land Minecraft generates.
+     */
+    private boolean isBlendedWithGeneratedLand(Dimension dimension) {
+        return (dimension.getAnchor().dim == DIM_NORMAL)
+                && (! dimension.getAnchor().invert)
+                && (dimension.getBorder() == null)
+                && (dimension.getWallType() == null)
+                && platform.getAttribute(ATTRIBUTE_MC_VERSION).isAtLeast(V_1_19);
+    }
+
+    /**
+     * Have Minecraft make the land it generates around the map meet it smoothly, where it can.
+     */
+    private ChunkFactory.ChunkCreationResult markForBlending(Dimension dimension, ChunkFactory.ChunkCreationResult result, boolean ceiling) {
+        if ((result != null) && (! ceiling) && (result.chunk instanceof MC118AnvilChunk) && isBlendedWithGeneratedLand(dimension)) {
+            ((MC118AnvilChunk) result.chunk).setBlendWithGeneratedLand(true);
+        }
+        return result;
+    }
+
+    private static final org.pepsoft.util.Version V_1_19 = new org.pepsoft.util.Version(1, 19);
+
     protected ChunkFactory.ChunkCreationResult createChunk(Dimension dimension, ChunkFactory chunkFactory, Map<Point, Tile> tiles, int chunkX, int chunkY, boolean tileSelection, Map<Layer, LayerExporter> exporters, boolean ceiling) {
         final int tileX = chunkX >> 3;
         final int tileY = chunkY >> 3;
@@ -869,14 +895,14 @@ public abstract class AbstractWorldExporter implements WorldExporter {
         if (tileSelection) {
             // Tile selection. Don't export bedrock wall or border tiles
             if (tiles.containsKey(tileCoords)) {
-                return chunkFactory.createChunk(chunkX, chunkY);
+                return markForBlending(dimension, chunkFactory.createChunk(chunkX, chunkY), ceiling);
             } else {
                 return null;
             }
         } else {
             final Tile tile = dimension.getTile(tileCoords);
             if (tile != null) {
-                final ChunkFactory.ChunkCreationResult result = chunkFactory.createChunk(chunkX, chunkY);
+                final ChunkFactory.ChunkCreationResult result = markForBlending(dimension, chunkFactory.createChunk(chunkX, chunkY), ceiling);
                 // If the chunk is marked as NotPresent we might want to render a border chunk here
                 if ((result == null) && border && tile.getBitLayerValue(NotPresent.INSTANCE, (chunkX & 0x7) << 4, (chunkY & 0x7) << 4)) {
                     return BorderChunkFactory.create(chunkX, chunkY, dimension, platform, exporters);

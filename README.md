@@ -173,7 +173,7 @@ A single **Brushes** panel, with no hidden menu:
 
 - **Transition zone** of 16 to 4096 blocks, outside the map (which is then enlarged), inside it (the edge is softened) or across the edge. Round maps are blended too.
 - **Target**: generated terrain from a preset (*Minecraft-like* by default, close to what Minecraft generates beyond the map) or a flat level.
-- Adjustable curve shape and **irregularity**; Minecraft then joins up the last few blocks itself with its *chunk blending*.
+- Adjustable curve shape and **irregularity**; WorldPainter marks the chunks of the map so that Minecraft (1.19 and later) joins up the last blocks itself with its *chunk blending*, as it does for worlds made before 1.18.
 
 <img alt="Before and after blending the edges" src="docs/images/edge-blending.png" width="100%">
 
