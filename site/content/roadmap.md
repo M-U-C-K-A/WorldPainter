@@ -11,7 +11,6 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 
 ## Next preview
 
-- [ ] [Faster export, first as an experimental button](https://github.com/M-U-C-K-A/WorldPainter/issues/14) (in progress)
 - [ ] [Blend edges into seed: forests and biomes](https://github.com/M-U-C-K-A/WorldPainter/issues/21)
 - [ ] [Automated export tests in CI](https://github.com/M-U-C-K-A/WorldPainter/issues/1)
 - [ ] [Sign and notarise the macOS app](https://github.com/M-U-C-K-A/WorldPainter/issues/2)
@@ -43,6 +42,7 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 - [x] [Find a matching seed: a score which means something](https://github.com/M-U-C-K-A/WorldPainter/issues/22): the height of the land is scored as well as the biomes, relative to chance
 - [x] [3D view: looking at the land from below](https://github.com/M-U-C-K-A/WorldPainter/issues/23): the model is closed with a floor
 - [x] [Remove the old Procedural Terrain dialog](https://github.com/M-U-C-K-A/WorldPainter/issues/16): the node graph is the one way to generate land, with Minecraft-like and Plains examples in place of its presets
+- [x] [Faster export](https://github.com/M-U-C-K-A/WorldPainter/issues/14): lighting through a queue, and ores and stone patches which skip the noise where it cannot matter, for the same blocks about a third faster
 - [x] Map thumbnails: the Finder shows the map of a world as the icon of its `.world` file
 - [x] Preview releases on GitHub, with versions and release notes
 - [x] Brush settings which stay when switching tools, with limits by map selection, by height on a scale you can drag, by several terrain types or layers at once, and by slope, with undo

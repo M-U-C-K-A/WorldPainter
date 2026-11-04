@@ -676,18 +676,15 @@ public abstract class AbstractWorldExporter implements WorldExporter {
     }
 
     protected void blockPropertiesPass(MinecraftWorld minecraftWorld, Point regionCoords, BlockBasedExportSettings exportSettings, ProgressReceiver progressReceiver) throws OperationCancelled {
-        float maxIterations = 0;
         final StringBuilder nounsBuilder = new StringBuilder();
         if (exportSettings.isCalculateSkyLight() || exportSettings.isCalculateBlockLight()) {
             nounsBuilder.append("lighting");
-            maxIterations = 16;
         }
         if (exportSettings.isCalculateLeafDistance()) {
             if (nounsBuilder.length() > 0) {
                 nounsBuilder.append(" and ");
             }
             nounsBuilder.append("leaf distances");
-            maxIterations = Math.max(maxIterations, 7);
         }
         final String nouns = nounsBuilder.toString();
         if (progressReceiver != null) {
@@ -727,16 +724,7 @@ public abstract class AbstractWorldExporter implements WorldExporter {
 
             // Calculate secondary light
             calculator.setDirtyArea(new Box((regionCoords.x << 9) - 16, ((regionCoords.x + 1) << 9) + 16, lowMark, highMark + 1, (regionCoords.y << 9) - 16, ((regionCoords.y + 1) << 9) + 16));
-            if ((worldExportSettings != null) && worldExportSettings.isExperimental()) {
-                calculator.propagate();
-            } else {
-                int iteration = 1;
-                while (calculator.secondPass()) {
-                    if (progressReceiver != null) {
-                        progressReceiver.setProgress(0.2f + 0.8f * (iteration++ / maxIterations));
-                    }
-                }
-            }
+            calculator.propagate();
             calculator.finalise();
         }
 

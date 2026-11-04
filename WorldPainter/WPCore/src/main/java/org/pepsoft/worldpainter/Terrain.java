@@ -9,6 +9,7 @@ import com.google.common.collect.ImmutableSet;
 import org.pepsoft.minecraft.Material;
 import org.pepsoft.util.IconUtils;
 import org.pepsoft.util.PerlinNoise;
+import org.pepsoft.worldpainter.util.PerlinColumnBound;
 import org.pepsoft.util.RandomField;
 import org.pepsoft.worldpainter.layers.plants.Plant;
 import org.pepsoft.worldpainter.layers.plants.Plants;
@@ -1098,22 +1099,35 @@ public enum Terrain {
                 andesiteNoise.setSeed(seed + ANDESITE_SEED_OFFSET);
                 RANDOM.setSeed(seed);
             }
+            // Ask the noise only where the bounds of the noise along the column (which are kept for the current
+            // column and seed on each thread) do not rule out the patch; this gives exactly the same result
+            PerlinColumnBound[] bounds = BOUNDS.get();
+            if ((bounds == null) || (BOUNDS_SEED.get() != seed)) {
+                bounds = new PerlinColumnBound[] {PerlinColumnBound.create(graniteNoise), PerlinColumnBound.create(dioriteNoise), PerlinColumnBound.create(andesiteNoise)};
+                if ((bounds[0] == null) || (bounds[1] == null) || (bounds[2] == null)) {
+                    bounds = NO_BOUNDS;
+                }
+                BOUNDS.set(bounds);
+                BOUNDS_SEED.set(seed);
+            }
+            final double noiseX = x / SMALL_BLOBS, noiseY = y / SMALL_BLOBS, noiseZ = z / SMALL_BLOBS;
+            final boolean granite = ((bounds == NO_BOUNDS) || bounds[0].mayExceed(noiseX, noiseY, noiseZ, GRANITE_CHANCE)) && (graniteNoise.getPerlinNoise(noiseX, noiseY, noiseZ) > GRANITE_CHANCE);
             if ((z >= 0) || ((z >= -4) && (z >= -RANDOM.nextInt(5)))) { // TODO this is not stable
-                if (graniteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > GRANITE_CHANCE) {
+                if (granite) {
                     return Material.GRANITE;
-                } else if (dioriteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > DIORITE_CHANCE) {
+                } else if (((bounds == NO_BOUNDS) || bounds[1].mayExceed(noiseX, noiseY, noiseZ, DIORITE_CHANCE)) && (dioriteNoise.getPerlinNoise(noiseX, noiseY, noiseZ) > DIORITE_CHANCE)) {
                     return Material.DIORITE;
-                } else if (andesiteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > ANDESITE_CHANCE) {
+                } else if (((bounds == NO_BOUNDS) || bounds[2].mayExceed(noiseX, noiseY, noiseZ, ANDESITE_CHANCE)) && (andesiteNoise.getPerlinNoise(noiseX, noiseY, noiseZ) > ANDESITE_CHANCE)) {
                     return Material.ANDESITE;
                 } else {
                     return Material.STONE;
                 }
             } else {
-                if (graniteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > GRANITE_CHANCE) {
+                if (granite) {
                     return Material.TUFF;
-                } else if (dioriteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > DIORITE_CHANCE) {
+                } else if (((bounds == NO_BOUNDS) || bounds[1].mayExceed(noiseX, noiseY, noiseZ, DIORITE_CHANCE)) && (dioriteNoise.getPerlinNoise(noiseX, noiseY, noiseZ) > DIORITE_CHANCE)) {
                     return Material.DEEPSLATE_X;
-                } else if (andesiteNoise.getPerlinNoise(x / SMALL_BLOBS, y / SMALL_BLOBS, z / SMALL_BLOBS) > ANDESITE_CHANCE) {
+                } else if (((bounds == NO_BOUNDS) || bounds[2].mayExceed(noiseX, noiseY, noiseZ, ANDESITE_CHANCE)) && (andesiteNoise.getPerlinNoise(noiseX, noiseY, noiseZ) > ANDESITE_CHANCE)) {
                     return Material.DEEPSLATE_Z;
                 } else {
                     return Material.DEEPSLATE_Y;
@@ -1130,6 +1144,9 @@ public enum Terrain {
         private static final int ANDESITE_SEED_OFFSET =  87772192;
 
         private final Random RANDOM = new Random();
+        private final ThreadLocal<PerlinColumnBound[]> BOUNDS = new ThreadLocal<>();
+        private final ThreadLocal<Long> BOUNDS_SEED = new ThreadLocal<>();
+        private final PerlinColumnBound[] NO_BOUNDS = new PerlinColumnBound[3];
     },
     CUSTOM_25("Custom 25",                                  "custom material twenty-five", BIOME_PLAINS) {
         @Override public Material getMaterial(Platform platform, long seed, int x, int y, int z, int height) {return helper.getMaterial(seed, x, y, z, height);}

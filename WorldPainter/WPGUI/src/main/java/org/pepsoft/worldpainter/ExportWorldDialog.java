@@ -272,7 +272,7 @@ public class ExportWorldDialog extends WPDialogWithPaintSelection {
         exportSettings = (exportSettings != null)
                 ? exportSettings
                 : ((world.getExportSettings() != null) ? world.getExportSettings() : EXPORT_EVERYTHING);
-        final boolean exportAllDimensions = exportSettings.getDimensionsToExport() == null, inhibitWarnings = (exportSettings != EXPORT_EVERYTHING) && (! exportSettings.isExperimental());
+        final boolean exportAllDimensions = exportSettings.getDimensionsToExport() == null, inhibitWarnings = exportSettings != EXPORT_EVERYTHING;
         final Set<Point> selectedTiles = exportAllDimensions ? null : exportSettings.getTilesToExport();
         final int selectedDimension = exportAllDimensions ? DIM_NORMAL : exportSettings.getDimensionsToExport().iterator().next();
 
@@ -424,7 +424,6 @@ public class ExportWorldDialog extends WPDialogWithPaintSelection {
         fieldName.setEnabled(false);
         buttonSelectDirectory.setEnabled(false);
         buttonExport.setEnabled(false);
-        buttonExportExperimental.setEnabled(false);
         buttonTestExport.setEnabled(false);
         buttonCancel.setEnabled(false);
         for (DimensionPropertiesEditor editor: dimensionPropertiesEditors.values()) {
@@ -491,18 +490,15 @@ public class ExportWorldDialog extends WPDialogWithPaintSelection {
         fieldDirectory.setEnabled(platformSupported);
         buttonSelectDirectory.setEnabled(platformSupported);
         buttonExport.setEnabled(platformSupported);
-        buttonExportExperimental.setEnabled(platformSupported);
         buttonTestExport.setEnabled(platformSupported);
         final boolean dataPacksEnabled = listDataPacks.isEnabled();
         buttonAddDataPack.setEnabled(dataPacksEnabled);
         buttonRemoveDataPack.setEnabled(dataPacksEnabled && (listDataPacks.getSelectedIndex() != -1));
         if (! platformSupported) {
             buttonExport.setToolTipText(labelPlatformWarning.getToolTipText());
-            buttonExportExperimental.setToolTipText(labelPlatformWarning.getToolTipText());
             buttonTestExport.setToolTipText(labelPlatformWarning.getToolTipText());
         } else {
             buttonExport.setToolTipText(null);
-            buttonExportExperimental.setToolTipText(EXPERIMENTAL_EXPORT_TIP);
             buttonTestExport.setToolTipText(null);
         }
     }
@@ -591,7 +587,6 @@ public class ExportWorldDialog extends WPDialogWithPaintSelection {
         buttonGroup2 = new javax.swing.ButtonGroup();
         buttonCancel = new javax.swing.JButton();
         buttonExport = new javax.swing.JButton();
-        buttonExportExperimental = new javax.swing.JButton();
         jTabbedPane1 = new javax.swing.JTabbedPane();
         jPanel1 = new javax.swing.JPanel();
         checkBoxGoodies = new javax.swing.JCheckBox();
@@ -642,15 +637,6 @@ public class ExportWorldDialog extends WPDialogWithPaintSelection {
             }
         });
 
-        buttonExportExperimental.setText("Export");
-        buttonExportExperimental.setIcon(new TagIcon("EXPERIMENTAL"));
-        buttonExportExperimental.setHorizontalTextPosition(javax.swing.SwingConstants.LEADING);
-        buttonExportExperimental.setToolTipText(EXPERIMENTAL_EXPORT_TIP);
-        buttonExportExperimental.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                buttonExportExperimentalActionPerformed(evt);
-            }
-        });
 
         buttonExport.setText("Export");
         buttonExport.addActionListener(new java.awt.event.ActionListener() {
@@ -961,8 +947,6 @@ public class ExportWorldDialog extends WPDialogWithPaintSelection {
                         .addGap(0, 0, Short.MAX_VALUE)
                         .addComponent(buttonTestExport)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(buttonExportExperimental)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(buttonExport)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(buttonCancel))
@@ -978,7 +962,6 @@ public class ExportWorldDialog extends WPDialogWithPaintSelection {
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(buttonCancel)
                     .addComponent(buttonExport)
-                    .addComponent(buttonExportExperimental)
                     .addComponent(buttonTestExport))
                 .addContainerGap())
         );
@@ -993,12 +976,6 @@ public class ExportWorldDialog extends WPDialogWithPaintSelection {
     private void buttonExportActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonExportActionPerformed
         export(EXPORT_EVERYTHING);
     }//GEN-LAST:event_buttonExportActionPerformed
-
-    private void buttonExportExperimentalActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonExportExperimentalActionPerformed
-        final WorldExportSettings exportSettings = new WorldExportSettings();
-        exportSettings.setExperimental(true);
-        export(exportSettings);
-    }//GEN-LAST:event_buttonExportExperimentalActionPerformed
 
     private void buttonSelectDirectoryActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonSelectDirectoryActionPerformed
         selectDir();
@@ -1076,7 +1053,6 @@ public class ExportWorldDialog extends WPDialogWithPaintSelection {
     private javax.swing.JButton buttonAddDataPack;
     private javax.swing.JButton buttonCancel;
     private javax.swing.JButton buttonExport;
-    private javax.swing.JButton buttonExportExperimental;
     private javax.swing.ButtonGroup buttonGroup2;
     private javax.swing.JButton buttonRemoveDataPack;
     private javax.swing.JButton buttonSelectDirectory;
@@ -1118,47 +1094,6 @@ public class ExportWorldDialog extends WPDialogWithPaintSelection {
     private javax.swing.JSpinner spinnerMcBorderSize;
     // End of variables declaration//GEN-END:variables
 
-    /**
-     * A small coloured tag after the text of a button.
-     */
-    private static final class TagIcon implements Icon {
-        TagIcon(String text) {
-            this.text = text;
-        }
-
-        @Override
-        public void paintIcon(Component c, Graphics g, int x, int y) {
-            final Graphics2D g2 = (Graphics2D) g.create();
-            try {
-                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-                g2.setFont(font(c));
-                g2.setColor(new Color(0xd9822b));
-                final FontMetrics metrics = g2.getFontMetrics();
-                g2.drawString(text, x, y + (getIconHeight() + metrics.getAscent() - metrics.getDescent()) / 2);
-            } finally {
-                g2.dispose();
-            }
-        }
-
-        @Override
-        public int getIconWidth() {
-            return new JLabel().getFontMetrics(font(null)).stringWidth(text);
-        }
-
-        @Override
-        public int getIconHeight() {
-            return new JLabel().getFontMetrics(font(null)).getHeight();
-        }
-
-        private static Font font(Component c) {
-            final Font base = UIManager.getFont("Button.font");
-            return base.deriveFont(Font.BOLD, base.getSize2D() - 3f);
-        }
-
-        private final String text;
-    }
-
-    private static final String EXPERIMENTAL_EXPORT_TIP = "<html><b>A faster export, still being tried out.</b><br>It is meant to give the same result as the normal export.<br>Check the map in Minecraft before relying on it.</html>";
 
     private final World2 world;
     private final ColourScheme colourScheme;

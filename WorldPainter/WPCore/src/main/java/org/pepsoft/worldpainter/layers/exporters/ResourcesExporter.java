@@ -14,6 +14,7 @@ import org.pepsoft.worldpainter.exporting.AbstractLayerExporter;
 import org.pepsoft.worldpainter.exporting.FirstPassLayerExporter;
 import org.pepsoft.worldpainter.layers.Resources;
 import org.pepsoft.worldpainter.layers.Void;
+import org.pepsoft.worldpainter.util.PerlinColumnBound;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -36,6 +37,14 @@ import static org.pepsoft.worldpainter.layers.exporters.ResourcesExporter.Resour
  */
 public class ResourcesExporter extends AbstractLayerExporter<Resources> implements FirstPassLayerExporter {
     public ResourcesExporter(Dimension dimension, Platform platform, ExporterSettings settings) {
+        this(dimension, platform, settings, true);
+    }
+
+    /**
+     * @param useBounds Whether to skip the noise where it cannot reach the threshold of an ore; only for testing that
+     *                  this makes no difference.
+     */
+    ResourcesExporter(Dimension dimension, Platform platform, ExporterSettings settings, boolean useBounds) {
         super(dimension, platform, (settings != null) ? settings : defaultSettings(platform, dimension.getAnchor(), dimension.getMinHeight(), dimension.getMaxHeight()), Resources.INSTANCE);
         final ResourcesExporterSettings resourcesSettings = (ResourcesExporterSettings) super.settings;
         final Set<Material> allMaterials = resourcesSettings.getMaterials();
@@ -66,6 +75,42 @@ public class ResourcesExporter extends AbstractLayerExporter<Resources> implemen
                 noiseGenerators[i].setSeed(dimension.getSeed() + seedOffsets[i]);
             }
         }
+        blobs = new boolean[this.activeMaterials.length];
+        deepslateVariants = new Material[this.activeMaterials.length];
+        for (int i = 0; i < this.activeMaterials.length; i++) {
+            blobs[i] = this.activeMaterials[i].isNamedOneOf(MC_DIRT, MC_GRAVEL);
+            deepslateVariants[i] = ORE_TO_DEEPSLATE_VARIANT.get(this.activeMaterials[i].name);
+        }
+        PerlinColumnBound[] bounds = new PerlinColumnBound[this.activeMaterials.length];
+        for (int i = 0; i < this.activeMaterials.length; i++) {
+            bounds[i] = useBounds ? PerlinColumnBound.create(noiseGenerators[i]) : null;
+            if (bounds[i] == null) {
+                bounds = null;
+                break;
+            }
+        }
+        this.bounds = bounds;
+        // The cell of the noise of each height, and the position in it, as the generators work them out
+        final int heights = maxZ - minHeight + 1;
+        tinyZ = new double[heights];
+        smallZ = new double[heights];
+        tinyCells = new int[heights];
+        smallCells = new int[heights];
+        tinyPositions = new float[heights];
+        smallPositions = new float[heights];
+        tinyFades = new double[heights];
+        smallFades = new double[heights];
+        for (int y = minHeight; y <= maxZ; y++) {
+            final int index = y - minHeight;
+            tinyZ[index] = y / TINY_BLOBS;
+            smallZ[index] = y / SMALL_BLOBS;
+            tinyCells[index] = (int) Math.floor(tinyZ[index]);
+            smallCells[index] = (int) Math.floor(smallZ[index]);
+            tinyPositions[index] = PerlinColumnBound.positionInCell(tinyZ[index]);
+            smallPositions[index] = PerlinColumnBound.positionInCell(smallZ[index]);
+            tinyFades[index] = PerlinColumnBound.fade(tinyPositions[index]);
+            smallFades[index] = PerlinColumnBound.fade(smallPositions[index]);
+        }
     }
 
     @Override
@@ -79,6 +124,20 @@ public class ResourcesExporter extends AbstractLayerExporter<Resources> implemen
         final int xOffset = (chunk.getxPos() & 7) << 4;
         final int zOffset = (chunk.getzPos() & 7) << 4;
         final boolean coverSteepTerrain = dimension.isCoverSteepTerrain(), nether = (dimension.getAnchor().dim == DIM_NETHER);
+        // Bounds of the noise of each ore along the column, to skip the cells of the noise where it cannot reach the
+        // threshold of the ore
+        final PerlinColumnBound[] bounds;
+        if (this.bounds != null) {
+            bounds = new PerlinColumnBound[this.bounds.length];
+            for (int i = 0; i < bounds.length; i++) {
+                bounds[i] = this.bounds[i].copy();
+            }
+        } else {
+            bounds = null;
+        }
+        // The ore found for each height of the column, by index, or NO_ORE
+        final int[] ores = new int[maxZ - minHeight + 1];
+        Arrays.fill(ores, NO_ORE);
 //        int[] counts = new int[256];
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
@@ -105,26 +164,64 @@ public class ResourcesExporter extends AbstractLayerExporter<Resources> implemen
                     // this going higher than maxHeight, so there must be some obscure way in which the terrainHeight
                     // can be raised too high
                     final int minZ = (minHeightField != null) ? (int) floor(minHeightField.getHeight(worldX, worldY)) : this.minZ;
+                    final int top = Math.min(subsurfaceMaxHeight, maxZ);
+                    if ((bounds != null) && (minZ >= minHeight)) {
+                        // Ore by ore, skipping the cells of the noise where the ore cannot reach its threshold; at
+                        // each height the first ore which reaches its threshold wins, as below
+                        for (int i = 0; i < activeMaterials.length; i++) {
+                            final float chance = chances[i][resourcesValue];
+                            final int high = Math.min(top, maxLevels[i]), low = Math.max(minZ, minLevels[i]);
+                            if ((chance > 0.5f) || (high < low)) {
+                                continue;
+                            }
+                            final PerlinColumnBound bound = bounds[i];
+                            final double noiseX = blobs[i] ? dirtX : dx, noiseY = blobs[i] ? dirtY : dy;
+                            bound.setColumn(noiseX, noiseY);
+                            final int[] cellsOf = blobs[i] ? smallCells : tinyCells;
+                            final float[] positions = blobs[i] ? smallPositions : tinyPositions;
+                            final double[] zs = blobs[i] ? smallZ : tinyZ, fades = blobs[i] ? smallFades : tinyFades;
+                            int index = high - minHeight;
+                            final int lowIndex = low - minHeight;
+                            while (index >= lowIndex) {
+                                final int cell = cellsOf[index];
+                                bound.setCell(cell);
+                                if (bound.getCellMax() < chance) {
+                                    do {
+                                        index--;
+                                    } while ((index >= lowIndex) && (cellsOf[index] == cell));
+                                    continue;
+                                }
+                                do {
+                                    if ((ores[index] == NO_ORE)
+                                            && (bound.getMax(positions[index], fades[index]) >= chance)
+                                            && (noiseGenerators[i].getPerlinNoise(noiseX, noiseY, zs[index]) >= chance)) {
+                                        ores[index] = i;
+                                    }
+                                    index--;
+                                } while ((index >= lowIndex) && (cellsOf[index] == cell));
+                            }
+                        }
+                        for (int y = top; y >= minZ; y--) {
+                            final int i = ores[y - minHeight];
+                            if (i != NO_ORE) {
+                                ores[y - minHeight] = NO_ORE;
+                                placeOre(chunk, x, y, z, i, nether);
+                            }
+                        }
+                        continue;
+                    }
                     for (int y = Math.min(subsurfaceMaxHeight, maxZ); y >= minZ; y--) {
                         final double dz = y / TINY_BLOBS;
                         final double dirtZ = y / SMALL_BLOBS;
                         for (int i = 0; i < activeMaterials.length; i++) {
                             final float chance = chances[i][resourcesValue];
-                            if ((chance <= 0.5f)
-                                    && (y >= minLevels[i])
-                                    && (y <= maxLevels[i])
-                                    && (activeMaterials[i].isNamedOneOf(MC_DIRT, MC_GRAVEL)
+                            if ((chance > 0.5f) || (y < minLevels[i]) || (y > maxLevels[i])) {
+                                continue;
+                            }
+                            if (blobs[i]
                                         ? (noiseGenerators[i].getPerlinNoise(dirtX, dirtY, dirtZ) >= chance)
-                                        : (noiseGenerators[i].getPerlinNoise(dx, dy, dz) >= chance))) {
-//                                counts[oreType]++;
-                                final Material existingMaterial = chunk.getMaterial(x, y, z);
-                                if (existingMaterial.isNamed(MC_DEEPSLATE) && ORE_TO_DEEPSLATE_VARIANT.containsKey(activeMaterials[i].name)) {
-                                    chunk.setMaterial(x, y, z, ORE_TO_DEEPSLATE_VARIANT.get(activeMaterials[i].name));
-                                } else if (nether && (activeMaterials[i].isNamed(MC_GOLD_ORE))) {
-                                    chunk.setMaterial(x, y, z, NETHER_GOLD_ORE);
-                                } else {
-                                    chunk.setMaterial(x, y, z, activeMaterials[i]);
-                                }
+                                        : (noiseGenerators[i].getPerlinNoise(dx, dy, dz) >= chance)) {
+                                placeOre(chunk, x, y, z, i, nether);
                                 break;
                             }
                         }
@@ -141,10 +238,42 @@ public class ResourcesExporter extends AbstractLayerExporter<Resources> implemen
 //        System.out.println();
     }
 
+    private void placeOre(Chunk chunk, int x, int y, int z, int i, boolean nether) {
+        final Material existingMaterial = chunk.getMaterial(x, y, z);
+        if ((deepslateVariants[i] != null) && existingMaterial.isNamed(MC_DEEPSLATE)) {
+            chunk.setMaterial(x, y, z, deepslateVariants[i]);
+        } else if (nether && (activeMaterials[i].isNamed(MC_GOLD_ORE))) {
+            chunk.setMaterial(x, y, z, NETHER_GOLD_ORE);
+        } else {
+            chunk.setMaterial(x, y, z, activeMaterials[i]);
+        }
+    }
+
 //  TODO: resource frequenties onderzoeken met Statistics tool!
 
     private final Material[] activeMaterials;
     private final PerlinNoise[] noiseGenerators;
+    /**
+     * Whether each ore comes in larger blobs (dirt and gravel).
+     */
+    private final boolean[] blobs;
+    /**
+     * The variant of each ore in deepslate, if any.
+     */
+    private final Material[] deepslateVariants;
+    /**
+     * For each height from {@code minHeight} up: its coordinate in the noise of small and tiny blobs, the cell of the
+     * noise it is in, its position in that cell and the fade of that position.
+     */
+    private final double[] tinyZ, smallZ, tinyFades, smallFades;
+    private final int[] tinyCells, smallCells;
+    private final float[] tinyPositions, smallPositions;
+
+    private static final int NO_ORE = Integer.MAX_VALUE;
+    /**
+     * Bounds of the noise of each ore, or {@code null} if they could not be worked out.
+     */
+    private final PerlinColumnBound[] bounds;
     private final int[] minLevels, maxLevels;
     private final float[][] chances;
 
