@@ -48,6 +48,17 @@ public class WorldPainterDialog extends JDialog {
             });
         }
 
+        // Some dialogs ignore the close button of their window, to decide themselves what closing means (such as
+        // stopping what they are running first); without this they could not be closed with it at all
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                if (getDefaultCloseOperation() == DO_NOTHING_ON_CLOSE) {
+                    cancel();
+                }
+            }
+        });
+
         ActionMap actionMap = rootPane.getActionMap();
         actionMap.put("cancel", new AbstractAction("cancel") {
             @Override

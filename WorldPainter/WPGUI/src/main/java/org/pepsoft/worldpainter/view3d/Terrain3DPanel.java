@@ -15,6 +15,7 @@ import org.pepsoft.worldpainter.biomeschemes.Minecraft1_21Biomes;
 import org.pepsoft.worldpainter.layers.Biome;
 import org.pepsoft.worldpainter.layers.Layer;
 import org.pepsoft.worldpainter.util.HairlineBorder;
+import org.pepsoft.worldpainter.util.WrapLayout;
 import org.pepsoft.worldpainter.util.Icons;
 import org.pepsoft.worldpainter.util.ThemeUtils;
 
@@ -42,9 +43,9 @@ public class Terrain3DPanel extends JPanel {
         infoCard = new InfoCard();
         legend = new Legend();
 
-        final JToolBar toolBar = new JToolBar();
-        toolBar.setFloatable(false);
-        toolBar.setBorder(new HairlineBorder(false, false, true, false, new Insets(2, 6, 2, 6)));
+        // The buttons in groups (the kinds of view, what to show, the camera, and refreshing), which go on to another
+        // row when the area is too narrow for all of them
+        final JToolBar modes = createGroup(), display = createGroup(), camera = createGroup(), actions = createGroup();
         final ButtonGroup modeGroup = new ButtonGroup();
         for (Terrain3DView.Mode mode: Terrain3DView.Mode.values()) {
             final JToggleButton button = new JToggleButton(mode.displayName, mode == Terrain3DView.Mode.TERRAIN);
@@ -55,49 +56,46 @@ public class Terrain3DPanel extends JPanel {
                 legend.repaint();
             });
             modeGroup.add(button);
-            toolBar.add(button);
+            modes.add(button);
         }
-        toolBar.addSeparator();
         final JToggleButton waterButton = new JToggleButton(Icons.get("droplets", 18), true);
         waterButton.setToolTipText(App.richToolTip("Water", "Show water and lava surfaces", null));
         waterButton.addActionListener(e -> view.setShowWater(waterButton.isSelected()));
-        toolBar.add(waterButton);
+        display.add(waterButton);
         final JToggleButton shadersButton = new JToggleButton(Icons.get("sun", 18));
         shadersButton.setToolTipText(App.richToolTip("Shaders", "Light the land with the sun, with shadows, and show moving water reflecting the sky. Set the sun with the globe at the bottom right", null));
         shadersButton.addActionListener(e -> {
             view.setShaders(shadersButton.isSelected());
             sunControl.setVisible(shadersButton.isSelected());
         });
-        toolBar.add(shadersButton);
+        display.add(shadersButton);
         final JToggleButton contoursButton = new JToggleButton(Icons.get("chart-spline", 18));
         contoursButton.setToolTipText(App.richToolTip("Contour lines", "Draw a line every " + Terrain3DView.CONTOUR_INTERVAL + " blocks of height", null));
         contoursButton.addActionListener(e -> view.setShowContours(contoursButton.isSelected()));
-        toolBar.add(contoursButton);
-        toolBar.addSeparator();
-        toolBar.add(Box.createHorizontalGlue());
+        display.add(contoursButton);
         final JButton rotateLeftButton = new JButton(Icons.get("rotate-ccw", 18));
         rotateLeftButton.setToolTipText(App.richToolTip("Rotate left", "Turn the view a quarter turn", null));
         rotateLeftButton.addActionListener(e -> view.rotateBy(-90));
-        toolBar.add(rotateLeftButton);
+        camera.add(rotateLeftButton);
         final JButton rotateRightButton = new JButton(Icons.get("rotate-cw", 18));
         rotateRightButton.setToolTipText(App.richToolTip("Rotate right", "Turn the view a quarter turn", null));
         rotateRightButton.addActionListener(e -> view.rotateBy(90));
-        toolBar.add(rotateRightButton);
+        camera.add(rotateRightButton);
         final JButton lowButton = new JButton(Icons.get("sunrise", 18));
         lowButton.setToolTipText(App.richToolTip("Low angle", "Look across the land, as a player would", null));
         lowButton.addActionListener(e -> view.setPitchDegrees(14));
-        toolBar.add(lowButton);
+        camera.add(lowButton);
         final JButton highButton = new JButton(Icons.get("mountain", 18));
         highButton.setToolTipText(App.richToolTip("High angle", "Look down on the land from above", null));
         highButton.addActionListener(e -> view.setPitchDegrees(62));
-        toolBar.add(highButton);
+        camera.add(highButton);
         final JButton topButton = new JButton(Icons.get("grid-3x3", 18));
         topButton.setToolTipText(App.richToolTip("Top view", "Look straight down on the land, like the map", null));
         topButton.addActionListener(e -> {
             view.setYawDegrees(0);
             view.setPitchDegrees(90);
         });
-        toolBar.add(topButton);
+        camera.add(topButton);
         blocksButton = new JToggleButton(Icons.get("package", 18));
         blocksButton.setToolTipText(App.richToolTip("Blocks", "Preview the land as Minecraft will show it: every block a one metre cube at its exact height, around the centre of the view", null));
         blocksButton.addActionListener(e -> {
@@ -105,7 +103,7 @@ public class Terrain3DPanel extends JPanel {
             detailSizeComboBox.setEnabled(blocksButton.isSelected());
             requestDetail();
         });
-        toolBar.add(blocksButton);
+        camera.add(blocksButton);
         detailSizeComboBox = new JComboBox<>(new Integer[] {256, 512, 768, 1024, 1536, 2048, 3072, 4096});
         detailSizeComboBox.setSelectedItem(detailSize);
         detailSizeComboBox.setEnabled(false);
@@ -122,20 +120,19 @@ public class Terrain3DPanel extends JPanel {
             detailArea = null;
             requestDetail();
         });
-        toolBar.add(detailSizeComboBox);
+        camera.add(detailSizeComboBox);
         final JToggleButton orthographicButton = new JToggleButton(Icons.get("box", 18));
         orthographicButton.setToolTipText(App.richToolTip("Orthographic", "Show the land without perspective: parallel lines stay parallel and sizes do not shrink with distance", null));
         orthographicButton.addActionListener(e -> view.setOrthographic(orthographicButton.isSelected()));
-        toolBar.add(orthographicButton);
+        camera.add(orthographicButton);
         final JButton resetButton = new JButton(Icons.get("scan-search", 18));
         resetButton.setToolTipText(App.richToolTip("Reset view", "Show the whole map again", null));
         resetButton.addActionListener(e -> view.resetView());
-        toolBar.add(resetButton);
-        toolBar.addSeparator();
+        camera.add(resetButton);
         final JButton refreshButton = new JButton(Icons.get("refresh-cw", 18));
         refreshButton.setToolTipText(App.richToolTip("Refresh", "Update the 3D view with the latest changes to the map", null));
         refreshButton.addActionListener(e -> refresh(true));
-        toolBar.add(refreshButton);
+        actions.add(refreshButton);
         popOutButton = new JButton(Icons.get("picture-in-picture-2", 18));
         popOutButton.setToolTipText(App.richToolTip("Detach", "Show the 3D view in a panel of its own, which can float next to the map or be docked like the other panels", null));
         popOutButton.addActionListener(e -> {
@@ -143,7 +140,32 @@ public class Terrain3DPanel extends JPanel {
                 popOutAction.run();
             }
         });
-        toolBar.add(popOutButton);
+        actions.add(popOutButton);
+        final JPanel toolBar = new JPanel(new WrapLayout(0, 0));
+        toolBar.setBorder(new HairlineBorder(false, false, true, false, new Insets(2, 6, 2, 6)));
+        for (JToolBar group: new JToolBar[] {modes, display, camera, actions}) {
+            if (toolBar.getComponentCount() > 0) {
+                final JSeparator separator = new JSeparator(SwingConstants.VERTICAL);
+                separator.setPreferredSize(new java.awt.Dimension(13, 20));
+                toolBar.add(separator);
+            }
+            for (Component component: group.getComponents()) {
+                if (component instanceof AbstractButton) {
+                    ((AbstractButton) component).putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+                    ((AbstractButton) component).setFocusable(false);
+                }
+                toolBar.add(component);
+            }
+        }
+        // Its height depends on its width, so lay out again when the width changes
+        toolBar.addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                if (toolBar.getPreferredSize().height != toolBar.getHeight()) {
+                    revalidate();
+                }
+            }
+        });
         add(toolBar, BorderLayout.NORTH);
         autoRefreshTimer.start();
 
@@ -158,6 +180,8 @@ public class Terrain3DPanel extends JPanel {
                 legend.setBounds(12, h - 58, 280, 46);
                 final java.awt.Dimension helpSize = helpLabel.getPreferredSize();
                 helpLabel.setBounds(w - helpSize.width - 14, h - helpSize.height - 12, helpSize.width, helpSize.height);
+                // Leave out the help when it would run into the legend, rather than cut it off
+                helpLabel.setVisible(helpSize.width + 14 + 12 <= w - (legend.isVisible() ? 292 : 0));
                 final java.awt.Dimension sunSize = sunControl.getPreferredSize();
                 sunControl.setBounds(w - sunSize.width - 14, h - helpSize.height - 20 - sunSize.height, sunSize.width, sunSize.height);
                 final java.awt.Dimension statusSize = statusLabel.getPreferredSize();
@@ -242,6 +266,21 @@ public class Terrain3DPanel extends JPanel {
      * Set what the detach button does, and whether the view is detached (in a panel of its own) or not, for the tooltip
      * of the button.
      */
+    /**
+     * Stop updating, when the panel is thrown away.
+     */
+    public void dispose() {
+        autoRefreshTimer.stop();
+    }
+
+    private static JToolBar createGroup() {
+        final JToolBar group = new JToolBar();
+        group.setFloatable(false);
+        group.setOpaque(false);
+        group.setBorder(null);
+        return group;
+    }
+
     public void setPopOutAction(Runnable popOutAction, boolean detached) {
         this.popOutAction = popOutAction;
         popOutButton.setVisible(popOutAction != null);

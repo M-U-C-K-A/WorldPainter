@@ -65,6 +65,14 @@ public class DockableFrameBuilder {
     }
 
     /**
+     * Say what the panel is for in its tab and in the editor type menu only, for panels which explain themselves.
+     */
+    public DockableFrameBuilder withSummary(String summary) {
+        this.summary = summary;
+        return this;
+    }
+
+    /**
      * List the page in another column of the editor type menu than the one of its kind of editor.
      */
     public DockableFrameBuilder inCategory(String category) {
@@ -107,7 +115,7 @@ public class DockableFrameBuilder {
                     return false;
                 }
             };
-            scrollPane.setBorder(null);
+            scrollPane.setBorder(BorderFactory.createEmptyBorder());
             dockableFrame.add(scrollPane, BorderLayout.CENTER);
         } else {
             dockableFrame.add(panel, BorderLayout.CENTER);
@@ -121,7 +129,7 @@ public class DockableFrameBuilder {
         }
 
         dockableFrame.setTitle(title);
-        dockableFrame.setDescription(description);
+        dockableFrame.setDescription((description != null) ? description : summary);
         dockableFrame.setGroup(group);
         dockableFrame.setCategory(category);
 
@@ -162,7 +170,7 @@ public class DockableFrameBuilder {
     private Icon icon;
     private int margin = 2;
     private boolean scrollable;
-    private String description, category;
+    private String description, summary, category;
 
     private static Icon findIcon(Container container) {
         if (container instanceof JComponent) {

@@ -88,6 +88,13 @@ final class AreaPanel extends JPanel {
         tabStrip.update();
     }
 
+    /**
+     * Shift was pressed or let go.
+     */
+    void setShiftDown(boolean shiftDown) {
+        header.setShiftDown(shiftDown);
+    }
+
     void dispose() {
         content.removeAll();
         tabStrip.removeAll();
@@ -112,6 +119,11 @@ final class AreaPanel extends JPanel {
     private DockableFrame page;
 
     private static final long serialVersionUID = 1L;
+
+    /**
+     * The red of the bin which closes an area while Shift is held down.
+     */
+    private static final Color CLOSE_COLOUR = new Color(0xe5484d);
 
     /**
      * The header at the top, the tabs (if any) down the left side below it, and the page in the rest. The corner
@@ -188,10 +200,16 @@ final class AreaPanel extends JPanel {
                 detachButton.addActionListener(e -> manager.detach(leaf, null));
                 buttons.add(detachButton);
             }
-            final JButton menuButton = new JButton(Icons.muted("ellipsis-vertical", 14));
-            menuButton.setToolTipText("<html><b>Area</b><br>Split, join, maximise or close this area. Right click the header for the same</html>");
-            menuButton.addActionListener(e -> createMenu().show(menuButton, 0, menuButton.getHeight()));
+            menuButton = new JButton();
+            menuButton.addActionListener(e -> {
+                if (closing) {
+                    manager.closeArea(leaf);
+                } else {
+                    createMenu().show(menuButton, 0, menuButton.getHeight());
+                }
+            });
             buttons.add(menuButton);
+            updateMenuButton();
             for (Component button: buttons.getComponents()) {
                 ((JComponent) button).setFocusable(false);
             }
@@ -278,11 +296,36 @@ final class AreaPanel extends JPanel {
             if (pinButton != null) {
                 pinButton.setSelected(manager.isOnTop(leaf));
             }
+            closing = manager.isShiftDown() && manager.canClose(leaf);
+            updateMenuButton();
             revalidate();
             repaint();
         }
 
-        private final JButton typeButton, maximiseButton, detachButton;
+        /**
+         * While Shift is held down the menu button closes the area instead, shown as a red bin, to clear away areas
+         * quickly.
+         */
+        void setShiftDown(boolean shiftDown) {
+            final boolean closing = shiftDown && manager.canClose(leaf);
+            if (closing != this.closing) {
+                this.closing = closing;
+                updateMenuButton();
+            }
+        }
+
+        private void updateMenuButton() {
+            if (closing) {
+                menuButton.setIcon(Icons.tinted("trash-2", 14, CLOSE_COLOUR));
+                menuButton.setToolTipText("<html><b>Close area</b><br>Its neighbour takes its room. Let go of Shift for the menu of the area</html>");
+            } else {
+                menuButton.setIcon(Icons.muted("ellipsis-vertical", 14));
+                menuButton.setToolTipText("<html><b>Area</b><br>Split, join, maximise or close this area. Right click the header for the same; hold Shift to close it with one click</html>");
+            }
+        }
+
+        private final JButton typeButton, maximiseButton, detachButton, menuButton;
+        private boolean closing;
         private final JToggleButton pinButton;
         private final JLabel titleLabel;
         private final JToolBar buttons;
@@ -345,7 +388,7 @@ final class AreaPanel extends JPanel {
             column.setBorder(BorderFactory.createEmptyBorder(4, 3, 4, 3));
             column.setOpaque(false);
             final JScrollPane scrollPane = new JScrollPane(column, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-            scrollPane.setBorder(null);
+            scrollPane.setBorder(BorderFactory.createEmptyBorder());
             scrollPane.setOpaque(false);
             scrollPane.getViewport().setOpaque(false);
             scrollPane.getVerticalScrollBar().putClientProperty(FlatClientProperties.STYLE, "width: 4");

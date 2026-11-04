@@ -18,6 +18,8 @@ import java.net.URLEncoder;
 import java.util.List;
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.pepsoft.util.GUIUtils.getUIScale;
@@ -32,8 +34,10 @@ import static org.pepsoft.worldpainter.docking.AreaTree.FILL;
  * of each area chooses what it shows. Pages of the same kind (such as the terrain, the layers and the biomes) share the
  * tabs down the side of the area which shows them.
  *
- * <p>Every page is shown in at most one area. Choosing a page which is already shown in another area swaps the two
- * areas' pages, so that nothing ever disappears by accident.
+ * <p>A page is shown in at most one area, except those which allow copies (the map and the 3D view, say): choosing
+ * one of those for an area while it is shown in another one opens another one of it, as Blender does with its editors.
+ * Choosing any other page which is already shown in another area swaps the two areas' pages, so that nothing ever
+ * disappears by accident.
  *
  * <p>There are several workspaces, each with its own arrangement, chosen with the tabs in the header of the window,
  * like the workspaces of Blender. They are made from templates, and can be added, renamed, duplicated, reset and
@@ -67,6 +71,31 @@ public class AreaManager {
                         }
                     }
                 });
+            }
+        });
+        // While Shift is held down the menu buttons of the areas close them instead
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(event -> {
+            if ((event.getKeyCode() == KeyEvent.VK_SHIFT) && ((event.getID() == KeyEvent.KEY_PRESSED) || (event.getID() == KeyEvent.KEY_RELEASED))) {
+                final boolean shiftDown = event.getID() == KeyEvent.KEY_PRESSED;
+                if (shiftDown != this.shiftDown) {
+                    this.shiftDown = shiftDown;
+                    for (AreaPanel panel: areaPanels.values()) {
+                        panel.setShiftDown(shiftDown);
+                    }
+                }
+            }
+            return false;
+        });
+        // Losing the focus while Shift is held down (to another application, say) would leave the bins showing
+        owner.addWindowFocusListener(new WindowAdapter() {
+            @Override
+            public void windowLostFocus(WindowEvent e) {
+                if (shiftDown) {
+                    shiftDown = false;
+                    for (AreaPanel panel: areaPanels.values()) {
+                        panel.setShiftDown(false);
+                    }
+                }
             }
         });
         // Ctrl+Space maximises the area under the mouse, or puts it back, as in Blender
@@ -155,6 +184,36 @@ public class AreaManager {
 
     public DockableFrame getPage(String key) {
         return pages.get(key);
+    }
+
+    /**
+     * Let a page be shown in more than one area at a time. Choosing it for an area while it is shown in another one
+     * then opens another one of it there, made by the factory, instead of swapping the two areas. The copies are
+     * thrown away again when no area of any workspace shows them any more.
+     *
+     * @param key The key of the page.
+     * @param factory Makes a copy of the page, with the key it is given, in the same group.
+     * @param disposer Is told when a copy is thrown away, to let go of what it uses.
+     */
+    public void allowCopies(String key, Function<String, DockableFrame> factory, Consumer<DockableFrame> disposer) {
+        copyFactories.put(key, factory);
+        copyDisposers.put(key, disposer);
+    }
+
+    /**
+     * The key of the page of which a page is a copy, or its own key if it is not a copy.
+     */
+    public static String originalKey(String key) {
+        final int p = key.indexOf(COPY_SEPARATOR);
+        return (p == -1) ? key : key.substring(0, p);
+    }
+
+    boolean canCopy(String key) {
+        return copyFactories.containsKey(originalKey(key));
+    }
+
+    boolean isCopy(DockableFrame page) {
+        return copyOf.containsKey(page.getKey());
     }
 
     public List<DockableFrame> getPages() {
@@ -524,7 +583,16 @@ public class AreaManager {
             return;
         }
         final Leaf current = assignment.get(key);
-        if (current == leaf) {
+        final String shownHere = display.get(leaf);
+        if ((current == leaf) || ((shownHere != null) && originalKey(shownHere).equals(key))) {
+            return;
+        }
+        if ((current != null) && canCopy(key)) {
+            // Shown elsewhere: open another one here, rather than taking it away from the other area
+            leaf.group = page.getGroup();
+            leaf.page = createCopy(key);
+            activeLeaf = leaf;
+            refresh();
             return;
         }
         final String previous = display.get(leaf);
@@ -675,6 +743,10 @@ public class AreaManager {
     boolean isOnTop(Leaf leaf) {
         final FloatingArea floating = findFloating(leaf);
         return (floating != null) && floating.onTop;
+    }
+
+    boolean isShiftDown() {
+        return shiftDown;
     }
 
     boolean isFloating(Leaf leaf) {
@@ -1061,11 +1133,8 @@ public class AreaManager {
                 switch (tokens[0]) {
                     case "workspace":
                         final Workspace workspace = new Workspace(decode(tokens[1]), decode(tokens[2]), new AreaTree(AreaTree.parse(tokens[4], 1.0f), divider));
-                        if (! tokens[3].equals("-")) {
-                            for (String side: tokens[3].split(",")) {
-                                workspace.collapsed.add(Side.valueOf(side));
-                            }
-                        }
+                        // Sides of the map folded away by an earlier version are left out: there are no buttons to
+                        // fold them back out any more
                         loaded.add(workspace);
                         break;
                     case "float":
@@ -1153,6 +1222,26 @@ public class AreaManager {
         return assignment.get(key);
     }
 
+    /**
+     * Whether an area shows a page, or a copy of it.
+     */
+    boolean shows(Leaf leaf, String key) {
+        final String shown = display.get(leaf);
+        return (shown != null) && originalKey(shown).equals(key);
+    }
+
+    /**
+     * Whether a page, or a copy of it, is shown in another area than this one.
+     */
+    Leaf shownElsewhere(Leaf leaf, String key) {
+        for (Map.Entry<String, Leaf> entry: assignment.entrySet()) {
+            if ((entry.getValue() != leaf) && originalKey(entry.getKey()).equals(key)) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
     EditorGroup getGroup(String id) {
         return groups.get(id);
     }
@@ -1161,10 +1250,13 @@ public class AreaManager {
         return categories;
     }
 
+    /**
+     * The pages of a kind of editor, leaving out the copies.
+     */
     List<DockableFrame> pagesOf(String group) {
         final List<DockableFrame> result = new ArrayList<>();
         for (DockableFrame page: pages.values()) {
-            if (page.getGroup().equals(group)) {
+            if (page.getGroup().equals(group) && (! copyOf.containsKey(page.getKey()))) {
                 result.add(page);
             }
         }
@@ -1174,7 +1266,7 @@ public class AreaManager {
     List<DockableFrame> pagesIn(String category) {
         final List<DockableFrame> result = new ArrayList<>();
         for (DockableFrame page: pages.values()) {
-            if (category.equals(categoryOf(page))) {
+            if (category.equals(categoryOf(page)) && (! copyOf.containsKey(page.getKey()))) {
                 result.add(page);
             }
         }
@@ -1345,6 +1437,8 @@ public class AreaManager {
         if (active == null) {
             return;
         }
+        // Make the copies the areas show (after loading the arrangement, say), and throw away those none show any more
+        updateCopies();
         // Decide which page each area shows
         final Map<String, Leaf> oldAssignment = new HashMap<>(assignment);
         assignPages();
@@ -1414,6 +1508,62 @@ public class AreaManager {
             }
         }
         fireChanged();
+    }
+
+    /**
+     * Make a copy of a page, with a key of its own.
+     */
+    private String createCopy(String key) {
+        final String original = originalKey(key);
+        String copyKey;
+        int number = 2;
+        do {
+            copyKey = original + COPY_SEPARATOR + number++;
+        } while (pages.containsKey(copyKey));
+        addCopy(original, copyKey);
+        return copyKey;
+    }
+
+    private void addCopy(String original, String copyKey) {
+        final DockableFrame copy = copyFactories.get(original).apply(copyKey);
+        if (! copy.getKey().equals(copyKey)) {
+            throw new IllegalStateException("Copy of " + original + " has key " + copy.getKey() + " instead of " + copyKey);
+        }
+        pages.put(copyKey, copy);
+        copyOf.put(copyKey, original);
+        copy.addPropertyChangeListener(pageListener);
+    }
+
+    private void updateCopies() {
+        final Set<String> wanted = new HashSet<>();
+        for (Workspace workspace: workspaces) {
+            for (Leaf leaf: allLeaves(workspace)) {
+                if (leaf.page != null) {
+                    wanted.add(leaf.page);
+                }
+            }
+        }
+        for (String key: wanted) {
+            final String original = originalKey(key);
+            if ((! pages.containsKey(key)) && (! key.equals(original)) && copyFactories.containsKey(original) && pages.containsKey(original)) {
+                addCopy(original, key);
+            }
+        }
+        for (Iterator<Map.Entry<String, String>> i = copyOf.entrySet().iterator(); i.hasNext(); ) {
+            final Map.Entry<String, String> entry = i.next();
+            if (! wanted.contains(entry.getKey())) {
+                final DockableFrame copy = pages.remove(entry.getKey());
+                i.remove();
+                if (copy != null) {
+                    copy.removePropertyChangeListener(pageListener);
+                    final Container parent = copy.getParent();
+                    if (parent != null) {
+                        parent.remove(copy);
+                    }
+                    copyDisposers.get(entry.getValue()).accept(copy);
+                }
+            }
+        }
     }
 
     private void assignPages() {
@@ -1627,12 +1777,19 @@ public class AreaManager {
 
     private final JFrame owner;
     private final int divider;
+    private boolean shiftDown;
     private final ScreenPanel screen;
     private final AreaDrag drag;
     private final Timer saveTimer;
     private final List<String> categories = new ArrayList<>();
     private final Map<String, EditorGroup> groups = new LinkedHashMap<>();
     private final Map<String, DockableFrame> pages = new LinkedHashMap<>();
+    private final Map<String, Function<String, DockableFrame>> copyFactories = new HashMap<>();
+    private final Map<String, Consumer<DockableFrame>> copyDisposers = new HashMap<>();
+    /**
+     * For each copy of a page, the key of the page.
+     */
+    private final Map<String, String> copyOf = new HashMap<>();
     private final Map<String, Template> templates = new LinkedHashMap<>();
     private final List<Workspace> workspaces = new ArrayList<>();
     private final Map<Leaf, AreaPanel> areaPanels = new HashMap<>();
@@ -1677,6 +1834,11 @@ public class AreaManager {
     /**
      * The page which is the heart of the window; the panels on either side of it are those which can be folded away.
      */
+    /**
+     * Between the key of a page and the number of a copy of it, in the key of the copy.
+     */
+    public static final char COPY_SEPARATOR = '#';
+
     public static final String MAIN_PAGE = "map";
     /**
      * The page which is the heart of the window if the {@link #MAIN_PAGE} is not shown.

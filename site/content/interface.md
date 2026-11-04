@@ -37,16 +37,17 @@ Hover over a mix of blocks or a plant layer to see what it is made of: each bloc
 
 ## Areas
 
-The window is divided into areas, as in Blender. At the left of the header of each one, the **editor type** button chooses what it shows: the map, the 3D view, the tools, their settings, the brushes, the brush settings, the terrain, the layers, the biomes, the packs, the annotations, the surroundings or the info. Pages of the same kind share the tabs down the side of their area, like the tabs of the Properties editor of Blender: the terrain, the layers, the biomes, the packs and the annotations are one kind, the brushes and your custom brushes another. Each page is shown once: choosing one which is already shown in another area swaps the two.
+The window is divided into areas, as in Blender. At the left of the header of each one, the **editor type** button chooses what it shows: the map, the 3D view, the tools, their settings, the brushes, the brush settings, the terrain, the layers, the biomes, the packs, the annotations, the surroundings or the info. Pages of the same kind share the tabs down the side of their area, like the tabs of the Properties editor of Blender: the terrain, the layers, the biomes, the packs and the annotations are one kind, the brushes and your custom brushes another. Hover over a choice to see what it is for and a picture of it. The map and the 3D view can be shown in several areas at once, each with its own view, as the editors of Blender can: choosing one of them while it is shown elsewhere opens another one, moved and zoomed on its own, in which the current tool works too. Any other page is shown once: choosing one which is already shown in another area swaps the two.
 
 - **Resize** two areas by dragging the gap between them.
 - **Split** an area by dragging from one of its corners into it, or with *Split vertically* or *Split horizontally* in its menu (the ⋮ button, or a right click on its header). The new area shows another page of the same kind, or asks what to show.
 - **Join** two areas by dragging from a corner of one into the other, which it takes over: they must line up.
 - **Move** an area by dragging its header onto another one: near an edge to put it on that side, in the middle to swap the two. Drag a tab the same way to show that page in an area of its own.
 - **Maximise** the area under the mouse with <kbd>Ctrl</kbd>+<kbd>Space</kbd>, the button in its header or a double click on the header, and put it back the same way.
+- **Close** an area with *Close area* in its menu, or hold <kbd>Shift</kbd>: the ⋮ button of each area turns into a red bin which closes it with one click.
 - **Detach** an area into a window of its own, which floats over the main window like picture in picture, with the button in its header or by dragging the header out of the window. Its pin keeps it in front of other applications too; closing it, or dragging its header back onto the main window, puts it back.
 
-To make room for the map, the panel buttons at either end of the toolbar fold away the areas on its left, below it or on its right, and bring them back. **View › Panels** shows or hides each page, and **View › Area** has the commands for the area you last clicked in.
+What is under the mouse (its location, height, terrain, biome…) and the zoom are at the foot of the map, since they belong to it; another view of the map has its own zoom. **View › Panels** shows or hides each page, and **View › Area** has the commands for the area you last clicked in.
 
 ## Workspaces
 
@@ -58,7 +59,7 @@ The tabs below the toolbar switch between workspaces, as in Blender: each keeps 
 | **Sculpting** | The tools, their settings and the brush settings on one side of the map and the brushes on the other, to shape the land |
 | **Painting** | The terrain on one side of the map and the layers on the other, next to the tools and the brushes |
 | **3D** | The map and the [3D view](3d-view.html) side by side, to see the land take shape as you work |
-| **Minimal** | Only the map, with the panels folded away |
+| **Minimal** | Only the map: split it, or choose what it shows, to add panels |
 
 The **+** after the tabs adds a workspace, made from one of these or as a copy of the current one. Right click a tab to rename, duplicate, reset, move or delete it, or double click it to rename it; <kbd>Ctrl</kbd>+<kbd>Page Up</kbd> and <kbd>Ctrl</kbd>+<kbd>Page Down</kbd> go to the previous and the next one. **View › Workspaces** has the same commands, and can put back the built-in workspaces.
 

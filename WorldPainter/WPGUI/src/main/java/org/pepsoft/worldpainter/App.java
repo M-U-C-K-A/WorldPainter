@@ -698,6 +698,9 @@ public final class App extends JFrame implements BrushControl,
             if (areaManager.isPageShown(PAGE_3D)) {
                 terrain3DPanel.setDimension(dimension, selectedColourScheme);
             }
+            for (Terrain3DPanel copy: terrain3DCopies.values()) {
+                copy.setDimension(dimension, selectedColourScheme);
+            }
             if (! refreshTerrainMode()) {
                 view.refreshTiles();
             }
@@ -2717,14 +2720,38 @@ public final class App extends JFrame implements BrushControl,
         }
     }
 
+    /**
+     * What the mouse wheel does on the map other than zooming (changing the size or the rotation of the brush), for
+     * the other views of the map.
+     */
+    void mapWheelMoved(MouseWheelEvent e) {
+        viewListener.mouseWheelMoved(e);
+    }
+
+    /**
+     * Let the current tool work in a view of the map: the map itself, or another view of it in an area of its own.
+     */
+    void useMapView(WorldPainterView target) {
+        if (target == ((operationsView != null) ? operationsView : view)) {
+            return;
+        }
+        operationsView = target;
+        if (activeOperation != null) {
+            try {
+                activeOperation.setActive(false);
+                activeOperation.setView(target);
+                activeOperation.setActive(true);
+            } catch (PropertyVetoException e) {
+                logger.warn("Could not move tool " + activeOperation + " to another view of the map", e);
+            }
+        }
+    }
+
     private void updateZoomLabel() {
         double factor = Math.pow(2.0, view.getZoom());
         final float scale = (dimension != null) ? dimension.getScale() : 1.0f;
         int zoomPercentage = (int) (100 * factor / scale);
-        zoomLabel.setText(MessageFormat.format(strings.getString("zoom.0"), zoomPercentage));
-        if (headerZoomLabel != null) {
-            headerZoomLabel.setText(zoomPercentage + "%");
-        }
+        zoomLabel.setText(zoomPercentage + "%");
         glassPane.setScale((float) factor / scale);
     }
 
@@ -2802,6 +2829,9 @@ public final class App extends JFrame implements BrushControl,
         mapPage.setGroup(GROUP_MAP);
         mapPage.setDescription("Paint and edit the map from above");
         mapPage.add(org.pepsoft.worldpainter.design.Glass.frame(viewContainer), BorderLayout.CENTER);
+        // What is under the mouse, and the zoom, belong to the map, so they are at its foot rather than at the bottom
+        // of the window
+        mapPage.add(createStatusBar(), BorderLayout.SOUTH);
         areaManager.addPage(mapPage);
         terrain3DPanel = new Terrain3DPanel();
         // The header of its area detaches it
@@ -2828,7 +2858,6 @@ public final class App extends JFrame implements BrushControl,
 
         getContentPane().add(createToolBar(), BorderLayout.NORTH);
 
-        getContentPane().add(createStatusBar(), BorderLayout.SOUTH);
 
         scrollController.install();
 
@@ -2839,9 +2868,11 @@ public final class App extends JFrame implements BrushControl,
             }
         });
 
-        areaManager.addPage(new DockableFrameBuilder(createToolPanel(), "Tools", GROUP_TOOLS).withIcon(Icons.get("pencil-ruler")).build());
+        areaManager.addPage(new DockableFrameBuilder(createToolPanel(), "Tools", GROUP_TOOLS).withIcon(Icons.get("pencil-ruler"))
+                .withSummary("The tools which shape the land, paint on it, add water and lava, and select parts of the map.").build());
 
-        areaManager.addPage(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", GROUP_TOOL_SETTINGS).withIcon(Icons.get("sliders-horizontal")).expand().scrollable().build());
+        areaManager.addPage(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", GROUP_TOOL_SETTINGS).withIcon(Icons.get("sliders-horizontal")).expand().scrollable()
+                .withSummary("The settings of the chosen tool, such as how far a flood spreads or the width of a path.").build());
 
         // The four kinds of things that can be painted, each with a short explanation, from the most basic to the most
         // specialised
@@ -2863,25 +2894,30 @@ public final class App extends JFrame implements BrushControl,
         areaManager.addPage(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", GROUP_PAINT).withIcon(Icons.get("message-square-text"))
                 .withDescription("Coloured markings for planning the map. They are not exported, unless you enable that in the export settings.").scrollable().build());
 
-        areaManager.addPage(new DockableFrameBuilder(createBrushPanel(), "Brushes", GROUP_BRUSHES).withIcon(Icons.get("brush")).scrollable().build());
+        areaManager.addPage(new DockableFrameBuilder(createBrushPanel(), "Brushes", GROUP_BRUSHES).withIcon(Icons.get("brush")).scrollable()
+                .withSummary("The shapes the tools work with: round and square brushes, and stamps of mountains, hills, volcanoes and valleys.").build());
 
         if (customBrushes.containsKey(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
-            areaManager.addPage(new DockableFrameBuilder(createCustomBrushPanel(CUSTOM_BRUSHES_DEFAULT_TITLE, customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE)), "Custom Brushes", GROUP_BRUSHES).withId("customBrushesDefault").scrollable().build());
+            areaManager.addPage(new DockableFrameBuilder(createCustomBrushPanel(CUSTOM_BRUSHES_DEFAULT_TITLE, customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE)), "Custom Brushes", GROUP_BRUSHES).withId("customBrushesDefault").scrollable()
+                    .withSummary("The brushes you made from your own images.").build());
         }
         for (Map.Entry<String, BrushGroup> entry: customBrushes.entrySet()) {
             if (entry.getKey().equals(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
                 continue;
             }
-            areaManager.addPage(new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), entry.getKey(), GROUP_BRUSHES).withId("customBrushes." + entry.getKey()).scrollable().build());
+            areaManager.addPage(new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), entry.getKey(), GROUP_BRUSHES).withId("customBrushes." + entry.getKey()).scrollable()
+                    .withSummary("Brushes you made from your own images, in the “" + entry.getKey() + "” group.").build());
         }
 
-        areaManager.addPage(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", GROUP_PROPERTIES).withId("brushSettings").withIcon(Icons.get("settings-2")).scrollable().build());
+        areaManager.addPage(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", GROUP_PROPERTIES).withId("brushSettings").withIcon(Icons.get("settings-2")).scrollable()
+                .withSummary("The rotation and strength of the brush, and where it applies: the whole map or the selection, between two heights, on some terrains or layers, on slopes.").build());
 
         areaManager.addPage(new DockableFrameBuilder(createSurroundingsPanel(), "Surroundings", GROUP_PROPERTIES).withId("surroundings").withIcon(Icons.get("map")).inCategory(CATEGORY_WORLD)
                 .withDescription("The world seed, and a preview of the land Minecraft will generate around the map.").scrollable().build());
 
         infoPanel = createInfoPanel();
-        areaManager.addPage(new DockableFrameBuilder(infoPanel, "Info", GROUP_PROPERTIES).withId("infoPanel").expand().withIcon(Icons.get("info")).inCategory(CATEGORY_WORLD).build());
+        areaManager.addPage(new DockableFrameBuilder(infoPanel, "Info", GROUP_PROPERTIES).withId("infoPanel").expand().withIcon(Icons.get("info")).inCategory(CATEGORY_WORLD)
+                .withSummary("Everything about the place under the mouse: its height, slope, terrain, layers, biome and water.").build());
 
         // The built-in arrangements, from which the workspaces are made (the sizes are in pixels at 100%: "a" is the
         // size of what the area shows, "*" the room left over)
@@ -2893,14 +2929,14 @@ public final class App extends JFrame implements BrushControl,
                 "H[270=V[a=L(tools,tools);a=L(toolSettings,toolSettings);*=L(paint,terrain)];*=L(map,map);300=V[*=L(paint,layers);220=L(brushes,brushes);260=L(properties,brushSettings)]]");
         areaManager.addTemplate("3d", "3D", "box", "The map and the 3D view side by side, to see the land take shape as you work",
                 "H[250=V[a=L(tools,tools);a=L(toolSettings,toolSettings);*=L(properties,brushSettings)];*=L(map,map);45%=L(view3d,view3d)]");
-        areaManager.addTemplate("minimal", "Minimal", "maximize", "Only the map: fold the panels back out with the buttons at either end of the header", layout, Side.WEST, Side.EAST);
+        areaManager.addTemplate("minimal", "Minimal", "maximize", "Only the map: split it from a corner, or choose what to show with the button at its top left, to add panels", "L(map,map)");
         if (! areaManager.loadState(config.getDefaultJideLayoutData())) {
             areaManager.createDefaultWorkspaces();
         }
         // Remember the arrangement, a little after each change
         areaManager.setStateListener(() -> Configuration.getInstance().setDefaultJideLayoutData(areaManager.saveState()));
 
-        MouseAdapter viewListener = new MouseAdapter() {
+        viewListener = new MouseAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
                 Point worldCoords = view.viewToWorld(e.getX(), e.getY());
@@ -2959,6 +2995,52 @@ public final class App extends JFrame implements BrushControl,
         view.addMouseMotionListener(viewListener);
         view.addMouseListener(viewListener);
         view.addMouseWheelListener(viewListener);
+        // The current tool works in whichever view of the map the mouse is in
+        view.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                if ((e.getModifiersEx() & (InputEvent.BUTTON1_DOWN_MASK | InputEvent.BUTTON2_DOWN_MASK | InputEvent.BUTTON3_DOWN_MASK)) == 0) {
+                    useMapView(view);
+                }
+            }
+        });
+
+        // The map and the 3D view can be shown in several areas at once, each with a view of its own, as the editors
+        // of Blender can
+        areaManager.allowCopies(PAGE_MAP, key -> {
+            final MapCopy copy = new MapCopy(this, view, key, selectedColourScheme, customBiomeManager);
+            mapCopies.put(key, copy);
+            return copy.getPage();
+        }, page -> {
+            final MapCopy copy = mapCopies.remove(page.getKey());
+            if (copy != null) {
+                copy.dispose();
+            }
+        });
+        areaManager.allowCopies(PAGE_3D, key -> {
+            final Terrain3DPanel panel = new Terrain3DPanel();
+            panel.setPopOutAction(null, false);
+            final DockableFrame page = new DockableFrame(key);
+            page.setTitle("3D View");
+            page.setFrameIcon(Icons.get("box", 16));
+            page.setGroup(GROUP_3D);
+            page.setDescription("Another 3D view of the map, with a camera of its own");
+            page.add(panel, BorderLayout.CENTER);
+            terrain3DCopies.put(key, panel);
+            if (dimension != null) {
+                SwingUtilities.invokeLater(() -> {
+                    if ((dimension != null) && terrain3DCopies.containsKey(key)) {
+                        panel.setDimension(dimension, selectedColourScheme);
+                    }
+                });
+            }
+            return page;
+        }, page -> {
+            final Terrain3DPanel panel = terrain3DCopies.remove(page.getKey());
+            if (panel != null) {
+                panel.dispose();
+            }
+        });
 
         if (false && (config.getShowCalloutCount() > 0)) {
             // Replaced by explanatory tooltips on the controls
@@ -3127,10 +3209,12 @@ public final class App extends JFrame implements BrushControl,
         }
     }
 
+    /**
+     * The foot of the map: what is under the mouse on the left, and the memory use and the zoom on the right.
+     */
     private JPanel createStatusBar() {
         JPanel statusBar = new JPanel();
         statusBar.setLayout(new FlowLayout(FlowLayout.LEADING, 14, 3));
-        statusBar.setBorder(new HairlineBorder(true, false, false, false, new Insets(1, 4, 1, 4)));
         StringBuilder warnings = new StringBuilder();
         Configuration config = Configuration.getInstance();
         if (config.isAutosaveEnabled() && config.isAutosaveInhibited()) {
@@ -3169,9 +3253,16 @@ public final class App extends JFrame implements BrushControl,
         radiusLabel.setToolTipText(strings.getString("scroll.the.mouse.wheel"));
         radiusLabel.setBorder(null);
         statusBar.add(radiusLabel);
-        zoomLabel = new JLabel(MessageFormat.format(strings.getString("zoom.0"), 3200));
+        zoomLabel = new JLabel("3200%", SwingConstants.CENTER);
         zoomLabel.setBorder(null);
-        statusBar.add(zoomLabel);
+        zoomLabel.setToolTipText("<html><b>Zoom</b><br>Click to reset to 100%</html>");
+        zoomLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        zoomLabel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                ACTION_ZOOM_RESET.actionPerformed(new ActionEvent(zoomLabel, ActionEvent.ACTION_PERFORMED, null));
+            }
+        });
         final JProgressBar memoryBar = new JProgressBar();
         memoryBar.setBorder(null);
         java.awt.Dimension preferredSize = memoryBar.getPreferredSize();
@@ -3187,7 +3278,6 @@ public final class App extends JFrame implements BrushControl,
                 System.gc();
             }
         });
-        statusBar.add(memoryBar);
         new Timer(2500, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -3210,7 +3300,25 @@ public final class App extends JFrame implements BrushControl,
                 ((JLabel) component).putClientProperty(FlatClientProperties.STYLE, "foreground: $WorldPainter.mutedForeground");
             }
         }
-        return statusBar;
+        zoomLabel.setFont(zoomLabel.getFont().deriveFont(zoomLabel.getFont().getSize2D() - 1f));
+        final JToolBar zoomBar = createHeaderToolBar();
+        zoomBar.add(memoryBar);
+        zoomBar.addSeparator();
+        zoomBar.add(ACTION_ZOOM_OUT);
+        zoomBar.add(zoomLabel);
+        zoomBar.add(ACTION_ZOOM_IN);
+        for (Component component: zoomBar.getComponents()) {
+            if (component instanceof AbstractButton) {
+                ((AbstractButton) component).setMargin(new Insets(1, 3, 1, 3));
+            }
+        }
+        // The labels are left out when the map is too narrow for them, rather than pushing the zoom out of sight
+        final JPanel foot = new JPanel(new BorderLayout(8, 0));
+        foot.setBorder(new HairlineBorder(true, false, false, false, new Insets(0, 4, 0, 4)));
+        statusBar.setOpaque(false);
+        foot.add(statusBar, BorderLayout.CENTER);
+        foot.add(zoomBar, BorderLayout.EAST);
+        return foot;
     }
 
     private JPanel createToolPanel() {
@@ -3362,6 +3470,8 @@ public final class App extends JFrame implements BrushControl,
 
     private JPanel createToolSettingsPanel() {
         toolSettingsPanel = new JPanel(new BorderLayout());
+        toolSettingsEmptyState = new org.pepsoft.worldpainter.design.EmptyState("sliders-horizontal", "No tool chosen", "Choose a tool in the Tools panel to see its settings here");
+        toolSettingsPanel.add(toolSettingsEmptyState, BorderLayout.CENTER);
         return toolSettingsPanel;
     }
     
@@ -5242,12 +5352,6 @@ public final class App extends JFrame implements BrushControl,
         setActionIcon(ACTION_ROTATE_LIGHT_RIGHT, "sunset");
 
         final JToolBar toolBar = createHeaderToolBar();
-        // Buttons to fold the panels on either side away, to make room for the map
-        westPanelsButton = new JToggleButton(Icons.get("panel-left", 18), true);
-        westPanelsButton.setToolTipText(richToolTip("Left panels", "Fold away the areas to the left of the map, to make room for it, or bring them back", null));
-        westPanelsButton.addActionListener(e -> areaManager.setCollapsed(Side.WEST, ! westPanelsButton.isSelected()));
-        toolBar.add(westPanelsButton);
-        toolBar.addSeparator();
         toolBar.add(ACTION_NEW_WORLD);
         toolBar.add(ACTION_OPEN_WORLD);
         toolBar.add(ACTION_SAVE_WORLD);
@@ -5288,29 +5392,8 @@ public final class App extends JFrame implements BrushControl,
 //        toolBar.add(Box.createHorizontalGlue());
 //        toolBar.add(ACTION_SHOW_HELP_PICKER);
 
-        // The zoom and theme controls on the right
+        // The theme control on the right (the zoom is at the bottom of the map, since it is the map's)
         final JToolBar rightToolBar = createHeaderToolBar();
-        rightToolBar.add(ACTION_ZOOM_OUT);
-        headerZoomLabel = new JLabel("100%", SwingConstants.CENTER);
-        headerZoomLabel.setPreferredSize(new java.awt.Dimension(Math.round(52 * getUIScale()), headerZoomLabel.getPreferredSize().height));
-        headerZoomLabel.setToolTipText("<html><b>Zoom</b><br>Click to reset to 100%</html>");
-        headerZoomLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        headerZoomLabel.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                ACTION_ZOOM_RESET.actionPerformed(new ActionEvent(headerZoomLabel, ActionEvent.ACTION_PERFORMED, null));
-            }
-        });
-        rightToolBar.add(headerZoomLabel);
-        rightToolBar.add(ACTION_ZOOM_IN);
-        eastPanelsButton = new JToggleButton(Icons.get("panel-right", 18), true);
-        eastPanelsButton.setToolTipText(richToolTip("Right panels", "Fold away the areas to the right of the map, to make room for it, or bring them back", null));
-        eastPanelsButton.addActionListener(e -> areaManager.setCollapsed(Side.EAST, ! eastPanelsButton.isSelected()));
-        southPanelsButton = new JToggleButton(Icons.get("panel-bottom", 18), true);
-        southPanelsButton.setToolTipText(richToolTip("Bottom panels", "Fold away the areas below the map, or bring them back. Split an area, or drag one there by its header, to put panels below the map", null));
-        southPanelsButton.addActionListener(e -> areaManager.setCollapsed(Side.SOUTH, ! southPanelsButton.isSelected()));
-        areaManager.addChangeListener(this::updatePanelButtons);
-        updatePanelButtons();
         if (ThemeUtils.isModernTheme()) {
             rightToolBar.addSeparator();
             themeToggleButton = new JButton();
@@ -5318,9 +5401,6 @@ public final class App extends JFrame implements BrushControl,
             updateThemeToggleButton();
             rightToolBar.add(themeToggleButton);
         }
-        rightToolBar.addSeparator();
-        rightToolBar.add(southPanelsButton);
-        rightToolBar.add(eastPanelsButton);
 
         headerTitleLabel = new JLabel("WorldPainter", SwingConstants.CENTER);
         headerTitleLabel.putClientProperty("FlatLaf.styleClass", "semibold");
@@ -5367,18 +5447,6 @@ public final class App extends JFrame implements BrushControl,
                 window.requestFocus();
             }
         }
-    }
-
-    /**
-     * Show which sides of the map have areas, and which are folded away.
-     */
-    private void updatePanelButtons() {
-        westPanelsButton.setSelected(! areaManager.isCollapsed(Side.WEST));
-        westPanelsButton.setEnabled(areaManager.hasAreasOn(Side.WEST) || areaManager.isCollapsed(Side.WEST));
-        eastPanelsButton.setSelected(! areaManager.isCollapsed(Side.EAST));
-        eastPanelsButton.setEnabled(areaManager.hasAreasOn(Side.EAST) || areaManager.isCollapsed(Side.EAST));
-        southPanelsButton.setSelected(! areaManager.isCollapsed(Side.SOUTH));
-        southPanelsButton.setEnabled(areaManager.hasAreasOn(Side.SOUTH) || areaManager.isCollapsed(Side.SOUTH));
     }
 
     private static JToolBar createHeaderToolBar() {
@@ -5616,30 +5684,13 @@ public final class App extends JFrame implements BrushControl,
     }
     
     private void fixLabelSizes() {
-        locationLabel.setMinimumSize(locationLabel.getSize());
-        locationLabel.setPreferredSize(locationLabel.getSize());
-        locationLabel.setMaximumSize(locationLabel.getSize());
-        heightLabel.setMinimumSize(heightLabel.getSize());
-        heightLabel.setPreferredSize(heightLabel.getSize());
-        heightLabel.setMaximumSize(heightLabel.getSize());
-        slopeLabel.setMinimumSize(slopeLabel.getSize());
-        slopeLabel.setPreferredSize(slopeLabel.getSize());
-        slopeLabel.setMaximumSize(slopeLabel.getSize());
-        materialLabel.setMinimumSize(materialLabel.getSize());
-        materialLabel.setPreferredSize(materialLabel.getSize());
-        materialLabel.setMaximumSize(materialLabel.getSize());
-        waterLabel.setMinimumSize(waterLabel.getSize());
-        waterLabel.setPreferredSize(waterLabel.getSize());
-        waterLabel.setMaximumSize(waterLabel.getSize());
-        biomeLabel.setMinimumSize(biomeLabel.getSize());
-        biomeLabel.setPreferredSize(biomeLabel.getSize());
-        biomeLabel.setMaximumSize(biomeLabel.getSize());
-        radiusLabel.setMinimumSize(radiusLabel.getSize());
-        radiusLabel.setPreferredSize(radiusLabel.getSize());
-        radiusLabel.setMaximumSize(radiusLabel.getSize());
-        zoomLabel.setMinimumSize(zoomLabel.getSize());
-        zoomLabel.setPreferredSize(zoomLabel.getSize());
-        zoomLabel.setMaximumSize(zoomLabel.getSize());
+        // Fix the sizes to those of the longest texts they were created with, so that the labels do not move about
+        for (JLabel label: new JLabel[] {locationLabel, heightLabel, slopeLabel, materialLabel, waterLabel, biomeLabel, radiusLabel, zoomLabel}) {
+            final java.awt.Dimension size = label.getPreferredSize();
+            label.setMinimumSize(size);
+            label.setPreferredSize(size);
+            label.setMaximumSize(size);
+        }
 
         locationLabel.setText(strings.getString("location-"));
         heightLabel.setText(" ");
@@ -5809,10 +5860,11 @@ public final class App extends JFrame implements BrushControl,
                         logger.error("Property veto exception while deactivating operation " + operation, e);
                     }
                     activeOperation = null;
-                    if (toolSettingsPanel.getComponentCount() > 0) {
-                        toolSettingsPanel.removeAll();
-                        refreshOptionsPanel = true;
-                    }
+                    toolSettingsPanel.removeAll();
+                    toolSettingsEmptyState.setTitle("No tool chosen");
+                    toolSettingsEmptyState.setText("Choose a tool in the Tools panel to see its settings here");
+                    toolSettingsPanel.add(toolSettingsEmptyState, BorderLayout.CENTER);
+                    refreshOptionsPanel = true;
                 } else {
                     mapSelectionController.cancelPaintSelection(true, false);
                     if (operation instanceof PaintOperation) {
@@ -5861,6 +5913,10 @@ public final class App extends JFrame implements BrushControl,
                     activeOperation = operation;
                     updateLayerVisibility();
                     updateBrushRotation();
+                    if ((operationsView != null) && (operationsView != view)) {
+                        // The mouse is in another view of the map
+                        operation.setView(operationsView);
+                    }
                     try {
                         operation.setActive(true);
                     } catch (PropertyVetoException e) {
@@ -5881,10 +5937,15 @@ public final class App extends JFrame implements BrushControl,
                         }
                     }
                     JPanel optionsPanel = operation.getOptionsPanel();
+                    toolSettingsPanel.removeAll();
                     if (optionsPanel != null) {
                         toolSettingsPanel.add(optionsPanel, BorderLayout.CENTER);
-                        refreshOptionsPanel = true;
+                    } else {
+                        toolSettingsEmptyState.setTitle(operation.getName());
+                        toolSettingsEmptyState.setText("This tool has no settings of its own");
+                        toolSettingsPanel.add(toolSettingsEmptyState, BorderLayout.CENTER);
                     }
+                    refreshOptionsPanel = true;
                 }
                 if (refreshOptionsPanel) {
                     toolSettingsPanel.revalidate();
@@ -7699,11 +7760,17 @@ public final class App extends JFrame implements BrushControl,
     private boolean showBackgroundStatus;
     private int backgroundZoom;
     private Operation activeOperation;
+    /**
+     * The view of the map the tools work in: the map, or another view of it in an area of its own.
+     */
+    private WorldPainterView operationsView;
+    private MouseAdapter viewListener;
+    private final Map<String, MapCopy> mapCopies = new HashMap<>();
+    private final Map<String, Terrain3DPanel> terrain3DCopies = new HashMap<>();
     private File lastSelectedFile;
     private JLabel heightLabel, slopeLabel, locationLabel, waterLabel, materialLabel, radiusLabel, zoomLabel, biomeLabel, levelLabel, brushRotationLabel;
-    private JLabel headerTitleLabel, headerZoomLabel, surroundingsNoteLabel;
+    private JLabel headerTitleLabel, surroundingsNoteLabel;
     private Terrain3DPanel terrain3DPanel;
-    private JToggleButton westPanelsButton, eastPanelsButton, southPanelsButton;
 
     /**
      * The pages of the areas which are not built with a {@link DockableFrameBuilder}.
@@ -7751,6 +7818,7 @@ public final class App extends JFrame implements BrushControl,
     };
     private JMenu recentMenu;
     private JPanel toolSettingsPanel, customTerrainPanel;
+    private org.pepsoft.worldpainter.design.EmptyState toolSettingsEmptyState;
     private Timer autosaveTimer;
     private int pauseAutosave;
     private long autosaveInhibitedUntil;

@@ -1,6 +1,7 @@
 package org.pepsoft.worldpainter.docking;
 
 import org.pepsoft.worldpainter.docking.AreaTree.Leaf;
+import org.pepsoft.worldpainter.help.ToolCard;
 
 import javax.swing.*;
 import java.awt.*;
@@ -57,7 +58,7 @@ final class EditorTypeChooser extends JPanel {
             title.putClientProperty("FlatLaf.style", "font: +2");
             constraints.insets = new Insets(0, 0, 4, 0);
             add(title, constraints);
-            final JLabel hint = new JLabel("<html><div style=\"text-align: center; width: " + Math.round(300 * getUIScale()) + "px\">Pages shown in another area are swapped with it. Drag from a corner of an area to split it, or into a neighbour to join them.</div></html>");
+            final JLabel hint = new JLabel("<html><div style=\"text-align: center; width: " + Math.round(300 * getUIScale()) + "px\">The map and the 3D view can be shown in several areas; other pages shown in another area are swapped with it. Drag from a corner of an area to split it, or into a neighbour to join them.</div></html>");
             hint.putClientProperty("FlatLaf.style", "font: -1; foreground: $WorldPainter.mutedForeground");
             hint.setHorizontalAlignment(SwingConstants.CENTER);
             constraints.insets = new Insets(0, 0, 14, 0);
@@ -75,7 +76,7 @@ final class EditorTypeChooser extends JPanel {
         final EditorTypeChooser chooser = new EditorTypeChooser(manager, leaf, null);
         final Centred centred = new Centred(chooser);
         final JScrollPane scrollPane = new JScrollPane(centred, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.setBorder(null);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.setOpaque(false);
         scrollPane.getViewport().setOpaque(false);
         return scrollPane;
@@ -151,17 +152,21 @@ final class EditorTypeChooser extends JPanel {
     private final class Item extends JComponent {
         Item(DockableFrame page) {
             this.page = page;
-            final Leaf shownIn = manager.getLeafOf(page.getKey());
-            current = (shownIn == leaf);
-            elsewhere = (shownIn != null) && (shownIn != leaf);
-            final StringBuilder toolTip = new StringBuilder("<html><b>").append(page.getTitle()).append("</b>");
-            if (page.getDescription() != null) {
-                toolTip.append("<br><div style=\"width: 220px\">").append(page.getDescription()).append("</div>");
+            final Leaf shownIn = manager.shownElsewhere(leaf, page.getKey());
+            current = manager.shows(leaf, page.getKey());
+            elsewhere = shownIn != null;
+            // A card with what the page is for and a picture of it, as for the brushes
+            final ToolCard card = new ToolCard(page.getTitle(), (page.getDescription() != null) ? page.getDescription() : "", null, new PagePreview(page), null);
+            if (current) {
+                card.action("Shown here", "This area shows it now");
+            } else if (elsewhere && manager.canCopy(page.getKey())) {
+                card.action("Click", "Open another one here, with a view of its own");
+            } else if (elsewhere) {
+                card.action("Click", (manager.isFloating(shownIn) ? "It is in a window of its own" : "It is shown in another area") + ": the two areas swap");
+            } else {
+                card.action("Click", "Show it in this area");
             }
-            if (elsewhere) {
-                toolTip.append("<br><font color=\"#a1a1aa\">").append(manager.isFloating(shownIn) ? "In a window of its own" : "Shown in another area").append(": the two areas will swap</font>");
-            }
-            setToolTipText(toolTip.append("</html>").toString());
+            ToolCard.install(this, card);
             setFont(UIManager.getFont("Label.font"));
             addMouseListener(new MouseAdapter() {
                 @Override
@@ -183,6 +188,12 @@ final class EditorTypeChooser extends JPanel {
                     }
                 }
             });
+        }
+
+        @Override
+        public JToolTip createToolTip() {
+            final JToolTip card = ToolCard.toolTipFor(this);
+            return (card != null) ? card : super.createToolTip();
         }
 
         @Override
