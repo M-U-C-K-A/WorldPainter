@@ -339,8 +339,18 @@ public class NodeCanvas extends JComponent {
         g2.fillRect(0, 0, getWidth(), getHeight());
         final double spacing = GRID_SPACING * zoom;
         if (spacing >= 8) {
-            g2.setColor(ThemeUtils.getColour("WorldPainter.canvasDot", Color.GRAY));
             final double startX = offsetX - Math.floor(offsetX / spacing) * spacing, startY = offsetY - Math.floor(offsetY / spacing) * spacing;
+            if (UIManager.getBoolean("WorldPainter.canvasGrid")) {
+                // The Tactile theme draws a grid, with the dots where its lines cross
+                g2.setColor(ThemeUtils.getColour("WorldPainter.canvasGridLine", Color.LIGHT_GRAY));
+                for (double x = startX; x < getWidth(); x += spacing) {
+                    g2.fillRect((int) Math.round(x), 0, 1, getHeight());
+                }
+                for (double y = startY; y < getHeight(); y += spacing) {
+                    g2.fillRect(0, (int) Math.round(y), getWidth(), 1);
+                }
+            }
+            g2.setColor(ThemeUtils.getColour("WorldPainter.canvasDot", Color.GRAY));
             final double dotSize = Math.max(1.5, 2.2 * Math.min(1, zoom));
             for (double y = startY; y < getHeight(); y += spacing) {
                 for (double x = startX; x < getWidth(); x += spacing) {

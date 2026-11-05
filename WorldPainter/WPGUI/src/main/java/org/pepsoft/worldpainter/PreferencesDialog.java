@@ -209,7 +209,7 @@ public class PreferencesDialog extends WorldPainterDialog {
                 new SettingsCard("Undo", "How many of your last changes Ctrl+Z can take back. More steps use more memory.")
                         .row(checkBoxUndo)
                         .indented(jLabel5, spinnerUndoLevels),
-                new SettingsCard("Theme", "Modern, Classic and Glass are three designs for the whole program, each light, dark or following your system. A change shows at once; Cancel takes it back.")
+                new SettingsCard("Theme", "Modern, Classic, Glass and Tactile are four designs for the whole program, each light, dark or following your system. A change shows at once; Cancel takes it back.")
                         .field(jLabel30, comboBoxLookAndFeel)
                         .field(new JLabel("Appearance:"), comboBoxAppearance),
                 new SettingsCard("Interface size", "How large the text and controls are, for screens with small or large pixels.", Badge.Kind.RESTART)
@@ -927,7 +927,7 @@ public class PreferencesDialog extends WorldPainterDialog {
 
         jLabel30.setText("Visual theme:");
 
-        comboBoxLookAndFeel.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Modern", "Classic", "Glass" }));
+        comboBoxLookAndFeel.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Modern", "Classic", "Glass", "Tactile" }));
         comboBoxLookAndFeel.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 comboBoxLookAndFeelActionPerformed(evt);

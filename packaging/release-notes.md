@@ -4,6 +4,7 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 ## New in this version
 
+- **A fourth design, Tactile**: controls you feel you could touch, light or dark: buttons standing half out of the window, the default one in orange, sliders sunk into grooves with their ticks inside and a pill shaped thumb, selected tools standing out as tiles, and the map on a grid of fine lines
 - **A Classic design that really is classic**: the look of a classic desktop application, as WorldPainter used to have, instead of a variant of Modern: a grey window (charcoal in the dark), square controls with clear borders, buttons with a slight gradient, title bars on the areas, scroll bars with arrows, card shaped tabs, yellow tooltips, the font of the system and the original colour icons of WorldPainter
 - **Smooth the whole map at once**: *Global operations* can smooth the terrain everywhere, with a radius, optionally in half blocks (slabs and snow layers), within the limits of its filters (selection, heights, terrain, slope); undone in one go
 - **Large maps**: the map zooms out to 1:64 (1.56%) instead of 1:16, so that a map of 40,000 blocks fits on the screen, and draws faster when zoomed out; the walking distances also show several days and nights of walking on large maps, as far as it takes to cross the map
@@ -42,7 +43,7 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 ## What is in it
 
-- A new interface, with three designs (Modern, Classic and Glass), light or dark, areas which can be split, joined, moved and detached as in Blender, workspace tabs, palettes which fill their panels, and cards on hover which show what the mouse and keys do, with an animation of each tool, a 3D preview of each brush, pictures of the brush options, and the blocks or plants of each mix and their shares
+- A new interface, with four designs (Modern, Classic, Glass and Tactile), light or dark, areas which can be split, joined, moved and detached as in Blender, workspace tabs, palettes which fill their panels, and cards on hover which show what the mouse and keys do, with an animation of each tool, a 3D preview of each brush, pictures of the brush options, and the blocks or plants of each mix and their shares
 - An integrated 3D view which keeps up with the map, with colour modes, 1:1 blocks up to 4096 blocks around the camera, optional shaders (sun and sky light, shadows, moving water) and cross sections of the ground on its sides
 - A node graph to generate complete worlds, with 39 kinds of nodes, examples and `.wpgraph` files, including landforms ready made in one node and a Floating islands node
 - Surroundings drawn like the map, seed search, and blending the edges of the map into a seed (round maps included, with undo)

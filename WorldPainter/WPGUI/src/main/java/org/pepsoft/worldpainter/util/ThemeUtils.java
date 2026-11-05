@@ -10,6 +10,8 @@ import org.pepsoft.worldpainter.laf.WorldPainterGlassLightLaf;
 import org.pepsoft.worldpainter.laf.WorldPainterLightLaf;
 import org.pepsoft.worldpainter.laf.WorldPainterModernDarkLaf;
 import org.pepsoft.worldpainter.laf.WorldPainterModernLightLaf;
+import org.pepsoft.worldpainter.laf.WorldPainterTactileDarkLaf;
+import org.pepsoft.worldpainter.laf.WorldPainterTactileLightLaf;
 
 import javax.swing.*;
 import java.awt.*;
@@ -95,6 +97,10 @@ public final class ThemeUtils {
             case GLASS_DARK:
             case GLASS_AUTO:
                 return Style.GLASS;
+            case TACTILE_LIGHT:
+            case TACTILE_DARK:
+            case TACTILE_AUTO:
+                return Style.TACTILE;
             default:
                 return Style.MODERN;
         }
@@ -108,10 +114,12 @@ public final class ThemeUtils {
             case MODERN_LIGHT:
             case CLASSIC_LIGHT:
             case GLASS_LIGHT:
+            case TACTILE_LIGHT:
                 return Appearance.LIGHT;
             case MODERN_DARK:
             case CLASSIC_DARK:
             case GLASS_DARK:
+            case TACTILE_DARK:
                 return Appearance.DARK;
             default:
                 return Appearance.SYSTEM;
@@ -127,6 +135,8 @@ public final class ThemeUtils {
                 return (appearance == Appearance.LIGHT) ? Configuration.LookAndFeel.CLASSIC_LIGHT : ((appearance == Appearance.DARK) ? Configuration.LookAndFeel.CLASSIC_DARK : Configuration.LookAndFeel.CLASSIC_AUTO);
             case GLASS:
                 return (appearance == Appearance.LIGHT) ? Configuration.LookAndFeel.GLASS_LIGHT : ((appearance == Appearance.DARK) ? Configuration.LookAndFeel.GLASS_DARK : Configuration.LookAndFeel.GLASS_AUTO);
+            case TACTILE:
+                return (appearance == Appearance.LIGHT) ? Configuration.LookAndFeel.TACTILE_LIGHT : ((appearance == Appearance.DARK) ? Configuration.LookAndFeel.TACTILE_DARK : Configuration.LookAndFeel.TACTILE_AUTO);
             default:
                 return (appearance == Appearance.LIGHT) ? Configuration.LookAndFeel.MODERN_LIGHT : ((appearance == Appearance.DARK) ? Configuration.LookAndFeel.MODERN_DARK : Configuration.LookAndFeel.MODERN_AUTO);
         }
@@ -136,7 +146,9 @@ public final class ThemeUtils {
      * The design of the theme which is installed.
      */
     public static Style getInstalledStyle() {
-        if (UIManager.getBoolean("WorldPainter.glass")) {
+        if (UIManager.getBoolean("WorldPainter.tactile")) {
+            return Style.TACTILE;
+        } else if (UIManager.getBoolean("WorldPainter.glass")) {
             return Style.GLASS;
         } else if (UIManager.getBoolean("WorldPainter.modern")) {
             return Style.MODERN;
@@ -218,15 +230,22 @@ public final class ThemeUtils {
     }
 
     /**
-     * Create a tile for the dotted background of the canvas around the map, to be repeated.
+     * Create a tile for the dotted background of the canvas around the map, to be repeated. In the Tactile theme it is
+     * a grid of fine lines with a dot where they cross, as on graph paper.
      */
     public static BufferedImage createCanvasDotPattern() {
-        final int cell = 22;
+        final boolean grid = UIManager.getBoolean("WorldPainter.canvasGrid");
+        final int cell = grid ? 32 : 22;
         final BufferedImage image = new BufferedImage(cell, cell, BufferedImage.TYPE_INT_RGB);
         final Graphics2D g2 = image.createGraphics();
         try {
             g2.setColor(getCanvasBackground());
             g2.fillRect(0, 0, cell, cell);
+            if (grid) {
+                g2.setColor(getColour("WorldPainter.canvasGridLine", Color.LIGHT_GRAY));
+                g2.fillRect(cell / 2, 0, 1, cell);
+                g2.fillRect(0, cell / 2, cell, 1);
+            }
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(getColour("WorldPainter.canvasDot", Color.GRAY));
             g2.fill(new java.awt.geom.Ellipse2D.Float(cell / 2f - 1.1f, cell / 2f - 1.1f, 2.2f, 2.2f));
@@ -267,6 +286,13 @@ public final class ThemeUtils {
                     WorldPainterGlassLightLaf.setup();
                 }
                 break;
+            case TACTILE:
+                if (dark) {
+                    WorldPainterTactileDarkLaf.setup();
+                } else {
+                    WorldPainterTactileLightLaf.setup();
+                }
+                break;
             default:
                 if (dark) {
                     WorldPainterModernDarkLaf.setup();
@@ -298,7 +324,7 @@ public final class ThemeUtils {
     /**
      * The designs of the themes, in the order in which they are offered.
      */
-    public enum Style {MODERN, CLASSIC, GLASS}
+    public enum Style {MODERN, CLASSIC, GLASS, TACTILE}
 
     private static boolean geistInstalled;
     private static boolean fontInstalled;

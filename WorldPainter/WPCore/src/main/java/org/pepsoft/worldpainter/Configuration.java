@@ -1380,7 +1380,7 @@ public final class Configuration implements Serializable, EventLogger, Minecraft
      * The visual theme. The Modern, Classic and Glass themes come in a light and a dark variant, or follow the system.
      * The others are no longer offered, and are mapped to the Classic theme.
      */
-    public enum LookAndFeel {SYSTEM, METAL, NIMBUS, DARK_METAL, DARK_NIMBUS, MODERN_LIGHT, MODERN_DARK, MODERN_AUTO, CLASSIC_LIGHT, CLASSIC_DARK, CLASSIC_AUTO, GLASS_LIGHT, GLASS_DARK, GLASS_AUTO}
+    public enum LookAndFeel {SYSTEM, METAL, NIMBUS, DARK_METAL, DARK_NIMBUS, MODERN_LIGHT, MODERN_DARK, MODERN_AUTO, CLASSIC_LIGHT, CLASSIC_DARK, CLASSIC_AUTO, GLASS_LIGHT, GLASS_DARK, GLASS_AUTO, TACTILE_LIGHT, TACTILE_DARK, TACTILE_AUTO}
 
     public enum OverlayType {SCALE_ON_LOAD, OPTIMISE_ON_LOAD, SCALE_ON_PAINT}
 

@@ -9,13 +9,14 @@ description: The redesigned interface of WorldPainter Modernised.
 
 ## Themes
 
-Three designs, each light, dark or following the system:
+Four designs, each light, dark or following the system:
 
 | Design | Looks like |
 |---|---|
 | **Modern** | A window of soft grey with raised surfaces, a blue accent, softly rounded controls, tabs as a segmented control, line icons, the Geist typeface, and settings grouped on rounded surfaces with their controls on the right, as in the settings of macOS |
 | **Classic** | A classic desktop application, as WorldPainter used to look: a grey window (charcoal in the dark, in the spirit of Darcula), square controls with clear borders, buttons with a slight gradient, areas with title bars, scroll bars with arrows, card shaped tabs, yellow tooltips, a steel blue selection, the font of the system and the original colour icons of WorldPainter in the toolbar, the tools and the layers |
 | **Glass** | Frosted glass: the panels float on a soft gradient of sage and pearl grey (slate and teal in the dark), the map sits in a pane with rounded corners, settings are grouped on translucent cards with a soft shadow, and buttons and tabs are pills, the selected one black (white in the dark). It keeps the line icons and the layout of Modern |
+| **Tactile** | Controls you feel you could touch, on light grey (graphite in the dark): buttons stand half out of the window, lit from above with a darker lip along their bottom edge, the default button in a warm orange; sliders sink into wide grooves with their ticks inside and a pill shaped thumb; selected tools and tabs stand out as tiles; the map lies on a grid of fine lines instead of dots. It keeps the line icons and the layout of Modern |
 
 Choose them in **Preferences › General › Theme**: the change shows at once, without restarting, and **Cancel** takes it back. The sun and moon button in the toolbar switches between light and dark.
 
