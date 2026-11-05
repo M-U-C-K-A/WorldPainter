@@ -65,7 +65,8 @@ public final class Glass {
             // The glow inside the edge: the light gathered by the rounded edge of thick glass
             g.clip(shape);
             final Color glow = colour("WorldPainter.glass.innerGlow", new Color(255, 255, 255, 90));
-            final float glowWidth = Math.min(Math.min(width, height) / 2f, UIScale.scale(7f));
+            // (Thinner on small things, such as buttons, than on panes)
+            final float glowWidth = Math.min(Math.min(width, height) / 5f, UIScale.scale(7f));
             for (int i = 0; i < 4; i++) {
                 final float t = (i + 1) / 4f;
                 g.setStroke(new BasicStroke(glowWidth * 2 * t));
@@ -78,7 +79,7 @@ public final class Glass {
             // The specular rim: bright where the light comes from (the top left), dim along the sides, and reflected
             // at the bottom right
             final Color specular = colour("WorldPainter.glass.specular", Color.WHITE);
-            g.setStroke(new BasicStroke(UIScale.scale(2.2f)));
+            g.setStroke(new BasicStroke(Math.max(UIScale.scale(1f), Math.min(UIScale.scale(2.2f), Math.min(width, height) / 14f))));
             g.setPaint(new LinearGradientPaint(new Point2D.Float(x, y), new Point2D.Float(x + width, y + height), new float[] {0f, 0.32f, 0.68f, 1f},
                     new Color[] {withAlpha(specular, 1f), withAlpha(specular, 0.18f), withAlpha(specular, 0.12f), withAlpha(specular, 0.7f)}));
             g.draw(shape);

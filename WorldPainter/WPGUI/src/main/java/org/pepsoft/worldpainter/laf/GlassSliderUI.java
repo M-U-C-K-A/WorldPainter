@@ -11,8 +11,8 @@ import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
 
 /**
- * The sliders of the Glass theme: a thin track, filled with the accent up to the value, and a thumb of liquid glass
- * through which the track is seen magnified, as through a lens.
+ * The sliders of the Glass theme, as in the Liquid Glass of Apple: a thin track, filled with the accent up to the value,
+ * and a white capsule for a thumb, which turns into clear glass, magnifying the track under it, while it is dragged.
  */
 public class GlassSliderUI extends FlatSliderUI {
     public static ComponentUI createUI(JComponent c) {
@@ -36,7 +36,7 @@ public class GlassSliderUI extends FlatSliderUI {
     }
 
     private void paintBar(Graphics2D g2) {
-        final float height = UIScale.scale(6f), y = trackRect.y + (trackRect.height - height) / 2f;
+        final float height = UIScale.scale(4f), y = trackRect.y + (trackRect.height - height) / 2f;
         final Shape bar = new RoundRectangle2D.Float(trackRect.x, y, trackRect.width, height, height, height);
         g2.setColor(LiquidGlass.colour("WorldPainter.glass.track"));
         g2.fill(bar);
@@ -57,25 +57,36 @@ public class GlassSliderUI extends FlatSliderUI {
         final Graphics2D g2 = (Graphics2D) g.create();
         try {
             final Object[] hints = FlatUIUtils.setRenderingHints(g2);
-            final float x = thumbRect.x, width = thumbRect.width, height = Math.min(thumbRect.height, UIScale.scale(22f));
-            final float y = thumbRect.y + (thumbRect.height - height) / 2f;
+            final boolean dragging = isDragging();
+            // A little larger while it is held, as glass lifts under the finger
+            final float grow = dragging ? UIScale.scale(3f) : 0f;
+            final float width = thumbRect.width + 2 * grow, height = Math.min(thumbRect.height, UIScale.scale(18f)) + 2 * grow;
+            final float x = thumbRect.x - grow, y = thumbRect.y + (thumbRect.height - height) / 2f;
             final Shape capsule = new RoundRectangle2D.Float(x, y, width, height, height, height);
             LiquidGlass.paintShadow(g2, capsule);
-            // The track seen through the thumb, magnified as through a lens
-            final Graphics2D lens = (Graphics2D) g2.create();
-            try {
-                lens.clip(capsule);
-                lens.setColor(LiquidGlass.colour("WorldPainter.glass.lensBackground"));
-                lens.fill(capsule);
-                final double centreX = x + width / 2.0, centreY = y + height / 2.0, zoom = isDragging() ? 1.8 : 1.5;
-                lens.translate(centreX, centreY);
-                lens.scale(zoom, zoom);
-                lens.translate(-centreX, -centreY);
-                paintBar(lens);
-            } finally {
-                lens.dispose();
+            if (dragging) {
+                // Clear glass, through which the track is seen magnified
+                final Graphics2D lens = (Graphics2D) g2.create();
+                try {
+                    lens.clip(capsule);
+                    lens.setColor(LiquidGlass.colour("WorldPainter.glass.lensBackground"));
+                    lens.fill(capsule);
+                    final double centreX = x + width / 2.0, centreY = y + height / 2.0;
+                    lens.translate(centreX, centreY);
+                    lens.scale(1.25, 1.25);
+                    lens.translate(-centreX, -centreY);
+                    paintBar(lens);
+                } finally {
+                    lens.dispose();
+                }
+                Glass.paintLiquid(g2, capsule, null);
+            } else {
+                g2.setColor(slider.isEnabled() ? LiquidGlass.colour("WorldPainter.glass.knob") : LiquidGlass.colour("WorldPainter.glass.track"));
+                g2.fill(capsule);
+                g2.setColor(new Color(0, 0, 0, 20));
+                g2.setStroke(new BasicStroke(UIScale.scale(0.6f)));
+                g2.draw(capsule);
             }
-            Glass.paintLiquid(g2, capsule, null);
             FlatUIUtils.resetRenderingHints(g2, hints);
         } finally {
             g2.dispose();

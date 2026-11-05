@@ -36,14 +36,19 @@ final class LiquidGlass {
                 g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f));
             }
             final int width = button.getWidth(), height = button.getHeight();
-            if (Tactile.isToolBarButton(button)) {
-                final float inset = UIScale.scale(1f), arc = Math.min(width, height) - 2 * inset;
+            final boolean iconOnly = (button.getText() == null) || button.getText().isEmpty();
+            if (Tactile.isToolBarButton(button) || iconOnly) {
+                // Tools, swatches and other buttons without text: flat in their cell, on a tile of glass when selected
+                final float inset = UIScale.scale(1.5f), arc = UIScale.scale(9f);
                 final Shape drop = new RoundRectangle2D.Float(inset, inset, width - 2 * inset, height - 2 * inset, arc, arc);
                 if (selected) {
-                    // A drop of glass around the selected tool
-                    paintShadow(g2, drop);
+                    // A tile of glass under the selected tool, the shape of its cell
+                    g2.setColor(colour("WorldPainter.glass.selectedTile"));
+                    g2.fill(drop);
                     Glass.paintLiquid(g2, drop, null);
-                    overlay(g2, drop, pressed ? 0.25f : (rollover ? 0.15f : 0.08f));
+                    if (pressed || rollover) {
+                        overlay(g2, drop, pressed ? 0.25f : 0.12f);
+                    }
                 } else if (pressed || rollover) {
                     overlay(g2, drop, pressed ? 0.35f : 0.22f);
                 }
@@ -87,7 +92,6 @@ final class LiquidGlass {
             paintShadow(g2, knob);
             g2.setColor(colour("WorldPainter.glass.knob"));
             g2.fill(knob);
-            Glass.paintLiquid(g2, knob, null);
         } finally {
             g2.setComposite(saved);
         }
