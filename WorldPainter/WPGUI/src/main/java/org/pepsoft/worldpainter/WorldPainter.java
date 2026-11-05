@@ -649,11 +649,7 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
         }
         Rectangle repaintArea = null; // The repaint area in world coordinates relative to the mouse position
         if (drawBrush) {
-            if (brushShape != BrushShape.CUSTOM) {
-                repaintArea = new Rectangle(-effectiveRadius, -effectiveRadius, effectiveRadius * 2 + 1, effectiveRadius * 2 + 1);
-            } else {
-                repaintArea = customBrushShape.getBounds();
-            }
+            repaintArea = brushArea();
         }
         if (dimension != null) {
             if (drawViewDistance) {
@@ -852,13 +848,12 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
                     break;
                 case BITMAP:
                     // The actual shape of the brush (including its rotation), if it is known
-                    final App app = App.getInstanceIfExists();
-                    final org.pepsoft.worldpainter.operations.Operation operation = (app != null) ? app.getActiveOperation() : null;
-                    if ((operation instanceof org.pepsoft.worldpainter.operations.BrushOperation) && (((org.pepsoft.worldpainter.operations.BrushOperation) operation).getBrush() != null) && (radius > 0)) {
+                    final Shape outline = getBrushOutline();
+                    if (outline != null) {
                         final AffineTransform transform = g2.getTransform();
                         try {
                             g2.translate(mouseX, mouseY);
-                            g2.draw(org.pepsoft.worldpainter.brushes.BrushOutline.of(((org.pepsoft.worldpainter.operations.BrushOperation) operation).getBrush(), radius));
+                            g2.draw(outline);
                         } finally {
                             g2.setTransform(transform);
                         }
@@ -931,12 +926,43 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
      * @return The bounds of the brush.
      */
     private Rectangle getBrushBounds() {
+        final Rectangle bounds = brushArea();
+        bounds.translate(mouseX, mouseY);
+        return bounds;
+    }
+
+    /**
+     * The area covered by what is drawn for the brush, relative to the mouse position: for a brush made from an image,
+     * the bounds of its outline as drawn (see {@link #getBrushOutline()}), which may reach a little further than its
+     * nominal square when it is rotated.
+     */
+    private Rectangle brushArea() {
         if (brushShape == BrushShape.CUSTOM) {
-            Rectangle bounds = customBrushShape.getBounds();
-            bounds.translate(mouseX, mouseY);
-            return bounds;
+            return customBrushShape.getBounds();
+        }
+        final Rectangle area = new Rectangle(-effectiveRadius, -effectiveRadius, effectiveRadius * 2 + 1, effectiveRadius * 2 + 1);
+        if (brushShape == BrushShape.BITMAP) {
+            final Shape outline = getBrushOutline();
+            if (outline != null) {
+                final Rectangle bounds = outline.getBounds();
+                bounds.grow(1, 1);
+                area.add(bounds);
+            }
+        }
+        return area;
+    }
+
+    /**
+     * The outline of the shape of the brush of the current tool, relative to the mouse position, or {@code null} if it
+     * is not known.
+     */
+    private Shape getBrushOutline() {
+        final App app = App.getInstanceIfExists();
+        final org.pepsoft.worldpainter.operations.Operation operation = (app != null) ? app.getActiveOperation() : null;
+        if ((operation instanceof org.pepsoft.worldpainter.operations.BrushOperation) && (((org.pepsoft.worldpainter.operations.BrushOperation) operation).getBrush() != null) && (radius > 0)) {
+            return org.pepsoft.worldpainter.brushes.BrushOutline.of(((org.pepsoft.worldpainter.operations.BrushOperation) operation).getBrush(), radius);
         } else {
-            return new Rectangle(mouseX - effectiveRadius, mouseY - effectiveRadius, effectiveRadius * 2 + 1, effectiveRadius * 2 + 1);
+            return null;
         }
     }
 

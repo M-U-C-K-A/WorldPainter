@@ -61,9 +61,15 @@ public final class BrushOutline {
     }
 
     /**
-     * The strength of a brush at an offset, or zero outside its square (where not all brushes check their bounds).
+     * The strength of a brush at an offset, or zero outside its square: not all brushes check their bounds, and those
+     * made from an image would read the next or previous row of the image past their sides, which drew stray bits of
+     * outline outside the brush, which the map did not clear when the mouse moved on.
      */
     private static float strength(Brush brush, int dx, int dy) {
+        final int reach = brush.getEffectiveRadius();
+        if ((Math.abs(dx) > reach) || (Math.abs(dy) > reach)) {
+            return 0.0f;
+        }
         try {
             return brush.getFullStrength(dx, dy);
         } catch (ArrayIndexOutOfBoundsException e) {
