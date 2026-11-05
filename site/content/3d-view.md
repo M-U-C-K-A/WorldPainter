@@ -70,4 +70,4 @@ The **Shaders** button (the sun) lights the land like a shader pack would:
 
 The panel at the bottom right sets the **direction** the sun shines from and its **height**, or a time of day: **Morning**, **Noon** or **Evening**. The land looks best with the sun to the side of or behind the camera; looking towards the sun, you mostly see the shaded side of the land.
 
-> [!NOTE] The 3D view shows the terrain, water, colours and trees of the map. It does not show other custom objects or floating islands yet.
+> [!NOTE] The 3D view shows the terrain, water, colours and trees of the map, and the floating islands with the trees on them. It does not show other custom objects yet.

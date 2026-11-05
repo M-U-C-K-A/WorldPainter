@@ -34,6 +34,7 @@ import java.util.*;
 
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE;
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE_BITS;
+import static org.pepsoft.worldpainter.Constants.TILE_SIZE_MASK;
 
 /**
  * Applies a {@link NodeGraph} to the existing tiles of a dimension, either everywhere or only inside the selection
@@ -253,6 +254,8 @@ public class NodeGraphOperation {
         if (islandTiles.isEmpty()) {
             return;
         }
+        // No specks of a few blocks floating on their own around the islands, nor pinholes through them
+        tidyIslands(dimension, layer, islandTiles, MIN_ISLAND_AREA);
 
         // The floor dimension, which holds the tops of the islands
         final Dimension.Anchor anchor = dimension.getAnchor();
@@ -299,6 +302,83 @@ public class NodeGraphOperation {
             floor.setEventsInhibited(false);
         }
         createdLayers.add(layer);
+    }
+
+    /**
+     * Take away the bits of a bit layer which are not connected to at least {@code minimumArea} others (specks around
+     * floating islands, which would be single columns floating in the air), and fill the holes in it smaller than that
+     * (pinholes through the islands).
+     *
+     * @param tiles The tiles in which the layer is set.
+     */
+    static void tidyIslands(Dimension dimension, Layer layer, Collection<? extends Tile> tiles, int minimumArea) {
+        for (boolean set: new boolean[] {true, false}) {
+            // First the specks (connected areas where the layer is set), then the holes (where it is not)
+            final Map<Point, BitSet> settled = new HashMap<>();
+            for (Tile tile: tiles) {
+                final int tileX = tile.getX(), tileY = tile.getY();
+                for (int y = 0; y < TILE_SIZE; y++) {
+                    for (int x = 0; x < TILE_SIZE; x++) {
+                        if ((tile.getBitLayerValue(layer, x, y) != set) || isSettled(settled, tileX, tileY, x, y)) {
+                            continue;
+                        }
+                        // Follow the area this column is part of, until it is known to be large enough to stay
+                        final int worldX = (tileX << TILE_SIZE_BITS) | x, worldY = (tileY << TILE_SIZE_BITS) | y;
+                        final Set<Long> area = new HashSet<>();
+                        final ArrayDeque<Long> queue = new ArrayDeque<>();
+                        final long start = pack(worldX, worldY);
+                        area.add(start);
+                        queue.add(start);
+                        boolean large = false;
+                        while ((! queue.isEmpty()) && (! large)) {
+                            final long point = queue.poll();
+                            final int px = (int) (point >> 32), py = (int) point;
+                            for (int d = 0; d < 4; d++) {
+                                final int nx = px + ((d == 0) ? -1 : ((d == 1) ? 1 : 0)), ny = py + ((d == 2) ? -1 : ((d == 3) ? 1 : 0));
+                                final Tile neighbourTile = dimension.getTile(nx >> TILE_SIZE_BITS, ny >> TILE_SIZE_BITS);
+                                if (neighbourTile == null) {
+                                    // A hole open to the edge of the map is not a hole
+                                    if (! set) {
+                                        large = true;
+                                    }
+                                    continue;
+                                }
+                                if ((neighbourTile.getBitLayerValue(layer, nx & TILE_SIZE_MASK, ny & TILE_SIZE_MASK) == set) && area.add(pack(nx, ny))) {
+                                    queue.add(pack(nx, ny));
+                                    // Connected to an area already known to be large enough, or large enough itself
+                                    if ((area.size() >= minimumArea) || isSettled(settled, nx >> TILE_SIZE_BITS, ny >> TILE_SIZE_BITS, nx & TILE_SIZE_MASK, ny & TILE_SIZE_MASK)) {
+                                        large = true;
+                                    }
+                                }
+                            }
+                        }
+                        if (large) {
+                            for (long point: area) {
+                                settle(settled, (int) (point >> 32), (int) point);
+                            }
+                        } else {
+                            for (long point: area) {
+                                final int px = (int) (point >> 32), py = (int) point;
+                                dimension.getTile(px >> TILE_SIZE_BITS, py >> TILE_SIZE_BITS).setBitLayerValue(layer, px & TILE_SIZE_MASK, py & TILE_SIZE_MASK, ! set);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static long pack(int x, int y) {
+        return (((long) x) << 32) | (y & 0xffffffffL);
+    }
+
+    private static boolean isSettled(Map<Point, BitSet> settled, int tileX, int tileY, int x, int y) {
+        final BitSet bits = settled.get(new Point(tileX, tileY));
+        return (bits != null) && bits.get(x | (y << TILE_SIZE_BITS));
+    }
+
+    private static void settle(Map<Point, BitSet> settled, int worldX, int worldY) {
+        settled.computeIfAbsent(new Point(worldX >> TILE_SIZE_BITS, worldY >> TILE_SIZE_BITS), point -> new BitSet(TILE_SIZE * TILE_SIZE)).set((worldX & TILE_SIZE_MASK) | ((worldY & TILE_SIZE_MASK) << TILE_SIZE_BITS));
     }
 
     /**
@@ -513,6 +593,10 @@ public class NodeGraphOperation {
     private List<CustomLayer> existingLayers = Collections.emptyList();
 
     private static final String FLOATING_ISLANDS_NAME = "Floating islands";
+    /**
+     * The smallest island (and the largest hole in one) left when floating islands are created, in columns.
+     */
+    static final int MIN_ISLAND_AREA = 150;
 
     private static final int GROUP_SIZE = 4;
 

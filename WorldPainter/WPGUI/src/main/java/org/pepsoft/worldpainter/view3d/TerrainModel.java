@@ -85,7 +85,7 @@ final class TerrainModel {
             }
         }
         lowestHeight = (lowest != Float.MAX_VALUE) ? lowest : minHeight;
-        highestHeight = (highest != -Float.MAX_VALUE) ? highest : maxHeight;
+        float highestHeight = (highest != -Float.MAX_VALUE) ? highest : maxHeight;
 
         // Slopes and shading. The slope is measured on a slightly smoothed copy of the heights, so that the small
         // bumps of the surface do not drown the shape of the land in noise
@@ -118,6 +118,15 @@ final class TerrainModel {
             }
         }
         trees = withTrees ? TreeSamples.sample(dimension, area) : TreeSamples.NONE;
+        islands = withTrees ? IslandSamples.sample(dimension, colourScheme, x0, y0, step, width, height) : IslandSamples.NONE;
+        if (islands.count > 0) {
+            for (int i = 0; i < islands.tops.length; i++) {
+                if (islands.isIsland(i)) {
+                    highestHeight = Math.max(highestHeight, islands.tops[i]);
+                }
+            }
+        }
+        this.highestHeight = highestHeight;
         if (progressReceiver != null) {
             progressReceiver.setProgress(1.0f);
         }
@@ -196,4 +205,9 @@ final class TerrainModel {
      * The trees painted on the land, to be drawn as simple shapes.
      */
     final TreeSamples trees;
+
+    /**
+     * The floating islands above the land.
+     */
+    final IslandSamples islands;
 }

@@ -47,11 +47,9 @@ The preview draws the islands over the land, with their shadows.
 
 ## 5. Apply and export
 
-Click **Apply to map**. The islands become a *Floating islands* layer: its footprint is painted on the map, and the heights of the tops are kept in a floating dimension of their own. Right-click the layer in the Layers panel to edit it (its thickness, its underside, its edges) or the dimension of its tops.
+Click **Apply to map**. The islands become a *Floating islands* layer, and the heights of the tops are kept in a floating dimension of their own. The map shows the tops of the islands, with their terrain, their trees and their relief, a rim of the colour of the layer and their shadows on the land; the 3D view shows them floating above it. Specks of a few blocks around the islands and pinholes through them are tidied away, so that Minecraft gets no single columns floating in the air. Right-click the layer in the Layers panel to edit it (its thickness, its underside, its edges) or the dimension of its tops.
 
 Export as usual: in Minecraft, the islands have grass and trees on top and stone and dirt below, with nothing but air between them and the ground.
-
-> [!NOTE] The 3D view does not show floating islands yet, and undoing the graph does not remove the layer it created.
 
 ## Ideas
 

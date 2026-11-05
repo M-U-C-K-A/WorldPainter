@@ -26,6 +26,7 @@ import static org.pepsoft.minecraft.Constants.DEFAULT_WATER_LEVEL;
 import static org.pepsoft.minecraft.Material.*;
 import static org.pepsoft.worldpainter.Constants.*;
 import static org.pepsoft.worldpainter.Dimension.Role.CAVE_FLOOR;
+import static org.pepsoft.worldpainter.Dimension.Role.FLOATING_FLOOR;
 import static org.pepsoft.worldpainter.Dimension.Role.DETAIL;
 import static org.pepsoft.worldpainter.layers.tunnel.TunnelLayer.Mode.FIXED_HEIGHT_ABOVE_FLOOR;
 
@@ -226,6 +227,7 @@ public final class TileRenderer {
         for (int i = 0; i < layers.length; i++) {
             renderers[i] = getRenderer(layers[i]);
         }
+        prepareIslands(tile, layers);
 
         final int scale = 1 << -zoom;
         final Graphics2D g2 = (Graphics2D) image.getGraphics();
@@ -343,6 +345,29 @@ public final class TileRenderer {
     private int getPixelColour(Tile tile, int worldX, int worldY, Layer[] layers, LayerRenderer[] renderers, boolean contourLines, boolean hideTerrain, boolean hideFluids, boolean bottomless, boolean topLayersRelativeToTerrain, long seed) {
         final int x = worldX & TILE_SIZE_MASK, y = worldY & TILE_SIZE_MASK;
         final int offset = x + y * TILE_SIZE;
+        if (islandLayers != null) {
+            // Floating islands hide the land below them: draw their tops instead
+            for (int i = 0; i < islandLayers.length; i++) {
+                if (tile.getBitLayerValue(islandLayers[i], x, y)) {
+                    return getIslandColour(tile, i, worldX, worldY, seed);
+                }
+            }
+        }
+        final int colour = getGroundColour(tile, worldX, worldY, layers, renderers, contourLines, hideTerrain, hideFluids, bottomless, topLayersRelativeToTerrain, seed);
+        if ((islandLayers != null) && (colour != BLACK)) {
+            // The shadows the islands cast on the land, away from the light
+            for (int i = 0; i < islandLayers.length; i++) {
+                if (isIsland(tile, i, worldX - shadowDX, worldY - shadowDY)) {
+                    return ColourUtils.multiply(colour, ISLAND_SHADOW);
+                }
+            }
+        }
+        return colour;
+    }
+
+    private int getGroundColour(Tile tile, int worldX, int worldY, Layer[] layers, LayerRenderer[] renderers, boolean contourLines, boolean hideTerrain, boolean hideFluids, boolean bottomless, boolean topLayersRelativeToTerrain, long seed) {
+        final int x = worldX & TILE_SIZE_MASK, y = worldY & TILE_SIZE_MASK;
+        final int offset = x + y * TILE_SIZE;
         final int intHeight = intHeightCache[offset], minHeight = tile.getMinHeight();
         heights[1][0] = getNeighbourHeight(tile, x, y,  0, -1);
         deltas [1][0] = heights[1][0] - intHeight;
@@ -424,6 +449,131 @@ public final class TileRenderer {
                 default:
                     throw new UnsupportedOperationException("Don't know how to render " + layer.getClass().getSimpleName());
             }
+        }
+        return colour;
+    }
+
+    /**
+     * Find the floating islands (floating dimension layers) of a tile, which are drawn as the land on top of them,
+     * seen from above, rather than as a colour.
+     */
+    private void prepareIslands(Tile tile, Layer[] layers) {
+        islandLayers = null;
+        if (! (tileProvider instanceof Dimension)) {
+            return;
+        }
+        final Dimension dimension = (Dimension) tileProvider;
+        final List<TunnelLayer> found = new ArrayList<>();
+        final List<Dimension> floors = new ArrayList<>();
+        for (Layer layer: layers) {
+            if ((layer instanceof TunnelLayer) && (((TunnelLayer) layer).getLayerMode() == TunnelLayer.LayerMode.FLOATING) && (((TunnelLayer) layer).getFloorDimensionId() != null)) {
+                final Anchor anchor = dimension.getAnchor();
+                final Dimension floor = dimension.getWorld().getDimension(new Anchor(anchor.dim, FLOATING_FLOOR, anchor.invert, ((TunnelLayer) layer).getFloorDimensionId()));
+                if (floor != null) {
+                    found.add((TunnelLayer) layer);
+                    floors.add(floor);
+                }
+            }
+        }
+        if (found.isEmpty()) {
+            return;
+        }
+        final int count = found.size();
+        islandLayers = found.toArray(new TunnelLayer[count]);
+        islandFloors = floors.toArray(new Dimension[count]);
+        islandFloorTiles = new Tile[count];
+        islandFloorLayers = new Layer[count][];
+        islandFloorRenderers = new LayerRenderer[count][];
+        islandRimColours = new int[count];
+        for (int i = 0; i < count; i++) {
+            final Tile floorTile = islandFloors[i].getTile(tile.getX(), tile.getY());
+            islandFloorTiles[i] = floorTile;
+            final List<Layer> floorLayers = (floorTile != null) ? new ArrayList<>(floorTile.getLayers()) : new ArrayList<>();
+            floorLayers.removeIf(layer -> (layer instanceof Biome) || hiddenLayers.contains(layer) || (layer.getDataSize() == Layer.DataSize.BYTE) || (layer.getDataSize() == Layer.DataSize.NONE));
+            islandFloorLayers[i] = floorLayers.toArray(new Layer[0]);
+            islandFloorRenderers[i] = new LayerRenderer[islandFloorLayers[i].length];
+            for (int j = 0; j < islandFloorLayers[i].length; j++) {
+                islandFloorRenderers[i][j] = getRenderer(islandFloorLayers[i][j]);
+            }
+            final Object paint = islandLayers[i].getPaint();
+            islandRimColours[i] = (paint instanceof Color) ? (((Color) paint).getRGB() & 0xffffff) : 0xeab308;
+        }
+        // Outlines and shadows a few pixels wide however far the map is zoomed out
+        final int scale = (zoom < 0) ? (1 << -zoom) : 1;
+        final int shadow = Math.max(ISLAND_SHADOW_DISTANCE, 3 * scale);
+        switch (lightOrigin) {
+            case NORTHEAST -> { shadowDX = -shadow; shadowDY = shadow; }
+            case SOUTHEAST -> { shadowDX = -shadow; shadowDY = -shadow; }
+            case SOUTHWEST -> { shadowDX = shadow; shadowDY = -shadow; }
+            case ABOVE -> { shadowDX = 0; shadowDY = 0; }
+            default -> { shadowDX = shadow; shadowDY = shadow; }
+        }
+        islandStep = scale;
+    }
+
+    /**
+     * Whether there is an island of one of the floating layers of the tile being drawn at a location.
+     */
+    private boolean isIsland(Tile tile, int index, int worldX, int worldY) {
+        if (((worldX >> TILE_SIZE_BITS) == tile.getX()) && ((worldY >> TILE_SIZE_BITS) == tile.getY())) {
+            return tile.getBitLayerValue(islandLayers[index], worldX & TILE_SIZE_MASK, worldY & TILE_SIZE_MASK);
+        } else {
+            return ((Dimension) tileProvider).getBitLayerValueAt(islandLayers[index], worldX, worldY);
+        }
+    }
+
+    /**
+     * The colour of the top of a floating island: the terrain and layers (trees, snow) of its floor dimension, lit by
+     * the slopes of the island rather than of the land below it, with a rim of the colour of its layer around the edge
+     * so that islands stand out from the land.
+     */
+    private int getIslandColour(Tile tile, int index, int worldX, int worldY, long seed) {
+        final Dimension floor = islandFloors[index];
+        final Tile floorTile = islandFloorTiles[index];
+        final int x = worldX & TILE_SIZE_MASK, y = worldY & TILE_SIZE_MASK;
+        final int top = (floorTile != null) ? floorTile.getIntHeight(x, y) : islandLayers[index].getFloorLevel();
+        int colour;
+        if (floorTile != null) {
+            colour = floorTile.getTerrain(x, y).getColour(floor.getSeed(), worldX, worldY, floorTile.getHeight(x, y), top, platform, colourScheme);
+            final Layer[] floorLayers = islandFloorLayers[index];
+            for (int j = 0; j < floorLayers.length; j++) {
+                switch (floorLayers[j].getDataSize()) {
+                    case BIT, BIT_PER_CHUNK -> {
+                        if (floorTile.getBitLayerValue(floorLayers[j], x, y)) {
+                            colour = ((BitLayerRenderer) islandFloorRenderers[index][j]).getPixelColour(worldX, worldY, colour, true);
+                        }
+                    }
+                    case NIBBLE -> {
+                        final int value = floorTile.getLayerValue(floorLayers[j], x, y);
+                        if (value > 0) {
+                            colour = ((NibbleLayerRenderer) islandFloorRenderers[index][j]).getPixelColour(worldX, worldY, colour, value);
+                        }
+                    }
+                    default -> {}
+                }
+            }
+        } else {
+            colour = islandRimColours[index];
+        }
+        // The slopes of the top of the island, for the shading; the edge counts as a drop, which bevels the island
+        boolean edge = false;
+        for (int d = 0; d < 4; d++) {
+            final int dx = NEIGHBOUR_DX[d], dy = NEIGHBOUR_DY[d];
+            final int nx = worldX + dx * islandStep, ny = worldY + dy * islandStep;
+            final int neighbourHeight;
+            if (isIsland(tile, index, nx, ny)) {
+                neighbourHeight = floor.getIntHeightAt(nx, ny, top);
+            } else {
+                neighbourHeight = top - ISLAND_EDGE_DROP;
+                edge = true;
+            }
+            deltas[1 + dx][1 + dy] = (neighbourHeight - top) / islandStep;
+        }
+        for (int[] row: fluidDeltas) {
+            Arrays.fill(row, 0);
+        }
+        if (edge) {
+            colour = ColourUtils.mix(islandRimColours[index], colour, 160);
         }
         return colour;
     }
@@ -531,6 +681,17 @@ public final class TileRenderer {
     private final BiomeRenderer biomeRenderer;
     private final ColourScheme colourScheme;
     private final Map<Layer, LayerRenderer> rendererCache = new HashMap<>();
+    // The floating islands of the tile being drawn, if any
+    private TunnelLayer[] islandLayers;
+    private Dimension[] islandFloors;
+    private Tile[] islandFloorTiles;
+    private Layer[][] islandFloorLayers;
+    private LayerRenderer[][] islandFloorRenderers;
+    private int[] islandRimColours;
+    private int islandStep = 1, shadowDX, shadowDY;
+
+    private static final int[] NEIGHBOUR_DX = {0, -1, 1, 0}, NEIGHBOUR_DY = {-1, 0, 0, 1};
+    private static final int ISLAND_SHADOW_DISTANCE = 8, ISLAND_EDGE_DROP = 4, ISLAND_SHADOW = 150;
     private boolean contourLines = true, hideAllLayers;
     private int contourSeparation = 10;
     private LightOrigin lightOrigin = LightOrigin.NORTHWEST;

@@ -558,6 +558,84 @@ class Terrain3DView extends JComponent {
         blockMesh = null;
         floorMesh = null;
         treeMesh = null;
+        islandMesh = null;
+    }
+
+    /**
+     * The floating islands, as columns from their underside to their top, one for each sample of the model, with only
+     * the faces which are not hidden by the columns next to them. {@code null} if there are none.
+     */
+    private Mesh getIslandMesh() {
+        if ((islandMesh == null) && (model.islands.count > 0)) {
+            final IslandSamples islands = model.islands;
+            final QuadList quads = new QuadList();
+            final int w = model.width, h = model.height;
+            final float base = model.lowestHeight;
+            for (int sy = 0; sy < h; sy++) {
+                for (int sx = 0; sx < w; sx++) {
+                    final int i = sy * w + sx;
+                    if (! islands.isIsland(i)) {
+                        continue;
+                    }
+                    final float top = islands.tops[i] - base, bottom = islands.bottoms[i] - base;
+                    final float x1 = sx, x2 = sx + 1, y1 = sy, y2 = sy + 1;
+                    final int surface = islands.colours[i];
+                    quads.add(KIND_TOP, x1, y1, top, x2, y1, top, x2, y2, top, x1, y2, top, shade(surface, 1.05f), shade(surface, 1.05f));
+                    // The underside, facing down
+                    quads.add(KIND_TOP, x1, y2, bottom, x2, y2, bottom, x2, y1, bottom, x1, y1, bottom, shade(ISLAND_ROCK, 0.5f), shade(ISLAND_ROCK, 0.5f));
+                    // The sides, where the columns next to this one do not cover them: towards the north and the west
+                    // in the light, the others in the shade
+                    addIslandSide(quads, islands, sx, sy - 1, KIND_SIDE_Y, x1, y1, x2, y1, top, bottom, base, surface, 0.92f);
+                    addIslandSide(quads, islands, sx, sy + 1, KIND_SIDE_Y, x2, y2, x1, y2, top, bottom, base, surface, 0.68f);
+                    addIslandSide(quads, islands, sx - 1, sy, KIND_SIDE_X, x1, y2, x1, y1, top, bottom, base, surface, 0.98f);
+                    addIslandSide(quads, islands, sx + 1, sy, KIND_SIDE_X, x2, y1, x2, y2, top, bottom, base, surface, 0.74f);
+                }
+            }
+            islandMesh = quads.toMesh();
+            islandMesh.wallTriangleStart = islandMesh.triangleCount;
+            islandMesh.floor = getMesh().floor;
+        }
+        return islandMesh;
+    }
+
+    /**
+     * The side of an island column towards a neighbouring sample: the parts of it above and below the column of the
+     * neighbour, or all of it if there is no island there. The top few blocks are soil, the rest rock.
+     */
+    private void addIslandSide(QuadList quads, IslandSamples islands, int nx, int ny, byte kind, float xa, float ya, float xb, float yb, float top, float bottom, float base, int surface, float light) {
+        final boolean neighbour = (nx >= 0) && (ny >= 0) && (nx < model.width) && (ny < model.height) && islands.isIsland(ny * model.width + nx);
+        if (! neighbour) {
+            addIslandFace(quads, kind, xa, ya, xb, yb, top, bottom, top, surface, light);
+        } else {
+            final int n = ny * model.width + nx;
+            final float neighbourTop = islands.tops[n] - base, neighbourBottom = islands.bottoms[n] - base;
+            if (top > neighbourTop) {
+                addIslandFace(quads, kind, xa, ya, xb, yb, top, Math.max(bottom, neighbourTop), top, surface, light);
+            }
+            if (bottom < neighbourBottom) {
+                addIslandFace(quads, kind, xa, ya, xb, yb, Math.min(top, neighbourBottom), bottom, top, surface, light);
+            }
+        }
+    }
+
+    private static void addIslandFace(QuadList quads, byte kind, float xa, float ya, float xb, float yb, float upper, float lower, float top, int surface, float light) {
+        if (upper <= lower) {
+            return;
+        }
+        quads.add(kind, xa, ya, upper, xb, yb, upper, xb, yb, lower, xa, ya, lower, shade(islandSideColour(top - upper, surface), light), shade(islandSideColour(top - lower, surface), light * 0.85f));
+    }
+
+    /**
+     * The colour of the side of an island some way below its top: the surface, then soil, then rock.
+     */
+    private static int islandSideColour(float depth, int surface) {
+        if (depth < 1) {
+            return surface;
+        } else if (depth < 4) {
+            return ISLAND_SOIL;
+        } else {
+            return blend(ISLAND_SOIL, ISLAND_ROCK, Math.min(1, (depth - 4) / 4));
+        }
     }
 
     /**
@@ -1114,6 +1192,10 @@ class Terrain3DView extends JComponent {
             drawMesh(blockMesh, null, BLOCK_FACES, camera, pixels, w, h, horizon);
             drawBlockEdges(pixels, w, h, camera);
         }
+        final Mesh islandMesh = getIslandMesh();
+        if (islandMesh != null) {
+            drawMesh(islandMesh, null, ISLAND_FACES, camera, pixels, w, h, horizon);
+        }
         final Mesh treeMesh = showTrees ? getTreeMesh() : null;
         if (treeMesh != null) {
             drawMesh(treeMesh, null, TREE_FACES, camera, pixels, w, h, horizon);
@@ -1591,7 +1673,7 @@ class Terrain3DView extends JComponent {
     }
 
     private TerrainModel model, detail;
-    private Mesh mesh, blockMesh, treeMesh;
+    private Mesh mesh, blockMesh, treeMesh, islandMesh;
     private volatile Camera camera;
     private float[] depthBuffer, heightBuffer;
     private int[] faceBuffer;
@@ -1629,7 +1711,8 @@ class Terrain3DView extends JComponent {
     /**
      * The face numbers of the block mesh start here, to tell them apart from those of the smooth surface.
      */
-    private static final int BLOCK_FACES = 1 << 30, TREE_FACES = 1 << 29;
+    private static final int BLOCK_FACES = 1 << 30, TREE_FACES = 1 << 29, ISLAND_FACES = 1 << 28;
+    private static final int ISLAND_SOIL = 0x7a5a3c, ISLAND_ROCK = 0x77746f;
     private static final byte KIND_TOP = 0, KIND_SIDE_X = 1, KIND_SIDE_Y = 2, KIND_WATER = 3, KIND_WALL = 4;
     private static final int MAX_SHADOW_STEPS = 600;
     private static final int FLOOR_COLOUR = 0x2b2a28;

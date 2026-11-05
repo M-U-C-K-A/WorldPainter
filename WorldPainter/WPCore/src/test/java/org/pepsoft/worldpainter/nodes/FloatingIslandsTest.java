@@ -62,6 +62,45 @@ public class FloatingIslandsTest {
     }
 
     /**
+     * Specks of a few columns around the islands are taken away and pinholes through them are filled, but the islands
+     * themselves and small islands of their own stay.
+     */
+    @Test
+    public void testSpecksAndPinholesAreTidiedAway() {
+        final Dimension dimension = TestData.createDimension(new Rectangle(0, 0, 2 * TILE_SIZE, 2 * TILE_SIZE), 62);
+        final TunnelLayer layer = new TunnelLayer("Islands", TunnelLayer.LayerMode.FLOATING, Color.YELLOW, dimension.getWorld().getPlatform());
+        // A large island across the tiles, with a pinhole in it; a speck of three columns; and a small island of 15 x 15
+        for (int x = 100; x < 160; x++) {
+            for (int y = 100; y < 160; y++) {
+                dimension.setBitLayerValueAt(layer, x, y, ! ((x >= 120) && (x < 123) && (y >= 120) && (y < 123)));
+            }
+        }
+        for (int x = 20; x < 23; x++) {
+            dimension.setBitLayerValueAt(layer, x, 20, true);
+        }
+        for (int x = 200; x < 215; x++) {
+            for (int y = 30; y < 45; y++) {
+                dimension.setBitLayerValueAt(layer, x, y, true);
+            }
+        }
+        NodeGraphOperation.tidyIslands(dimension, layer, dimension.getTiles(), NodeGraphOperation.MIN_ISLAND_AREA);
+        assertFalse(dimension.getBitLayerValueAt(layer, 21, 20));
+        assertTrue(dimension.getBitLayerValueAt(layer, 121, 121));
+        assertTrue(dimension.getBitLayerValueAt(layer, 130, 130));
+        assertTrue(dimension.getBitLayerValueAt(layer, 207, 37));
+        assertFalse(dimension.getBitLayerValueAt(layer, 50, 50));
+        int count = 0;
+        for (int x = 0; x < 2 * TILE_SIZE; x++) {
+            for (int y = 0; y < 2 * TILE_SIZE; y++) {
+                if (dimension.getBitLayerValueAt(layer, x, y)) {
+                    count++;
+                }
+            }
+        }
+        assertEquals(60 * 60 + 15 * 15, count);
+    }
+
+    /**
      * Undo takes the islands off the map, which is how the editor knows to take their layer out of the layer panels
      * again, and redo puts them back.
      */

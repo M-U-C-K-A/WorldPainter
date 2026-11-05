@@ -21,7 +21,7 @@ The roadmap is followed on GitHub, on the [roadmap board](https://github.com/use
 - [ ] [Auto-paint and auto-biome rules](https://github.com/M-U-C-K-A/WorldPainter/issues/15)
 - [ ] [Settings: Apply button, settings which stick, and the new options](https://github.com/M-U-C-K-A/WorldPainter/issues/19) (the Apply button is done)
 - [ ] [Translations, and a choice of language](https://github.com/M-U-C-K-A/WorldPainter/issues/13)
-- [ ] [Show trees, objects and floating islands in the 3D view](https://github.com/M-U-C-K-A/WorldPainter/issues/4)
+- [ ] [Show custom objects in the 3D view](https://github.com/M-U-C-K-A/WorldPainter/issues/4) (trees and floating islands are shown)
 - [ ] [Large maps: memory and processing in chunks](https://github.com/M-U-C-K-A/WorldPainter/issues/5)
 - [ ] [Realistic erosion node](https://github.com/M-U-C-K-A/WorldPainter/issues/6)
 - [ ] [Map templates when creating a world](https://github.com/M-U-C-K-A/WorldPainter/issues/7)
