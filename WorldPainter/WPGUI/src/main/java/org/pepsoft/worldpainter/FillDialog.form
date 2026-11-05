@@ -198,6 +198,13 @@
                           <EmptySpace max="-2" attributes="0"/>
                           <Component id="spinnerTerrainHeight" min="-2" max="-2" attributes="0"/>
                       </Group>
+                      <Group type="102" attributes="0">
+                          <Component id="radioButtonSmooth" min="-2" max="-2" attributes="0"/>
+                          <EmptySpace max="-2" attributes="0"/>
+                          <Component id="spinnerSmoothRadius" min="-2" max="-2" attributes="0"/>
+                          <EmptySpace max="-2" attributes="0"/>
+                          <Component id="checkBoxSmoothHalfBlocks" min="-2" max="-2" attributes="0"/>
+                      </Group>
                   </Group>
                   <EmptySpace min="-2" pref="33" max="-2" attributes="0"/>
               </Group>
@@ -223,6 +230,12 @@
                           <Component id="comboBoxTerrainOperation" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="spinnerTerrainHeight" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
+                  </Group>
+                  <EmptySpace max="-2" attributes="0"/>
+                  <Group type="103" groupAlignment="3" attributes="0">
+                      <Component id="radioButtonSmooth" alignment="3" min="-2" max="-2" attributes="0"/>
+                      <Component id="spinnerSmoothRadius" alignment="3" min="-2" max="-2" attributes="0"/>
+                      <Component id="checkBoxSmoothHalfBlocks" alignment="3" min="-2" max="-2" attributes="0"/>
                   </Group>
                   <EmptySpace max="-2" attributes="0"/>
                   <Group type="103" groupAlignment="1" attributes="0">
@@ -566,6 +579,34 @@
             <Property name="model" type="javax.swing.SpinnerModel" editor="org.netbeans.modules.form.editors2.SpinnerModelEditor">
               <SpinnerModel initial="62" maximum="384" minimum="-64" numberType="java.lang.Integer" stepSize="1" type="number"/>
             </Property>
+            <Property name="enabled" type="boolean" value="false"/>
+          </Properties>
+        </Component>
+        <Component class="javax.swing.JRadioButton" name="radioButtonSmooth">
+          <Properties>
+            <Property name="buttonGroup" type="javax.swing.ButtonGroup" editor="org.netbeans.modules.form.RADComponent$ButtonGroupPropertyEditor">
+              <ComponentRef name="buttonGroup1"/>
+            </Property>
+            <Property name="text" type="java.lang.String" value="smooth the terrain, radius:"/>
+            <Property name="toolTipText" type="java.lang.String" value="Smooth the land everywhere at once, like the Smooth tool: each column moves towards the average height around it"/>
+          </Properties>
+          <Events>
+            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="radioButtonSmoothActionPerformed"/>
+          </Events>
+        </Component>
+        <Component class="javax.swing.JSpinner" name="spinnerSmoothRadius">
+          <Properties>
+            <Property name="model" type="javax.swing.SpinnerModel" editor="org.netbeans.modules.form.editors2.SpinnerModelEditor">
+              <SpinnerModel initial="5" maximum="32" minimum="1" numberType="java.lang.Integer" stepSize="1" type="number"/>
+            </Property>
+            <Property name="toolTipText" type="java.lang.String" value="How far around each column the heights are averaged, in blocks: small to take the edges off, large to soften the shapes of the land"/>
+            <Property name="enabled" type="boolean" value="false"/>
+          </Properties>
+        </Component>
+        <Component class="javax.swing.JCheckBox" name="checkBoxSmoothHalfBlocks">
+          <Properties>
+            <Property name="text" type="java.lang.String" value="in half blocks"/>
+            <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Also build the smoothed land in half blocks in Minecraft, as the Half Blocks tool does:&lt;br&gt;slabs on stone, cobblestone, sandstone and the like, snow layers on snow&lt;/html&gt;"/>
             <Property name="enabled" type="boolean" value="false"/>
           </Properties>
         </Component>

@@ -19,6 +19,7 @@ import org.pepsoft.worldpainter.biomeschemes.BiomeHelper;
 import org.pepsoft.worldpainter.biomeschemes.CustomBiomeManager;
 import org.pepsoft.worldpainter.layers.*;
 import org.pepsoft.worldpainter.operations.Filter;
+import org.pepsoft.worldpainter.operations.GlobalSmooth;
 import org.pepsoft.worldpainter.panels.BrushOptions.Listener;
 import org.pepsoft.worldpainter.panels.BrushOptions.MapSelectionListener;
 import org.pepsoft.worldpainter.selection.SelectionBlock;
@@ -206,7 +207,9 @@ public class FillDialog extends WPDialogWithPaintSelection implements Listener, 
         buttonFillBiomeSelectOnMap.setEnabled(radioButtonBiome.isSelected());
         comboBoxTerrainOperation.setEnabled(radioButtonTerrainHeight.isSelected());
         spinnerTerrainHeight.setEnabled(radioButtonTerrainHeight.isSelected());
-        buttonFill.setEnabled(radioButtonTerrain.isSelected() || radioButtonSetLayer.isSelected() || radioButtonClearLayer.isSelected() || radioButtonInvertLayer.isSelected() || radioButtonBiome.isSelected() || radioButtonResetBiomes.isSelected() || radioButtonResetWater.isSelected() || radioButtonResetTerrain.isSelected() || radioButtonMakeBiomesPermanent.isSelected() || radioButtonAddToSelection.isSelected() || radioButtonRemoveFromSelection.isSelected() || radioButtonTerrainHeight.isSelected());
+        spinnerSmoothRadius.setEnabled(radioButtonSmooth.isSelected());
+        checkBoxSmoothHalfBlocks.setEnabled(radioButtonSmooth.isSelected());
+        buttonFill.setEnabled(radioButtonSmooth.isSelected() || radioButtonTerrain.isSelected() || radioButtonSetLayer.isSelected() || radioButtonClearLayer.isSelected() || radioButtonInvertLayer.isSelected() || radioButtonBiome.isSelected() || radioButtonResetBiomes.isSelected() || radioButtonResetWater.isSelected() || radioButtonResetTerrain.isSelected() || radioButtonMakeBiomesPermanent.isSelected() || radioButtonAddToSelection.isSelected() || radioButtonRemoveFromSelection.isSelected() || radioButtonTerrainHeight.isSelected());
     }
     
     private void fill() {
@@ -239,6 +242,8 @@ public class FillDialog extends WPDialogWithPaintSelection implements Listener, 
                         return "Adding to selection";
                     } else if (radioButtonRemoveFromSelection.isSelected()) {
                         return "Removing from selection";
+                    } else if (radioButtonSmooth.isSelected()) {
+                        return checkBoxSmoothHalfBlocks.isSelected() ? "Smoothing the terrain in half blocks" : "Smoothing the terrain";
                     } else if (radioButtonTerrainHeight.isSelected()) {
                         return switch ((String) comboBoxTerrainOperation.getSelectedItem()) {
                             case "raise" -> "Raising terrain level to " + spinnerTerrainHeight.getValue();
@@ -276,6 +281,8 @@ public class FillDialog extends WPDialogWithPaintSelection implements Listener, 
                         removeFromSelection(progressReceiver);
                     } else if (radioButtonTerrainHeight.isSelected()) {
                         changeTerrainHeight(progressReceiver);
+                    } else if (radioButtonSmooth.isSelected()) {
+                        GlobalSmooth.smooth(dimension, (Integer) spinnerSmoothRadius.getValue(), filter, checkBoxSmoothHalfBlocks.isSelected(), progressReceiver);
                     }
                     return dimension;
                 }
@@ -985,6 +992,9 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
         radioButtonTerrainHeight = new javax.swing.JRadioButton();
         comboBoxTerrainOperation = new javax.swing.JComboBox<>();
         spinnerTerrainHeight = new javax.swing.JSpinner();
+        radioButtonSmooth = new javax.swing.JRadioButton();
+        spinnerSmoothRadius = new javax.swing.JSpinner();
+        checkBoxSmoothHalfBlocks = new javax.swing.JCheckBox();
         jLabel3 = new javax.swing.JLabel();
         jLabel4 = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
@@ -1194,6 +1204,23 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
         spinnerTerrainHeight.setModel(new javax.swing.SpinnerNumberModel(62, -64, 384, 1));
         spinnerTerrainHeight.setEnabled(false);
 
+        buttonGroup1.add(radioButtonSmooth);
+        radioButtonSmooth.setText("smooth the terrain, radius:");
+        radioButtonSmooth.setToolTipText("Smooth the land everywhere at once, like the Smooth tool: each column moves towards the average height around it");
+        radioButtonSmooth.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                radioButtonSmoothActionPerformed(evt);
+            }
+        });
+
+        spinnerSmoothRadius.setModel(new javax.swing.SpinnerNumberModel(5, 1, 32, 1));
+        spinnerSmoothRadius.setToolTipText("How far around each column the heights are averaged, in blocks: small to take the edges off, large to soften the shapes of the land");
+        spinnerSmoothRadius.setEnabled(false);
+
+        checkBoxSmoothHalfBlocks.setText("in half blocks");
+        checkBoxSmoothHalfBlocks.setToolTipText("<html>Also build the smoothed land in half blocks in Minecraft, as the Half Blocks tool does:<br>slabs on stone, cobblestone, sandstone and the like, snow layers on snow</html>");
+        checkBoxSmoothHalfBlocks.setEnabled(false);
+
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
@@ -1244,7 +1271,13 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(comboBoxTerrainOperation, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(spinnerTerrainHeight, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                        .addComponent(spinnerTerrainHeight, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addComponent(radioButtonSmooth)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(spinnerSmoothRadius, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(checkBoxSmoothHalfBlocks)))
                 .addGap(33, 33, 33))
         );
         jPanel1Layout.setVerticalGroup(
@@ -1265,6 +1298,11 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
                     .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                         .addComponent(comboBoxTerrainOperation, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addComponent(spinnerTerrainHeight, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(radioButtonSmooth)
+                    .addComponent(spinnerSmoothRadius, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(checkBoxSmoothHalfBlocks))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addGroup(jPanel1Layout.createSequentialGroup()
@@ -1533,6 +1571,10 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
         selectOnMap(comboBoxBiome, BIOME);
     }//GEN-LAST:event_buttonFillBiomeSelectOnMapActionPerformed
 
+    private void radioButtonSmoothActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_radioButtonSmoothActionPerformed
+        setControlStates();
+    }//GEN-LAST:event_radioButtonSmoothActionPerformed
+
     private void radioButtonTerrainHeightActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_radioButtonTerrainHeightActionPerformed
         setControlStates();
     }//GEN-LAST:event_radioButtonTerrainHeightActionPerformed
@@ -1584,6 +1626,9 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
     private javax.swing.JRadioButton radioButtonTerrainHeight;
     private javax.swing.JSlider sliderLayerValue;
     private javax.swing.JSpinner spinnerTerrainHeight;
+    private javax.swing.JRadioButton radioButtonSmooth;
+    private javax.swing.JSpinner spinnerSmoothRadius;
+    private javax.swing.JCheckBox checkBoxSmoothHalfBlocks;
     // End of variables declaration//GEN-END:variables
 
     private final ColourScheme colourScheme;

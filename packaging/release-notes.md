@@ -4,6 +4,7 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 ## New in this version
 
+- **Smooth the whole map at once**: *Global operations* can smooth the terrain everywhere, with a radius, optionally in half blocks (slabs and snow layers), within the limits of its filters (selection, heights, terrain, slope); undone in one go
 - **Large maps**: the map zooms out to 1:64 (1.56%) instead of 1:16, so that a map of 40,000 blocks fits on the screen, and draws faster when zoomed out; the walking distances also show several days and nights of walking on large maps, as far as it takes to cross the map
 - **Fix**: the walking distances no longer leave bits of their rings behind on the map when the mouse moves
 - **Floating islands you can see**: the map draws the tops of the islands with their terrain, trees and relief, a rim of the colour of their layer and their shadows on the land; the 3D view shows them floating, with their rocky undersides and their trees; specks of a few blocks around them and pinholes through them are tidied away when they are made
