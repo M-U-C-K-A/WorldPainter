@@ -141,8 +141,17 @@ public final class TileRenderer {
 //        synchronized (tile) {
 
         final int tileX = tile.getX(), tileY = tile.getY();
+        // Zoomed out only one block in so many is drawn, so only its height and those of the blocks next to it (for the
+        // shading) are needed, unless the whole tile is compared with another one below
+        final int sampleMask = ((zoom < 0) && (! renderCeilingIntersection) && (! renderTunnelRoofIntersection)) ? ((1 << -zoom) - 1) : 0;
         for (int x = 0; x < TILE_SIZE; x++) {
+            if ((sampleMask != 0) && (! isSampledOrNextToIt(x, sampleMask))) {
+                continue;
+            }
             for (int y = 0; y < TILE_SIZE; y++) {
+                if ((sampleMask != 0) && (! isSampledOrNextToIt(y, sampleMask))) {
+                    continue;
+                }
                 final float height = tile.getHeight(x, y);
                 floatHeightCache[x | (y << TILE_SIZE_BITS)] = height;
                 intHeightCache[x | (y << TILE_SIZE_BITS)] = Math.round(height);
@@ -417,6 +426,17 @@ public final class TileRenderer {
             }
         }
         return colour;
+    }
+
+    /**
+     * Whether a coordinate in a tile is drawn when zoomed out, or is next to one which is.
+     *
+     * @param coordinate The coordinate in the tile.
+     * @param sampleMask The scale of the zoom minus one: one coordinate in every {@code sampleMask + 1} is drawn.
+     */
+    private static boolean isSampledOrNextToIt(int coordinate, int sampleMask) {
+        final int offset = coordinate & sampleMask;
+        return (offset <= 1) || (offset == sampleMask);
     }
 
     private int getNeighbourHeight(Tile tile, int x, int y, int dx, int dy) {

@@ -49,7 +49,7 @@ The window is divided into areas, as in Blender. At the left of the header of ea
 - **Close** an area with *Close area* in its menu, or hold <kbd>Shift</kbd>: the ⋮ button of each area turns into a red bin which closes it with one click.
 - **Detach** an area into a window of its own, which floats over the main window like picture in picture, with the button in its header or by dragging the header out of the window. Its pin keeps it in front of other applications too; closing it, or dragging its header back onto the main window, puts it back.
 
-What is under the mouse (its location, height, terrain, biome…) and the zoom are at the foot of the map, since they belong to it; another view of the map has its own zoom. **View › Panels** shows or hides each page, and **View › Area** has the commands for the area you last clicked in.
+What is under the mouse (its location, height, terrain, biome…) and the zoom are at the foot of the map, since they belong to it; another view of the map has its own zoom. The map zooms out to 1:64 (1.56%), far enough to see a map of 40,000 blocks whole. The **walking distances** button of the toolbar draws around the mouse how far you walk in five minutes, in a day and in a day and a night; on large maps also in several days and nights, as far as it takes to cross the map. **View › Panels** shows or hides each page, and **View › Area** has the commands for the area you last clicked in.
 
 ## Workspaces
 

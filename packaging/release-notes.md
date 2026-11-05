@@ -4,6 +4,11 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 ## New in this version
 
+- **Large maps**: the map zooms out to 1:64 (1.56%) instead of 1:16, so that a map of 40,000 blocks fits on the screen, and draws faster when zoomed out; the walking distances also show several days and nights of walking on large maps, as far as it takes to cross the map
+- **Fix**: the walking distances no longer leave bits of their rings behind on the map when the mouse moves
+
+## New in 2.27.2-modernised.11
+
 - **Manage your own brushes**: add brushes from images, make, rename and delete groups, move a brush to another group by dragging it onto its page, tab or heading (or with a right click), all without restarting; the custom brushes of the original WorldPainter are copied the first time
 - **Show all at once**: an area can show all the pages of its kind one below the other, such as all your groups of brushes or all your layer palettes, instead of one at a time with tabs
 - **Curvature** in the brush settings: limit a brush to hollows (valleys, dips) or to bumps (ridges, peaks)

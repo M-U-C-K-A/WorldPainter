@@ -3127,8 +3127,7 @@ public final class App extends JFrame implements BrushControl,
     private void updateZoomLabel() {
         double factor = Math.pow(2.0, view.getZoom());
         final float scale = (dimension != null) ? dimension.getScale() : 1.0f;
-        int zoomPercentage = (int) (100 * factor / scale);
-        zoomLabel.setText(zoomPercentage + "%");
+        zoomLabel.setText(WorldPainter.formatZoom(100 * factor / scale));
         glassPane.setScale((float) factor / scale);
     }
 
@@ -3331,15 +3330,15 @@ public final class App extends JFrame implements BrushControl,
                 if (e.isControlDown() || e.isMetaDown()) {
                     int oldZoom = view.getZoom(), zoom;
                     if (e.getWheelRotation() < 0) {
-                        zoom = Math.min(oldZoom - e.getWheelRotation(), 6);
+                        zoom = Math.min(oldZoom - e.getWheelRotation(), WorldPainter.MAX_ZOOM);
                     } else {
-                        zoom = Math.max(oldZoom - e.getWheelRotation(), -4);
+                        zoom = Math.max(oldZoom - e.getWheelRotation(), WorldPainter.MIN_ZOOM);
                     }
                     if (zoom != oldZoom) {
                         view.setZoom(zoom, e.getX(), e.getY());
                         updateZoomLabel();
-                        ACTION_ZOOM_IN.setEnabled(zoom < 6);
-                        ACTION_ZOOM_OUT.setEnabled(zoom > -4);
+                        ACTION_ZOOM_IN.setEnabled(zoom < WorldPainter.MAX_ZOOM);
+                        ACTION_ZOOM_OUT.setEnabled(zoom > WorldPainter.MIN_ZOOM);
                         ACTION_ZOOM_RESET.setEnabled(zoom != 0);
                     }
                 } else if (e.isAltDown() || e.isAltGraphDown()) {
@@ -7640,7 +7639,7 @@ public final class App extends JFrame implements BrushControl,
             view.setZoom(zoom);
             updateZoomLabel();
 //            view.moveTo(location);
-            if (zoom == 6) {
+            if (zoom >= WorldPainter.MAX_ZOOM) {
                 setEnabled(false);
             }
             ACTION_ZOOM_OUT.setEnabled(true);
@@ -7699,7 +7698,7 @@ public final class App extends JFrame implements BrushControl,
             view.setZoom(zoom);
             updateZoomLabel();
 //            view.moveTo(location);
-            if (zoom == -4) {
+            if (zoom <= WorldPainter.MIN_ZOOM) {
                 setEnabled(false);
             }
             ACTION_ZOOM_IN.setEnabled(true);

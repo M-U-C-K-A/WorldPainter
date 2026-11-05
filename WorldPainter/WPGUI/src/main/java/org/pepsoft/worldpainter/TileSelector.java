@@ -54,7 +54,7 @@ public class TileSelector extends javax.swing.JPanel {
             if (rotation < 0) {
                 zoom = Math.min(zoom + -rotation, 0);
             } else {
-                zoom = Math.max(zoom - rotation, -4);
+                zoom = Math.max(zoom - rotation, WorldPainter.MIN_ZOOM);
             }
             viewer.setZoom(zoom);
         });
@@ -178,7 +178,7 @@ public class TileSelector extends javax.swing.JPanel {
             @Override
             public void actionPerformed(ActionEvent e) {
                 int zoom = viewer.getZoom();
-                if (zoom > -4) {
+                if (zoom > WorldPainter.MIN_ZOOM) {
                     viewer.setZoom(zoom - 1);
                 }
             }

@@ -170,7 +170,7 @@ final class MapCopy {
 
     private void updateZoomLabel() {
         final float scale = (view.getDimension() != null) ? view.getDimension().getScale() : 1.0f;
-        zoomLabel.setText(Math.round(100 * Math.pow(2.0, view.getZoom()) / scale) + "%");
+        zoomLabel.setText(WorldPainter.formatZoom(100 * Math.pow(2.0, view.getZoom()) / scale));
     }
 
     /**
@@ -254,5 +254,5 @@ final class MapCopy {
     private final Timer syncTimer;
     private JLabel locationLabel, zoomLabel;
 
-    private static final int MIN_ZOOM = -4, MAX_ZOOM = 6;
+    private static final int MIN_ZOOM = WorldPainter.MIN_ZOOM, MAX_ZOOM = WorldPainter.MAX_ZOOM;
 }

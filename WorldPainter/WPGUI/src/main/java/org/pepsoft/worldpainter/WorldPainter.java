@@ -226,7 +226,7 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
         if (drawWalkingDistance != this.drawWalkingDistance) {
             this.drawWalkingDistance = drawWalkingDistance;
             firePropertyChange("drawWalkingDistance", !drawWalkingDistance, drawWalkingDistance);
-            final int scaledRadius = (dimension != null) ? (int) Math.ceil(DAY_NIGHT_WALK_DISTANCE_RADIUS / dimension.getScale()) : DAY_NIGHT_WALK_DISTANCE_RADIUS;
+            final int scaledRadius = (dimension != null) ? (int) Math.ceil(getLargestWalkingDistance() / dimension.getScale()) : getLargestWalkingDistance();
             repaintWorld(mouseX - scaledRadius, mouseY - scaledRadius, (2 * scaledRadius) + 1, (2 * scaledRadius) + 1);
         }
     }
@@ -662,7 +662,7 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
                 }
             }
             if (drawWalkingDistance) {
-                final int scaledRadius = (int) Math.ceil(viewDistance / dimension.getScale());
+                final int scaledRadius = (int) Math.ceil(getLargestWalkingDistance() / dimension.getScale());
                 Rectangle walkingDistanceArea = new Rectangle(-scaledRadius, -scaledRadius, scaledRadius * 2, scaledRadius * 2);
                 if (repaintArea != null) {
                     repaintArea = repaintArea.union(walkingDistanceArea);
@@ -907,16 +907,35 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
             if (dashed) {
                 g2.setStroke(new BasicStroke(onePixel, CAP_SQUARE, JOIN_MITER, 10.0f, new float[] { 19 * onePixel, 21 * onePixel }, 0));
             }
-            int scaledRadius = (int) Math.ceil(DAY_NIGHT_WALK_DISTANCE_RADIUS / dimension.getScale());
-            g2.drawOval(mouseX - scaledRadius, mouseY - scaledRadius, scaledRadius * 2, scaledRadius * 2);
-            setFont(NORMAL_FONT.deriveFont(10 * onePixel));
-            g2.drawString("day + night", mouseX - scaledRadius + onePixel * 3, mouseY);
-            scaledRadius = (int) Math.ceil(DAY_WALK_DISTANCE_RADIUS / dimension.getScale());
-            g2.drawOval(mouseX - scaledRadius, mouseY - scaledRadius, scaledRadius * 2, scaledRadius * 2);
-            g2.drawString("1 day", mouseX - scaledRadius + onePixel * 3, mouseY);
-            scaledRadius = (int) Math.ceil(FIVE_MINUTE_WALK_DISTANCE_RADIUS / dimension.getScale());
-            g2.drawOval(mouseX - scaledRadius, mouseY - scaledRadius, scaledRadius * 2, scaledRadius * 2);
-            g2.drawString("5 min.", mouseX - scaledRadius + onePixel * 3, mouseY);
+            g2.setFont(NORMAL_FONT.deriveFont(10 * onePixel));
+            final FontMetrics fontMetrics = g2.getFontMetrics();
+            // From the smallest out; on large maps also the distances walked in several days and nights, as far as it
+            // takes to cross the map. A label is left out where the ring is too close to the one inside it for it to
+            // fit, as when zoomed out far
+            final int days = getWalkingDays();
+            int previousRadius = 0;
+            for (int ring = -2; ring <= days; ring++) {
+                final int radius;
+                final String label;
+                if (ring == -2) {
+                    radius = FIVE_MINUTE_WALK_DISTANCE_RADIUS;
+                    label = "5 min.";
+                } else if (ring == -1) {
+                    radius = DAY_WALK_DISTANCE_RADIUS;
+                    label = "1 day";
+                } else if (ring == 0) {
+                    continue;
+                } else {
+                    radius = ring * DAY_NIGHT_WALK_DISTANCE_RADIUS;
+                    label = (ring == 1) ? "day + night" : (ring + " days + nights");
+                }
+                final int scaledRadius = (int) Math.ceil(radius / dimension.getScale());
+                g2.drawOval(mouseX - scaledRadius, mouseY - scaledRadius, scaledRadius * 2, scaledRadius * 2);
+                if ((scaledRadius - previousRadius) >= (fontMetrics.stringWidth(label) + onePixel * 6)) {
+                    g2.drawString(label, mouseX - scaledRadius + onePixel * 3, mouseY);
+                }
+                previousRadius = scaledRadius;
+            }
         }
     }
 
@@ -929,6 +948,25 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
         final Rectangle bounds = brushArea();
         bounds.translate(mouseX, mouseY);
         return bounds;
+    }
+
+    /**
+     * How many days and nights of walking the walking distances show: one, or on large maps as many as it takes to
+     * walk across the map, up to {@link #MAX_WALKING_DAYS}.
+     */
+    private int getWalkingDays() {
+        if (dimension == null) {
+            return 1;
+        }
+        final long sizeInBlocks = (long) Math.ceil(Math.max(dimension.getWidth(), dimension.getHeight()) * TILE_SIZE * dimension.getScale());
+        return (int) Math.max(1, Math.min(MAX_WALKING_DAYS, (sizeInBlocks + DAY_NIGHT_WALK_DISTANCE_RADIUS - 1) / DAY_NIGHT_WALK_DISTANCE_RADIUS));
+    }
+
+    /**
+     * The radius in blocks of the largest walking distance which is drawn.
+     */
+    private int getLargestWalkingDistance() {
+        return getWalkingDays() * DAY_NIGHT_WALK_DISTANCE_RADIUS;
     }
 
     /**
@@ -1199,6 +1237,20 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
     private static final int FIVE_MINUTE_WALK_DISTANCE_RADIUS = 1280;
     private static final int DAY_WALK_DISTANCE_RADIUS = 3328;
     private static final int DAY_NIGHT_WALK_DISTANCE_RADIUS = 5120;
+    private static final int MAX_WALKING_DAYS = 12;
+
+    /**
+     * How far the map can be zoomed out and in: 1:64 to 64:1.
+     */
+    public static final int MIN_ZOOM = -6, MAX_ZOOM = 6;
+
+    /**
+     * A zoom percentage as shown to the user: whole numbers, with decimals when zoomed out far, where it is less than
+     * ten percent (1:64 is 1.56%).
+     */
+    public static String formatZoom(double percentage) {
+        return ((percentage >= 10) ? Long.toString(Math.round(percentage)) : new java.text.DecimalFormat("0.##").format(percentage)) + "%";
+    }
     private static final Font NORMAL_FONT = new Font("SansSerif", Font.PLAIN, 10);
     /**
      * Whether the map changed while the view was not in a window, so that it must draw everything again when it is.
