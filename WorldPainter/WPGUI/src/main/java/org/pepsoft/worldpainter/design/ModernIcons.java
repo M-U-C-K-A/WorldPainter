@@ -72,6 +72,17 @@ public final class ModernIcons {
     }
 
     /**
+     * An icon which is the original icon in the Classic theme and the line icon in the Modern and Glass themes; or
+     * whichever of the two there is.
+     */
+    public static Icon themed(Icon classic, Icon modern) {
+        if ((classic != null) && (modern != null)) {
+            return new ThemedIcon(classic, modern, null);
+        }
+        return (modern != null) ? modern : classic;
+    }
+
+    /**
      * An icon which is the given icon in the Classic theme and the named line icon in the Modern theme.
      */
     public static Icon themed(Icon classic, String name) {

@@ -5862,7 +5862,9 @@ public final class App extends JFrame implements BrushControl,
     }
 
     private static void setActionIcon(Action action, String iconName) {
-        final Icon icon = Icons.get(iconName, 18);
+        // The original icon of WorldPainter, if the action has one, in the Classic theme
+        final Object original = action.getValue(Action.SMALL_ICON);
+        final Icon icon = org.pepsoft.worldpainter.design.ModernIcons.themed((original instanceof Icon) ? (Icon) original : null, Icons.get(iconName, 18));
         action.putValue(Action.SMALL_ICON, icon);
         action.putValue(Action.LARGE_ICON_KEY, icon);
     }
@@ -6222,10 +6224,10 @@ public final class App extends JFrame implements BrushControl,
         }
         button.setMargin(App.BUTTON_INSETS);
         final String modernIcon = modernIconFor(operation);
-        if (modernIcon != null) {
-            button.setIcon(Icons.get(modernIcon, 18));
-        } else if (icon != null) {
-            button.setIcon(new ImageIcon(icon));
+        // The line icon in the Modern and Glass themes, the original icon of WorldPainter in the Classic theme
+        final Icon themedIcon = org.pepsoft.worldpainter.design.ModernIcons.themed((icon != null) ? new ImageIcon(icon) : null, (modernIcon != null) ? Icons.get(modernIcon, 18) : null);
+        if (themedIcon != null) {
+            button.setIcon(themedIcon);
         }
         styleToolButton(button);
         if (mnemonic != 0) {
@@ -6396,10 +6398,9 @@ public final class App extends JFrame implements BrushControl,
             }
             button.setMargin(new Insets(2, 2, 2, 2));
             final String modernIcon = modernIconFor(layer);
-            if (modernIcon != null) {
-                button.setIcon(Icons.get(modernIcon, 16));
-            } else if (layer.getIcon() != null) {
-                button.setIcon(new ImageIcon(layer.getIcon()));
+            final Icon themedIcon = org.pepsoft.worldpainter.design.ModernIcons.themed((layer.getIcon() != null) ? new ImageIcon(layer.getIcon()) : null, (modernIcon != null) ? Icons.get(modernIcon, 16) : null);
+            if (themedIcon != null) {
+                button.setIcon(themedIcon);
             }
             button.setToolTipText(richToolTip(layer.getName(), layer.getDescription(), null));
             // TODO: make this work again, but with Ctrl + Alt or something
@@ -6422,7 +6423,7 @@ public final class App extends JFrame implements BrushControl,
             return createLayerRow(layer, true, createSoloCheckbox, button);
         } else {
             final String modernIcon = modernIconFor(layer);
-            JLabel label = new JLabel(layer.getName(), (modernIcon != null) ? Icons.get(modernIcon, 16) : new ImageIcon(layer.getIcon()), JLabel.LEADING);
+            JLabel label = new JLabel(layer.getName(), org.pepsoft.worldpainter.design.ModernIcons.themed((layer.getIcon() != null) ? new ImageIcon(layer.getIcon()) : null, (modernIcon != null) ? Icons.get(modernIcon, 16) : null), JLabel.LEADING);
             label.putClientProperty(KEY_HELP_KEY, "Layer/" + layer.getId());
             return createLayerRow(layer, true, createSoloCheckbox, label);
         }

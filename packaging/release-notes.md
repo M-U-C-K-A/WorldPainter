@@ -4,6 +4,7 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 ## New in this version
 
+- **A Classic design that really is classic**: the look of a classic desktop application, as WorldPainter used to have, instead of a variant of Modern: a grey window (charcoal in the dark), square controls with clear borders, buttons with a slight gradient, title bars on the areas, scroll bars with arrows, card shaped tabs, yellow tooltips, the font of the system and the original colour icons of WorldPainter
 - **Smooth the whole map at once**: *Global operations* can smooth the terrain everywhere, with a radius, optionally in half blocks (slabs and snow layers), within the limits of its filters (selection, heights, terrain, slope); undone in one go
 - **Large maps**: the map zooms out to 1:64 (1.56%) instead of 1:16, so that a map of 40,000 blocks fits on the screen, and draws faster when zoomed out; the walking distances also show several days and nights of walking on large maps, as far as it takes to cross the map
 - **Fix**: the walking distances no longer leave bits of their rings behind on the map when the mouse moves

@@ -354,6 +354,25 @@ final class AreaPanel extends JPanel {
      * The header of the area.
      */
     private final class Header extends JPanel {
+        /**
+         * The Classic theme draws the headers as title bars, with a gradient; the others leave them flat.
+         */
+        @Override
+        protected void paintComponent(Graphics g) {
+            final Color top = UIManager.getColor("WorldPainter.headerTop"), bottom = UIManager.getColor("WorldPainter.headerBottom");
+            if ((top == null) || (bottom == null)) {
+                super.paintComponent(g);
+                return;
+            }
+            final Graphics2D g2 = (Graphics2D) g.create();
+            try {
+                g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
+                g2.fillRect(0, 0, getWidth(), getHeight());
+            } finally {
+                g2.dispose();
+            }
+        }
+
         Header() {
             super(null);
             setLayout(new HeaderLayout());

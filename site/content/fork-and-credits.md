@@ -14,7 +14,7 @@ It is not an official release of WorldPainter, and it is not supported by its au
 ## Under the hood
 
 - Java 21, and native applications built with jpackage for macOS, Windows and Linux
-- The interface uses FlatLaf, with three custom designs (Modern, Classic and Glass, light and dark), the Geist typeface and Lucide icons
+- The interface uses FlatLaf, with three custom designs (Modern, Classic and Glass, light and dark), the Geist typeface and Lucide icons (Modern and Glass) and the original icons of WorldPainter (Classic)
 - The biomes Minecraft generates are computed by a Java port of Cubiomes
 - The node graph, the 3D view, the paths and the floating islands are new code, in the `nodes`, `view3d`, `paths` and `vanilla` packages
 

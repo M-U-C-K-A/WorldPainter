@@ -241,15 +241,17 @@ public final class ThemeUtils {
             System.setProperty("flatlaf.uiScale", Float.toString(uiScale));
         }
         if (! fontInstalled) {
-            if (GeistFont.install()) {
-                FlatLaf.setPreferredFontFamily(GeistFont.FAMILY);
-                FlatLaf.setPreferredLightFontFamily(GeistFont.FAMILY_LIGHT);
-                FlatLaf.setPreferredSemiboldFontFamily(GeistFont.FAMILY_SEMIBOLD);
-            } else {
+            geistInstalled = GeistFont.install();
+            if (! geistInstalled) {
                 logger.warn("Could not install the Geist font; using the default font of the system");
             }
             fontInstalled = true;
         }
+        // The Classic theme uses the font of the system, as WorldPainter always did; the Modern and Glass themes Geist
+        final boolean geist = geistInstalled && (style != Style.CLASSIC);
+        FlatLaf.setPreferredFontFamily(geist ? GeistFont.FAMILY : null);
+        FlatLaf.setPreferredLightFontFamily(geist ? GeistFont.FAMILY_LIGHT : null);
+        FlatLaf.setPreferredSemiboldFontFamily(geist ? GeistFont.FAMILY_SEMIBOLD : null);
         switch (style) {
             case CLASSIC:
                 if (dark) {
@@ -298,6 +300,7 @@ public final class ThemeUtils {
      */
     public enum Style {MODERN, CLASSIC, GLASS}
 
+    private static boolean geistInstalled;
     private static boolean fontInstalled;
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ThemeUtils.class);
 }
