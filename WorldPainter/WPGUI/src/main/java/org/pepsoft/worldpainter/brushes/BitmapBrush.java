@@ -54,6 +54,13 @@ public final class BitmapBrush extends AbstractBrush {
         image = null;
     }
 
+    /**
+     * The image file the brush was loaded from, or {@code null} if it was not loaded from a file.
+     */
+    public File getImageFile() {
+        return imageFile;
+    }
+
     @Override
     public float getStrength(int dx, int dy) {
         return getData().buffer.getElem(0, dx + radius + (dy + radius) * diameter) / 255f;

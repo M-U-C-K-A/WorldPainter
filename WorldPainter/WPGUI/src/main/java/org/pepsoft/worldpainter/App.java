@@ -2050,10 +2050,25 @@ public final class App extends JFrame implements BrushControl,
     private void loadCustomBrushes() {
         customBrushes = new TreeMap<>();
         if (! Configuration.getInstance().isSafeMode()) {
-            final File brushesDir = new File(Configuration.getConfigDir(), "brushes");
+            final File brushesDir = BrushFolders.getBrushesDir();
+            final Configuration config = Configuration.getInstance();
+            if ((! brushesDir.exists()) && BrushFolders.getOriginalBrushesDir().isDirectory() && (! config.isMessageDisplayed(BRUSHES_IMPORTED_KEY))) {
+                // This version keeps its settings apart from those of the original WorldPainter: bring its custom
+                // brushes along, once
+                try {
+                    final int count = BrushFolders.copyOriginalBrushes();
+                    if (count > 0) {
+                        StartupMessages.addMessage("Your " + count + " custom brushes from WorldPainter were copied here.\n" +
+                                "You can add more, and arrange them in groups,\n" +
+                                "with the menu of the Brushes panel.");
+                    }
+                } catch (IOException e) {
+                    logger.error("I/O error while copying the custom brushes of WorldPainter", e);
+                }
+                config.setMessageDisplayed(BRUSHES_IMPORTED_KEY);
+            }
             if (brushesDir.isDirectory()) {
                 loadCustomBrushes(CUSTOM_BRUSHES_DEFAULT_TITLE, brushesDir);
-                final Configuration config = Configuration.getInstance();
                 if ((customBrushes.size() == 1)
                         && customBrushes.containsKey(CUSTOM_BRUSHES_DEFAULT_TITLE)
                         && (customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE).brushes.size() >= 25)
@@ -2088,11 +2103,13 @@ public final class App extends JFrame implements BrushControl,
 
             private final String[] extensions = ImageIO.getReaderFileSuffixes();
         });
-        if ((files == null) || (files.length == 0)) {
+        if (files == null) {
             // No idea how files could be null since this is only invoked from loadCustomBrushes(), which checks that
             // the path is an existing directory, but it has been observed in the wild
             return;
         }
+        // In the order of their names, so that they keep their places
+        Arrays.sort(files, Comparator.comparing(file -> file.getName().toLowerCase()));
         final List<Brush> brushes = new ArrayList<>();
         BufferedImage icon = null;
         for (File file: files) {
@@ -2116,11 +2133,360 @@ public final class App extends JFrame implements BrushControl,
                 logger.warn("Skipping file " + file + "; it is neither a file nor a directory");
             }
         }
-        if (! brushes.isEmpty()) {
-            customBrushes.put(category, new BrushGroup(category, icon, brushes));
+        if ((! brushes.isEmpty()) || (! category.equals(CUSTOM_BRUSHES_DEFAULT_TITLE))) {
+            // A group of its own (a folder) is shown even while it is empty, so that brushes can be added to it
+            customBrushes.put(category, new BrushGroup(category, icon, brushes, brushesDir));
         }
     }
     
+    /**
+     * Add a page for each group of custom brushes.
+     */
+    private void addCustomBrushPages() {
+        for (Map.Entry<String, BrushGroup> entry: customBrushes.entrySet()) {
+            final boolean defaultGroup = entry.getKey().equals(CUSTOM_BRUSHES_DEFAULT_TITLE);
+            final String key = defaultGroup ? "customBrushesDefault" : ("customBrushes." + entry.getKey());
+            final DockableFrame page = new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), defaultGroup ? "Custom Brushes" : entry.getKey(), GROUP_BRUSHES).withId(key).scrollable()
+                    .withSummary(defaultGroup ? "The brushes you made from your own images." : ("Brushes you made from your own images, in the “" + entry.getKey() + "” group.")).build();
+            page.putClientProperty(KEY_BRUSH_GROUP, entry.getKey());
+            page.putClientProperty(DockableFrame.KEY_ACTIONS, brushGroupActions(entry.getValue()));
+            areaManager.addPage(page);
+            customBrushPageKeys.add(key);
+        }
+    }
+
+    /**
+     * Load the custom brushes again after their folder changed, and put them back in their pages, keeping the brush
+     * which was picked (where it went if it was moved).
+     *
+     * @param moved The brushes which were moved or renamed: their old and new files.
+     */
+    private void reloadCustomBrushes(Map<File, File> moved) {
+        final File brushFile = imageFileOf(brush), toolBrushFile = imageFileOf(toolBrush);
+        for (String key: customBrushPageKeys) {
+            areaManager.removePage(key);
+        }
+        customBrushPageKeys.clear();
+        for (BrushGroup group: customBrushes.values()) {
+            for (Brush oldBrush: group.brushes) {
+                final JToggleButton button = brushButtons.remove(oldBrush);
+                if (button != null) {
+                    brushButtonGroup.remove(button);
+                }
+            }
+        }
+        loadCustomBrushes();
+        addCustomBrushPages();
+        // Pick the same brushes again, in their new places
+        final Brush newBrush = (brushFile != null) ? findCustomBrush(moved.getOrDefault(brushFile, brushFile), SymmetricBrush.PLATEAU_CIRCLE) : brush;
+        final Brush newToolBrush = (toolBrushFile != null) ? findCustomBrush(moved.getOrDefault(toolBrushFile, toolBrushFile), SymmetricBrush.COSINE_CIRCLE) : toolBrush;
+        if ((newBrush != brush) || (newToolBrush != toolBrush)) {
+            brush = newBrush;
+            toolBrush = newToolBrush;
+            final Brush active = (activeOperation instanceof PaintOperation) ? brush : toolBrush;
+            if (activeOperation instanceof BrushOperation) {
+                ((BrushOperation) activeOperation).setBrush((brushRotation == 0) ? active : RotatedBrush.rotate(active, brushRotation));
+            }
+            if (brushButtons.containsKey(active)) {
+                programmaticChange = true;
+                try {
+                    selectBrushButton(active);
+                } finally {
+                    programmaticChange = false;
+                }
+            }
+            view.setBrushShape(active.getBrushShape());
+        }
+    }
+
+    private static File imageFileOf(Brush brush) {
+        return (brush instanceof BitmapBrush) ? ((BitmapBrush) brush).getImageFile() : null;
+    }
+
+    private Brush findCustomBrush(File file, Brush fallback) {
+        for (BrushGroup group: customBrushes.values()) {
+            for (Brush candidate: group.brushes) {
+                if (file.equals(imageFileOf(candidate))) {
+                    return candidate;
+                }
+            }
+        }
+        return fallback;
+    }
+
+    /**
+     * The commands for the brushes in the menu of the area which shows a group of brushes, or the built-in brushes if
+     * {@code group} is {@code null}.
+     */
+    private List<Action> brushGroupActions(BrushGroup group) {
+        final List<Action> actions = new ArrayList<>();
+        final String target = (group != null) ? group.name : CUSTOM_BRUSHES_DEFAULT_TITLE;
+        actions.add(simpleAction((group != null) ? ("Add brushes to “" + displayName(group) + "”…") : "Add brushes…", "plus", () -> addBrushes(target)));
+        actions.add(simpleAction("New brush group…", "folder-plus", this::newBrushGroup));
+        if ((group != null) && (! group.name.equals(CUSTOM_BRUSHES_DEFAULT_TITLE))) {
+            actions.add(simpleAction("Rename group…", "pencil", () -> renameBrushGroup(group)));
+            final Action delete = simpleAction("Delete group…", "trash-2", () -> deleteBrushGroup(group));
+            delete.setEnabled(BrushFolders.canTrash());
+            actions.add(delete);
+        }
+        actions.add(simpleAction("Open the brushes folder", "folder-open", this::openBrushesFolder));
+        if (BrushFolders.getOriginalBrushesDir().isDirectory()) {
+            actions.add(simpleAction("Copy brushes from WorldPainter", "copy", this::copyOriginalBrushes));
+        }
+        return actions;
+    }
+
+    private static Action simpleAction(String name, String icon, Runnable runnable) {
+        final Action action = new AbstractAction(name, Icons.exists(icon) ? Icons.get(icon, 16) : null) {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                runnable.run();
+            }
+        };
+        return action;
+    }
+
+    private static String displayName(BrushGroup group) {
+        return group.name.equals(CUSTOM_BRUSHES_DEFAULT_TITLE) ? "Custom Brushes" : group.name;
+    }
+
+    private File groupDir(String groupName) {
+        final BrushGroup group = customBrushes.get(groupName);
+        return (group != null) ? group.dir : (groupName.equals(CUSTOM_BRUSHES_DEFAULT_TITLE) ? BrushFolders.getBrushesDir() : new File(BrushFolders.getBrushesDir(), groupName));
+    }
+
+    /**
+     * Copy images chosen by the user into a group of brushes.
+     */
+    private void addBrushes(String groupName) {
+        final FileDialog dialog = new FileDialog(this, "Add Brushes", FileDialog.LOAD);
+        dialog.setMultipleMode(true);
+        dialog.setFilenameFilter((dir, name) -> BrushFolders.isImage(new File(dir, name)));
+        dialog.setVisible(true);
+        final File[] files = dialog.getFiles();
+        if ((files == null) || (files.length == 0)) {
+            return;
+        }
+        int count = 0;
+        try {
+            for (File file: files) {
+                if (file.isFile() && BrushFolders.isImage(file)) {
+                    BrushFolders.copyInto(file, groupDir(groupName));
+                    count++;
+                }
+            }
+        } catch (IOException e) {
+            showMessageDialog(this, "The brushes could not be added:\n" + e.getMessage(), "Add Brushes", ERROR_MESSAGE);
+        }
+        if (count > 0) {
+            reloadCustomBrushes(Collections.emptyMap());
+        }
+    }
+
+    private void newBrushGroup() {
+        final String name = JOptionPane.showInputDialog(this, "Name of the new group of brushes:", "New Brush Group", QUESTION_MESSAGE);
+        if (name == null) {
+            return;
+        }
+        try {
+            BrushFolders.createGroup(name);
+            reloadCustomBrushes(Collections.emptyMap());
+        } catch (IOException e) {
+            showMessageDialog(this, e.getMessage(), "New Brush Group", ERROR_MESSAGE);
+        }
+    }
+
+    private void renameBrushGroup(BrushGroup group) {
+        final String name = (String) JOptionPane.showInputDialog(this, "New name of the group:", "Rename Brush Group", QUESTION_MESSAGE, null, null, group.name);
+        if ((name == null) || name.trim().equals(group.name)) {
+            return;
+        }
+        try {
+            final File newDir = BrushFolders.renameGroup(group.dir, name);
+            final Map<File, File> moved = new HashMap<>();
+            for (Brush groupBrush: group.brushes) {
+                final File file = imageFileOf(groupBrush);
+                if (file != null) {
+                    moved.put(file, new File(newDir, file.getName()));
+                }
+            }
+            reloadCustomBrushes(moved);
+        } catch (IOException e) {
+            showMessageDialog(this, "The group could not be renamed:\n" + e.getMessage(), "Rename Brush Group", ERROR_MESSAGE);
+        }
+    }
+
+    private void deleteBrushGroup(BrushGroup group) {
+        if (showConfirmDialog(this, "Move the group “" + group.name + "” and its " + group.brushes.size() + " brushes to the Trash?\nYou can put them back from the Trash.", "Delete Brush Group", OK_CANCEL_OPTION, WARNING_MESSAGE) != OK_OPTION) {
+            return;
+        }
+        try {
+            BrushFolders.trash(group.dir);
+            reloadCustomBrushes(Collections.emptyMap());
+        } catch (IOException e) {
+            showMessageDialog(this, e.getMessage(), "Delete Brush Group", ERROR_MESSAGE);
+        }
+    }
+
+    /**
+     * Move a custom brush to another group.
+     */
+    private void moveBrush(File file, String groupName) {
+        try {
+            final File newFile = BrushFolders.moveInto(file, groupDir(groupName));
+            reloadCustomBrushes(Collections.singletonMap(file, newFile));
+        } catch (IOException e) {
+            showMessageDialog(this, "The brush could not be moved:\n" + e.getMessage(), "Move Brush", ERROR_MESSAGE);
+        }
+    }
+
+    private void removeBrush(File file) {
+        if (showConfirmDialog(this, "Move the brush “" + file.getName() + "” to the Trash?\nYou can put it back from the Trash.", "Remove Brush", OK_CANCEL_OPTION, WARNING_MESSAGE) != OK_OPTION) {
+            return;
+        }
+        try {
+            BrushFolders.trash(file);
+            reloadCustomBrushes(Collections.emptyMap());
+        } catch (IOException e) {
+            showMessageDialog(this, e.getMessage(), "Remove Brush", ERROR_MESSAGE);
+        }
+    }
+
+    private void openBrushesFolder() {
+        final File dir = BrushFolders.getBrushesDir();
+        dir.mkdirs();
+        DesktopUtils.open(dir);
+    }
+
+    private void copyOriginalBrushes() {
+        try {
+            final int count = BrushFolders.copyOriginalBrushes();
+            if (count > 0) {
+                reloadCustomBrushes(Collections.emptyMap());
+            }
+            showMessageDialog(this, (count > 0) ? (count + " brushes were copied from WorldPainter.") : "All the brushes of WorldPainter are already here.", "Copy Brushes from WorldPainter", INFORMATION_MESSAGE);
+        } catch (IOException e) {
+            showMessageDialog(this, "The brushes could not be copied:\n" + e.getMessage(), "Copy Brushes from WorldPainter", ERROR_MESSAGE);
+        }
+    }
+
+    /**
+     * The menu of a custom brush: move it to another group, or remove it.
+     */
+    private JPopupMenu createCustomBrushMenu(File file) {
+        final JPopupMenu menu = new JPopupMenu();
+        final JMenu moveMenu = new JMenu("Move to");
+        moveMenu.setIcon(Icons.get("folder-input", 16));
+        final File currentDir = file.getParentFile();
+        if (! currentDir.equals(BrushFolders.getBrushesDir())) {
+            final JMenuItem item = new JMenuItem("Custom Brushes");
+            item.addActionListener(e -> moveBrush(file, CUSTOM_BRUSHES_DEFAULT_TITLE));
+            moveMenu.add(item);
+        }
+        for (BrushGroup group: customBrushes.values()) {
+            if ((! group.name.equals(CUSTOM_BRUSHES_DEFAULT_TITLE)) && (! group.dir.equals(currentDir))) {
+                final JMenuItem item = new JMenuItem(group.name);
+                item.addActionListener(e -> moveBrush(file, group.name));
+                moveMenu.add(item);
+            }
+        }
+        if (moveMenu.getItemCount() > 0) {
+            moveMenu.addSeparator();
+        }
+        final JMenuItem newGroupItem = new JMenuItem("New group…");
+        newGroupItem.addActionListener(e -> {
+            final String name = JOptionPane.showInputDialog(this, "Name of the new group of brushes:", "New Brush Group", QUESTION_MESSAGE);
+            if (name != null) {
+                try {
+                    final File dir = BrushFolders.createGroup(name);
+                    reloadCustomBrushes(Collections.singletonMap(file, BrushFolders.moveInto(file, dir)));
+                } catch (IOException ex) {
+                    showMessageDialog(this, ex.getMessage(), "New Brush Group", ERROR_MESSAGE);
+                }
+            }
+        });
+        moveMenu.add(newGroupItem);
+        menu.add(moveMenu);
+        final JMenuItem removeItem = new JMenuItem("Remove…", Icons.get("trash-2", 16));
+        removeItem.setEnabled(BrushFolders.canTrash());
+        removeItem.addActionListener(e -> removeBrush(file));
+        menu.add(removeItem);
+        return menu;
+    }
+
+    /**
+     * Let a custom brush be dragged onto another group (its page, its tab or its heading) to move it there.
+     */
+    private void installBrushDrag(JToggleButton button, File file) {
+        final MouseAdapter adapter = new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (e.isPopupTrigger()) {
+                    createCustomBrushMenu(file).show(button, e.getX(), e.getY());
+                    return;
+                }
+                pressPoint = SwingUtilities.isLeftMouseButton(e) ? e.getLocationOnScreen() : null;
+                dragging = false;
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if ((pressPoint != null) && (! dragging) && (pressPoint.distance(e.getLocationOnScreen()) > 8)) {
+                    dragging = true;
+                    button.setCursor(java.awt.dnd.DragSource.DefaultMoveDrop);
+                }
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (e.isPopupTrigger()) {
+                    createCustomBrushMenu(file).show(button, e.getX(), e.getY());
+                } else if (dragging) {
+                    button.setCursor(null);
+                    final String target = brushGroupAt(e.getLocationOnScreen());
+                    if ((target != null) && (! groupDir(target).equals(file.getParentFile()))) {
+                        SwingUtilities.invokeLater(() -> moveBrush(file, target));
+                    }
+                }
+                pressPoint = null;
+                dragging = false;
+            }
+
+            private Point pressPoint;
+            private boolean dragging;
+        };
+        button.addMouseListener(adapter);
+        button.addMouseMotionListener(adapter);
+    }
+
+    /**
+     * The group of brushes shown at a point of the screen (on its page, its tab or its heading), if any.
+     */
+    private String brushGroupAt(Point screenPoint) {
+        for (Window window: Window.getWindows()) {
+            if ((! window.isShowing()) || (! window.getBounds().contains(screenPoint)) || (! (window instanceof RootPaneContainer))) {
+                continue;
+            }
+            final JLayeredPane layeredPane = ((RootPaneContainer) window).getLayeredPane();
+            final Point point = new Point(screenPoint);
+            SwingUtilities.convertPointFromScreen(point, layeredPane);
+            for (Component component = SwingUtilities.getDeepestComponentAt(layeredPane, point.x, point.y); component != null; component = component.getParent()) {
+                if (component instanceof JComponent) {
+                    final Object group = ((JComponent) component).getClientProperty(KEY_BRUSH_GROUP);
+                    if (group instanceof String) {
+                        return (String) group;
+                    }
+                    final Object page = ((JComponent) component).getClientProperty(DockableFrame.KEY_PAGE);
+                    if (page instanceof DockableFrame) {
+                        final Object pageGroup = ((DockableFrame) page).getClientProperty(KEY_BRUSH_GROUP);
+                        return (pageGroup instanceof String) ? (String) pageGroup : null;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     private void maybePing() {
         Configuration config = Configuration.getInstance();
         if (config.getPingAllowed() == null) {
@@ -2907,20 +3273,14 @@ public final class App extends JFrame implements BrushControl,
         areaManager.addPage(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", GROUP_PAINT).withIcon(Icons.get("message-square-text"))
                 .withDescription("Coloured markings for planning the map. They are not exported, unless you enable that in the export settings.").scrollable().build());
 
-        areaManager.addPage(new DockableFrameBuilder(createBrushPanel(), "Brushes", GROUP_BRUSHES).withIcon(Icons.get("brush")).scrollable()
-                .withSummary("The shapes the tools work with: round and square brushes, and stamps of mountains, hills, volcanoes and valleys.").build());
+        final DockableFrame brushesPage = new DockableFrameBuilder(createBrushPanel(), "Brushes", GROUP_BRUSHES).withIcon(Icons.get("brush")).scrollable()
+                .withSummary("The shapes the tools work with: round and square brushes, and stamps of mountains, hills, volcanoes and valleys.").build();
+        // Brushes dropped here go to the Custom Brushes group
+        brushesPage.putClientProperty(KEY_BRUSH_GROUP, CUSTOM_BRUSHES_DEFAULT_TITLE);
+        brushesPage.putClientProperty(DockableFrame.KEY_ACTIONS, brushGroupActions(null));
+        areaManager.addPage(brushesPage);
 
-        if (customBrushes.containsKey(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
-            areaManager.addPage(new DockableFrameBuilder(createCustomBrushPanel(CUSTOM_BRUSHES_DEFAULT_TITLE, customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE)), "Custom Brushes", GROUP_BRUSHES).withId("customBrushesDefault").scrollable()
-                    .withSummary("The brushes you made from your own images.").build());
-        }
-        for (Map.Entry<String, BrushGroup> entry: customBrushes.entrySet()) {
-            if (entry.getKey().equals(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
-                continue;
-            }
-            areaManager.addPage(new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), entry.getKey(), GROUP_BRUSHES).withId("customBrushes." + entry.getKey()).scrollable()
-                    .withSummary("Brushes you made from your own images, in the “" + entry.getKey() + "” group.").build());
-        }
+        addCustomBrushPages();
 
         areaManager.addPage(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", GROUP_PROPERTIES).withId("brushSettings").withIcon(Icons.get("settings-2")).scrollable()
                 .withSummary("The rotation and strength of the brush, and where it applies: the whole map or the selection, between two heights, on some terrains or layers, on slopes.").build());
@@ -4203,6 +4563,22 @@ public final class App extends JFrame implements BrushControl,
             optionsPanel.add(stampsPanel, constraints);
         }
 
+        // Your own brushes, in groups of their own
+        constraints.insets = new Insets(10, 4, 2, 4);
+        optionsPanel.add(createSectionLabel("Your brushes"), constraints);
+        constraints.insets = new Insets(2, 4, 2, 4);
+        final JPanel ownBrushesPanel = new JPanel(new org.pepsoft.worldpainter.util.WrapLayout(4, 2));
+        for (Action action: brushGroupActions(null)) {
+            final JButton button = new JButton(action);
+            button.putClientProperty(FlatClientProperties.STYLE, "font: -1");
+            button.setFocusable(false);
+            ownBrushesPanel.add(button);
+        }
+        optionsPanel.add(ownBrushesPanel, constraints);
+        final JLabel ownBrushesHint = new JLabel("<html>Brushes are greyscale images: white paints, black doesn't. Each group has a page of its own; drag a brush onto another group to move it.</html>");
+        ownBrushesHint.putClientProperty(FlatClientProperties.STYLE, "font: -2; foreground: $WorldPainter.mutedForeground");
+        optionsPanel.add(ownBrushesHint, constraints);
+
         optionsPanel.putClientProperty(KEY_ICON, createBrushThumbnail(SymmetricBrush.COSINE_CIRCLE, Math.round(16 * getUIScale())));
         return optionsPanel;
     }
@@ -4223,16 +4599,30 @@ public final class App extends JFrame implements BrushControl,
         for (Brush customBrush: brushGroup.brushes) {
             customBrushPanel.add(createBrushButton(customBrush));
         }
+        // After the brushes, a button to add more
+        final JButton addButton = new JButton(Icons.muted("plus", 18));
+        addButton.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+        addButton.setFocusable(false);
+        addButton.setToolTipText(richToolTip("Add brushes", "Add brushes made from images (greyscale: white paints, black doesn't) to this group. Drag a brush onto another group, or right click it, to move it", null));
+        addButton.addActionListener(e -> addBrushes(brushGroup.name));
+        customBrushPanel.add(addButton);
+        customBrushesPanel.putClientProperty(KEY_BRUSH_GROUP, brushGroup.name);
         
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.gridwidth = GridBagConstraints.REMAINDER;
         constraints.anchor = GridBagConstraints.FIRST_LINE_START;
         constraints.weightx = 1.0;
+        // As wide as the area, so that the brushes fill it in as many columns as fit, as the built-in ones do
+        constraints.fill = GridBagConstraints.HORIZONTAL;
         constraints.insets = new Insets(1, 1, 1, 1);
         customBrushesPanel.add(customBrushPanel, constraints);
 
         if (brushGroup.icon != null) {
             customBrushesPanel.putClientProperty(KEY_ICON, new ImageIcon(scaleIcon(brushGroup.icon, 16)));
+        } else if (! brushGroup.brushes.isEmpty()) {
+            // The shape of the first brush of the group, which tells groups apart better than the first letter of
+            // their names
+            customBrushesPanel.putClientProperty(KEY_ICON, createBrushThumbnail(brushGroup.brushes.get(0).clone(), round(16 * getUIScale())));
         } else {
             customBrushesPanel.putClientProperty(KEY_ICON, createScaledLetterIcon(title.charAt(0), darkMode ? WHITE : BLACK));
         }
@@ -6279,6 +6669,11 @@ public final class App extends JFrame implements BrushControl,
                 closeCallout("callout_2");
             }
         });
+        // Custom brushes can be moved to another group, or removed
+        final File imageFile = imageFileOf(brush);
+        if ((imageFile != null) && imageFile.toPath().startsWith(BrushFolders.getBrushesDir().toPath())) {
+            installBrushDrag(button, imageFile);
+        }
         brushButtonGroup.add(button);
         brushButtons.put(brush, button);
         return button;
@@ -7825,6 +8220,10 @@ public final class App extends JFrame implements BrushControl,
     private ColourScheme selectedColourScheme;
     private BiomeHelper biomeHelper;
     private SortedMap<String, BrushGroup> customBrushes;
+    /**
+     * The keys of the pages of the groups of custom brushes.
+     */
+    private final List<String> customBrushPageKeys = new ArrayList<>();
     private ThreeDeeFrame threeDeeFrame;
     private BiomesViewerFrame biomesViewerFrame;
     private BiomesPanel biomesPanel;
@@ -7931,6 +8330,12 @@ public final class App extends JFrame implements BrushControl,
 
     private static final String IMPORT_WARNING_KEY = "org.pepsoft.worldpainter.importWarning";
     private static final String BRUSH_FOLDER_TIP_KEY = "org.pepsoft.worldpainter.brushFolderTip";
+    private static final String BRUSHES_IMPORTED_KEY = "org.pepsoft.worldpainter.brushesImportedFromWorldPainter";
+    /**
+     * Client property of the pages and panels of brushes: the name of the group of custom brushes to which brushes
+     * dropped on them go.
+     */
+    private static final String KEY_BRUSH_GROUP = "WorldPainter.brushGroup";
 
     static final String MERGE_WARNING_KEY = "org.pepsoft.worldpainter.mergeWarning";
 
@@ -8096,15 +8501,20 @@ public final class App extends JFrame implements BrushControl,
     public enum Mode { WORLDPAINTER, MINECRAFTMAPEDITOR }
 
     class BrushGroup {
-        BrushGroup(String name, BufferedImage icon, List<Brush> brushes) {
+        BrushGroup(String name, BufferedImage icon, List<Brush> brushes, File dir) {
             this.name = name;
             this.icon = icon;
             this.brushes = brushes;
+            this.dir = dir;
         }
 
         final String name;
         final BufferedImage icon;
         final List<Brush> brushes;
+        /**
+         * The folder of the group.
+         */
+        final File dir;
     }
 
     public enum TerrainMode { SHOW_TERRAIN, HIDE_TERRAIN, DEFAULT_COLOUR_RAMP, DEFAULT_GREYSCALE_RAMP }

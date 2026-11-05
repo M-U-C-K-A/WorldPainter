@@ -1224,6 +1224,14 @@ public final class Configuration implements Serializable, EventLogger, Minecraft
         return getConfigDir(classifier);
     }
 
+    /**
+     * The folder in which the original WorldPainter keeps its settings (and its custom brushes), next to which the
+     * modernised fork keeps its own.
+     */
+    public static File getOriginalConfigDir() {
+        return getConfigDir(null);
+    }
+
     private static File getConfigDir(String classifier) {
         if (SystemUtils.isMac()) {
             return new File(System.getProperty("user.home"), "Library/Application Support/WorldPainter" + ((classifier != null) ? (" [" + classifier.toUpperCase() + "]") : ""));
