@@ -68,6 +68,12 @@ public final class OptionCards {
                 .tip("For instance: paint rock only on steep slopes.");
     }
 
+    public static ToolCard curvature() {
+        return new ToolCard("Curvature", "Limits the brush to hollows, where the land around is higher (valleys, dips, the foot of slopes), or to bumps, where it is lower (ridges, peaks, the brow of slopes). The number is how much higher or lower, on average over four blocks around, in blocks.", null,
+                new Panels(new String[] {"Hollows", "Bumps"}, OptionCards::paintCurvature), null)
+                .tip("For instance: gravel or water plants in the bottoms of valleys, snow or bare rock on the ridges.");
+    }
+
     public static ToolCard intensity() {
         return new ToolCard("Intensity", "How strongly the brush works: how quickly a height tool changes the land, and how densely a layer or terrain is painted.", null,
                 new Panels(new String[] {"25 %", "50 %", "100 %"}, OptionCards::paintIntensity), null);
@@ -212,6 +218,34 @@ public final class OptionCards {
             final boolean steep = (i == 1) || (i == 3);
             if (steep == (index == 0)) {
                 g2.drawLine((int) (points[i][0] * w), (int) (points[i][1] * h), (int) (points[i + 1][0] * w), (int) (points[i + 1][1] * h));
+            }
+        }
+    }
+
+    private static void paintCurvature(Graphics2D g2, int index, int w, int h) {
+        g2.setColor(SKY);
+        g2.fillRect(0, 0, w, h);
+        // Rolling land with a ridge and a valley
+        final int steps = 48;
+        final Path2D land = new Path2D.Float();
+        land.moveTo(0, h);
+        final float[] ys = new float[steps + 1];
+        for (int i = 0; i <= steps; i++) {
+            final double t = (double) i / steps;
+            ys[i] = (float) (h * (0.55 - 0.22 * Math.sin(t * Math.PI * 2 + 0.3)));
+            land.lineTo((float) (t * w), ys[i]);
+        }
+        land.lineTo(w, h);
+        land.closePath();
+        g2.setColor(GROUND);
+        g2.fill(land);
+        g2.setStroke(new BasicStroke(Math.max(3f, h * 0.06f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2.setColor(ACCENT);
+        for (int i = 1; i < steps; i++) {
+            // Where the curve bends up (a hollow) or down (a bump)
+            final float bend = ys[i - 1] + ys[i + 1] - 2 * ys[i];
+            if ((index == 0) ? (bend < -h * 0.0035f) : (bend > h * 0.0035f)) {
+                g2.drawLine((int) ((i - 1) * w / (float) steps), (int) ys[i - 1], (int) (i * w / (float) steps), (int) ys[i]);
             }
         }
     }

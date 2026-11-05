@@ -62,6 +62,49 @@ public final class DefaultFilter implements Filter {
         this.slopeIsAbove = slopeIsAbove;
     }
 
+    /**
+     * Also limit the brush by the curvature of the land: to hollows (valleys, dips, the foot of slopes: the land around
+     * is higher) or bumps (ridges, peaks, the brow of slopes: the land around is lower).
+     *
+     * @param mode {@link #CURVATURE_NONE}, {@link #CURVATURE_HOLLOWS} or {@link #CURVATURE_BUMPS}.
+     * @param depth How much higher (for hollows) or lower (for bumps) the land around must be on average, in blocks.
+     * @return This filter.
+     */
+    public DefaultFilter withCurvature(int mode, float depth) {
+        curvatureMode = mode;
+        curvatureDepth = depth;
+        return this;
+    }
+
+    public int getCurvatureMode() {
+        return curvatureMode;
+    }
+
+    public float getCurvatureDepth() {
+        return curvatureDepth;
+    }
+
+    /**
+     * How much higher the land around a location is than the location itself, on average, in blocks: positive in a
+     * hollow, negative on a bump. The land is sampled at {@link #CURVATURE_RADIUS} blocks in eight directions.
+     */
+    public static float curvatureAt(Dimension dimension, int x, int y) {
+        final float height = dimension.getHeightAt(x, y);
+        if (height == -Float.MAX_VALUE) {
+            return 0.0f;
+        }
+        float sum = 0.0f;
+        int count = 0;
+        for (int i = 0; i < 8; i++) {
+            final float around = dimension.getHeightAt(x + CURVATURE_DX[i], y + CURVATURE_DY[i]);
+            if (around != -Float.MAX_VALUE) {
+                sum += around;
+                count++;
+            }
+        }
+        return (count > 0) ? (sum / count - height) : 0.0f;
+    }
+
     public int getAboveLevel() {
         return aboveLevel;
     }
@@ -159,6 +202,13 @@ public final class DefaultFilter implements Filter {
                     return 0.0f;
                 }
             }
+            if (curvatureMode != CURVATURE_NONE) {
+                final float curvature = curvatureAt(dimension, x, y) * ((curvatureMode == CURVATURE_HOLLOWS) ? 1 : -1);
+                if (curvature < curvatureDepth) {
+                    // Fade out over half a block, so that the edge of the area is not ragged
+                    return Math.max(0.0f, 1.0f - (curvatureDepth - curvature) * 2) * strength;
+                }
+            }
             return strength;
         } else {
             return 0.0f;
@@ -210,6 +260,9 @@ public final class DefaultFilter implements Filter {
                     break;
             }
         }
+        if (curvatureMode != CURVATURE_NONE) {
+            sb.append((curvatureMode == CURVATURE_HOLLOWS) ? "hollows " : "bumps ").append(curvatureDepth).append(' ');
+        }
         if (checkSlope) {
             if (inSelection || outsideSelection || onlyOn || exceptOn || checkLevel) {
                 sb.append(" and ");
@@ -225,6 +278,13 @@ public final class DefaultFilter implements Filter {
             slopeIsAbove, inSelection, outsideSelection;
     final LevelType levelType;
     final int aboveLevel, belowLevel, degrees;
+    int curvatureMode = CURVATURE_NONE;
+    float curvatureDepth = 1.0f;
+
+    public static final int CURVATURE_NONE = 0, CURVATURE_HOLLOWS = 1, CURVATURE_BUMPS = 2;
+    public static final int CURVATURE_RADIUS = 4;
+    private static final int[] CURVATURE_DX = {CURVATURE_RADIUS, -CURVATURE_RADIUS, 0, 0, 3, 3, -3, -3};
+    private static final int[] CURVATURE_DY = {0, 0, CURVATURE_RADIUS, -CURVATURE_RADIUS, 3, -3, 3, -3};
     final float slope;
     final Filter onlyOnFilter;
     final Filter exceptOnFilter;

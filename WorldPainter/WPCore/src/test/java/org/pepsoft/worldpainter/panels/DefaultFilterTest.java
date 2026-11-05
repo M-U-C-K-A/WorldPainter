@@ -87,4 +87,35 @@ public class DefaultFilterTest {
         dimension.addTile(tileFactory.createTile(0, 0));
         return dimension;
     }
+
+    /**
+     * Curvature: a valley running north to south (a V of slopes) is a hollow at its bottom, and a ridge a bump at its
+     * top; flat land and even slopes are neither.
+     */
+    @Test
+    public void testCurvature() {
+        final World2 world = new World2(JAVA_ANVIL_1_20_5, -64, 320);
+        final TileFactory tileFactory = TileFactoryFactory.createFlatTileFactory(1, Terrain.GRASS, -64, 320, 64, 0, false, false);
+        final Dimension dimension = new Dimension(world, "Surface", 1, tileFactory, NORMAL_DETAIL);
+        world.addDimension(dimension);
+        final Tile tile = tileFactory.createTile(0, 0);
+        for (int x = 0; x < 128; x++) {
+            for (int y = 0; y < 128; y++) {
+                // A valley at x = 32, a ridge at x = 96
+                final float valley = Math.abs(x - 32), ridge = -Math.abs(x - 96);
+                tile.setHeight(x, y, 64 + ((x < 64) ? valley : (ridge + 32)) * 0.5f);
+            }
+        }
+        dimension.addTile(tile);
+        final DefaultFilter hollows = new DefaultFilter(dimension, false, false, Integer.MIN_VALUE, Integer.MIN_VALUE, false, false, null, false, null, -1, false)
+                .withCurvature(DefaultFilter.CURVATURE_HOLLOWS, 1.0f);
+        final DefaultFilter bumps = new DefaultFilter(dimension, false, false, Integer.MIN_VALUE, Integer.MIN_VALUE, false, false, null, false, null, -1, false)
+                .withCurvature(DefaultFilter.CURVATURE_BUMPS, 1.0f);
+        assertEquals(1.0f, hollows.modifyStrength(32, 64, 1.0f), 0.0f);
+        assertEquals(0.0f, hollows.modifyStrength(96, 64, 1.0f), 0.0f);
+        assertEquals(0.0f, hollows.modifyStrength(16, 64, 1.0f), 0.0f);
+        assertEquals(1.0f, bumps.modifyStrength(96, 64, 1.0f), 0.0f);
+        assertEquals(0.0f, bumps.modifyStrength(32, 64, 1.0f), 0.0f);
+        assertEquals(0.0f, bumps.modifyStrength(110, 64, 1.0f), 0.0f);
+    }
 }
