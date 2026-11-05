@@ -582,7 +582,11 @@ public class AreaManager {
         if (page == null) {
             return;
         }
-        final Leaf current = assignment.get(key);
+        Leaf current = assignment.get(key);
+        if ((current != null) && extras.getOrDefault(current, Collections.emptyList()).contains(key)) {
+            // One of the pages an area shows below its own: that area simply stops showing it
+            current = null;
+        }
         final String shownHere = display.get(leaf);
         if ((current == leaf) || ((shownHere != null) && originalKey(shownHere).equals(key))) {
             return;
@@ -1015,9 +1019,23 @@ public class AreaManager {
     /**
      * The commands for an area: split, maximise, detach, close.
      */
+    @SuppressWarnings("unchecked") // Guaranteed by contract
     void fillAreaMenu(JComponent menu, Leaf leaf) {
         if (leaf == null) {
             return;
+        }
+        // First the commands of what the area shows
+        final String shownKey = display.get(leaf);
+        final Object pageActions = (shownKey != null) ? pages.get(shownKey).getClientProperty(DockableFrame.KEY_ACTIONS) : null;
+        if ((pageActions instanceof List) && (! ((List<?>) pageActions).isEmpty())) {
+            for (Action action: (List<Action>) pageActions) {
+                menu.add(new JMenuItem(action));
+            }
+            if (menu instanceof JMenu) {
+                ((JMenu) menu).addSeparator();
+            } else {
+                ((JPopupMenu) menu).addSeparator();
+            }
         }
         final boolean floating = isFloating(leaf);
         JMenuItem menuItem = new JMenuItem("Split vertically", Icons.get("columns-2", 16));
@@ -1065,6 +1083,14 @@ public class AreaManager {
             menuItem.setToolTipText("Detach the area into a window of its own, which floats over the main window. You can also drag its header out of the window");
             menuItem.setEnabled(canDetach(leaf));
             menuItem.addActionListener(e -> detach(leaf, null));
+            menu.add(menuItem);
+        }
+        if (canStack(leaf)) {
+            final EditorGroup group = groups.get(leaf.group);
+            menuItem = new JCheckBoxMenuItem("Show all " + ((group != null) ? group.title : "pages") + " at once", leaf.stacked);
+            menuItem.setIcon(Icons.get("rows-3", 16));
+            menuItem.setToolTipText("Show all the pages of this kind one below the other, each under its name, instead of one at a time with tabs");
+            menuItem.addActionListener(e -> setStacked(leaf, ! leaf.stacked));
             menu.add(menuItem);
         }
         menuItem = new JMenuItem("Close area", Icons.get("x", 16));
@@ -1487,7 +1513,11 @@ public class AreaManager {
         // Put the pages in their areas
         for (Map.Entry<Leaf, AreaPanel> entry: areaPanels.entrySet()) {
             final String key = display.get(entry.getKey());
-            entry.getValue().update((key != null) ? pages.get(key) : null);
+            final List<DockableFrame> others = new ArrayList<>();
+            for (String other: extras.getOrDefault(entry.getKey(), Collections.emptyList())) {
+                others.add(pages.get(other));
+            }
+            entry.getValue().update((key != null) ? pages.get(key) : null, others);
         }
         for (FloatingArea floating: active.floating) {
             floating.window.update();
@@ -1569,6 +1599,7 @@ public class AreaManager {
     private void assignPages() {
         assignment.clear();
         display.clear();
+        extras.clear();
         final List<Leaf> leaves = allLeaves(active);
         // First the areas which can show the page they want
         for (Leaf leaf: leaves) {
@@ -1592,6 +1623,43 @@ public class AreaManager {
                 }
             }
         }
+        // Then the areas which show all the pages of their kind at once get those which no other area shows
+        for (Leaf leaf: leaves) {
+            if (leaf.stacked && display.containsKey(leaf)) {
+                final List<String> keys = new ArrayList<>();
+                for (DockableFrame page: pagesOf(leaf.group)) {
+                    if (! assignment.containsKey(page.getKey())) {
+                        assignment.put(page.getKey(), leaf);
+                        keys.add(page.getKey());
+                    }
+                }
+                extras.put(leaf, keys);
+            }
+        }
+    }
+
+    /**
+     * Whether an area shows all the pages of its kind at once, one below the other.
+     */
+    boolean isStacked(Leaf leaf) {
+        return leaf.stacked;
+    }
+
+    /**
+     * Have an area show all the pages of its kind at once, one below the other, or one at a time with tabs.
+     */
+    void setStacked(Leaf leaf, boolean stacked) {
+        if (stacked != leaf.stacked) {
+            leaf.stacked = stacked;
+            refresh();
+        }
+    }
+
+    /**
+     * Whether an area could show several pages at once: there is more than one page of its kind.
+     */
+    boolean canStack(Leaf leaf) {
+        return (leaf.group != null) && (pagesOf(leaf.group).size() > 1);
     }
 
     private List<Leaf> allLeaves(Workspace workspace) {
@@ -1795,6 +1863,10 @@ public class AreaManager {
     private final Map<Leaf, AreaPanel> areaPanels = new HashMap<>();
     private final Map<String, Leaf> assignment = new HashMap<>();
     private final Map<Leaf, String> display = new HashMap<>();
+    /**
+     * The other pages which areas showing all the pages of their kind at once show below their own, in order.
+     */
+    private final Map<Leaf, List<String>> extras = new HashMap<>();
     private final List<AreaTree.Divider> dividers = new ArrayList<>();
     private final List<BiConsumer<String, Boolean>> visibilityListeners = new ArrayList<>();
     private final List<Runnable> changeListeners = new ArrayList<>();

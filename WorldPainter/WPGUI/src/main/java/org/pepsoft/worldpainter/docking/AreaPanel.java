@@ -10,6 +10,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Path2D;
+import java.util.*;
 import java.util.List;
 
 import static org.pepsoft.util.GUIUtils.getUIScale;
@@ -61,21 +62,101 @@ final class AreaPanel extends JPanel {
      * Show a page, or the choice of what to show if it is {@code null}, and bring the header and the tabs up to date.
      */
     void update(DockableFrame page) {
+        update(page, Collections.emptyList());
+    }
+
+    /**
+     * Show a page, or the choice of what to show if it is {@code null}, and, if the area shows all the pages of its
+     * kind at once, the others below it; and bring the header and the tabs up to date.
+     */
+    void update(DockableFrame page, List<DockableFrame> others) {
         this.page = page;
-        final Component current = (content.getComponentCount() > 0) ? content.getComponent(0) : null;
-        if ((page == null) || (current != page)) {
-            content.removeAll();
-            if (page != null) {
-                page.setVisible(true);
-                content.add(page, BorderLayout.CENTER);
-            } else {
-                content.add(EditorTypeChooser.inline(manager, leaf), BorderLayout.CENTER);
+        // Give back the pages shown here before their scroll panes and descriptions
+        for (DockableFrame previous: stackedPages) {
+            unstack(previous);
+        }
+        stackedPages.clear();
+        content.removeAll();
+        if ((page != null) && manager.isStacked(leaf)) {
+            // The pages in the order of their kind
+            final List<DockableFrame> shown = new ArrayList<>();
+            for (DockableFrame candidate: manager.pagesOf(page.getGroup())) {
+                if ((candidate == page) || others.contains(candidate)) {
+                    shown.add(candidate);
+                }
             }
+            if (! shown.contains(page)) {
+                shown.add(0, page);
+            }
+            final StackView stack = new StackView();
+            for (DockableFrame shownPage: shown) {
+                stack(shownPage);
+                stackedPages.add(shownPage);
+                stack.addPage(shownPage);
+            }
+            stack.finish();
+            final JScrollPane scrollPane = new JScrollPane(stack, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+            scrollPane.setBorder(BorderFactory.createEmptyBorder());
+            scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+            content.add(scrollPane, BorderLayout.CENTER);
+        } else if (page != null) {
+            page.setVisible(true);
+            content.add(page, BorderLayout.CENTER);
+        } else {
+            content.add(EditorTypeChooser.inline(manager, leaf), BorderLayout.CENTER);
         }
         header.update();
         tabStrip.update();
         revalidate();
         repaint();
+    }
+
+    /**
+     * Prepare a page to be shown with others one below the other: without its own scroll pane (the area scrolls them
+     * all together) and without its description (its name is above it, the description in its tooltip).
+     */
+    private static void stack(DockableFrame page) {
+        if (page.getClientProperty(KEY_STACKED) != null) {
+            return;
+        }
+        final StackedState state = new StackedState();
+        final LayoutManager layout = page.getLayout();
+        if (layout instanceof BorderLayout) {
+            final Component centre = ((BorderLayout) layout).getLayoutComponent(BorderLayout.CENTER);
+            if ((centre instanceof JScrollPane) && (((JScrollPane) centre).getViewport().getView() != null)) {
+                state.scrollPane = (JScrollPane) centre;
+                state.view = state.scrollPane.getViewport().getView();
+                page.remove(state.scrollPane);
+                page.add(state.view, BorderLayout.CENTER);
+            }
+            final Component north = ((BorderLayout) layout).getLayoutComponent(BorderLayout.NORTH);
+            if ((north instanceof JComponent) && Boolean.TRUE.equals(((JComponent) north).getClientProperty(PagePreview.KEY_SKIP)) && north.isVisible()) {
+                state.description = north;
+                north.setVisible(false);
+            }
+        }
+        page.setVisible(true);
+        page.putClientProperty(KEY_STACKED, state);
+    }
+
+    /**
+     * Give a page back its scroll pane and description, as it was before {@link #stack(DockableFrame)}.
+     */
+    private static void unstack(DockableFrame page) {
+        final StackedState state = (StackedState) page.getClientProperty(KEY_STACKED);
+        if (state == null) {
+            return;
+        }
+        if (state.scrollPane != null) {
+            page.remove(state.view);
+            state.scrollPane.setViewportView(state.view);
+            page.add(state.scrollPane, BorderLayout.CENTER);
+        }
+        if (state.description != null) {
+            state.description.setVisible(true);
+        }
+        page.putClientProperty(KEY_STACKED, null);
+        page.revalidate();
     }
 
     /**
@@ -96,6 +177,10 @@ final class AreaPanel extends JPanel {
     }
 
     void dispose() {
+        for (DockableFrame previous: stackedPages) {
+            unstack(previous);
+        }
+        stackedPages.clear();
         content.removeAll();
         tabStrip.removeAll();
     }
@@ -116,9 +201,115 @@ final class AreaPanel extends JPanel {
     private final TabStrip tabStrip;
     private final JPanel content;
     private final CornerZones corners;
+    private final List<DockableFrame> stackedPages = new ArrayList<>();
     private DockableFrame page;
 
+    private static final String KEY_STACKED = "WorldPainter.stacked";
+
+    /**
+     * The pages whose content is folded away when the area shows all the pages of its kind at once.
+     */
+    private static final Set<String> COLLAPSED = new HashSet<>();
+
     private static final long serialVersionUID = 1L;
+
+    /**
+     * What a page was before it was shown with others one below the other.
+     */
+    private static final class StackedState {
+        JScrollPane scrollPane;
+        Component view, description;
+    }
+
+    /**
+     * All the pages of a kind one below the other, each under a heading with its name, which folds it away when
+     * clicked.
+     */
+    private final class StackView extends JPanel implements Scrollable {
+        StackView() {
+            setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+        }
+
+        void addPage(DockableFrame stackedPage) {
+            final String key = stackedPage.getKey();
+            final boolean collapsed = COLLAPSED.contains(key);
+            final JButton heading = new JButton(stackedPage.getTitle(), stackedPage.getFrameIcon());
+            heading.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+            heading.putClientProperty("FlatLaf.styleClass", "semibold");
+            heading.setHorizontalAlignment(SwingConstants.LEADING);
+            heading.setFocusable(false);
+            heading.setMargin(new Insets(4, 6, 4, 6));
+            heading.setIconTextGap(Math.round(6 * getUIScale()));
+            heading.setToolTipText("<html><b>" + stackedPage.getTitle() + "</b>" + ((stackedPage.getDescription() != null) ? ("<br><div style=\"width: 220px\">" + stackedPage.getDescription() + "</div>") : "")
+                    + "<br><font color=\"#a1a1aa\">Click to " + (collapsed ? "show" : "fold away") + " its content</font></html>");
+            final JPanel headingRow = new JPanel(new BorderLayout());
+            headingRow.putClientProperty(DockableFrame.KEY_PAGE, stackedPage);
+            heading.putClientProperty(DockableFrame.KEY_PAGE, stackedPage);
+            headingRow.setOpaque(false);
+            headingRow.setBorder(new HairlineBorder(getComponentCount() > 0, false, false, false, new Insets(2, 2, 0, 2)));
+            final JLabel chevron = new JLabel(Icons.muted(collapsed ? "chevron-right" : "chevron-down", 14));
+            chevron.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 0));
+            headingRow.add(chevron, BorderLayout.WEST);
+            headingRow.add(heading, BorderLayout.CENTER);
+            headingRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+            headingRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, headingRow.getPreferredSize().height));
+            heading.addActionListener(e -> {
+                if (! COLLAPSED.remove(key)) {
+                    COLLAPSED.add(key);
+                }
+                AreaPanel.this.update(page, new ArrayList<>(stackedPages));
+            });
+            add(headingRow);
+            stackedPage.setVisible(! collapsed);
+            // As high as the page wants, so that the pages do not share out the spare room between them
+            final JPanel holder = new JPanel(new BorderLayout()) {
+                @Override
+                public Dimension getMaximumSize() {
+                    return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+                }
+            };
+            holder.setOpaque(false);
+            holder.setAlignmentX(Component.LEFT_ALIGNMENT);
+            holder.add(stackedPage, BorderLayout.CENTER);
+            add(holder);
+        }
+
+        void finish() {
+            add(Box.createVerticalGlue());
+        }
+
+        @Override
+        public Dimension getMaximumSize() {
+            return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+        }
+
+        @Override
+        public Dimension getPreferredScrollableViewportSize() {
+            return getPreferredSize();
+        }
+
+        @Override
+        public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return Math.round(16 * getUIScale());
+        }
+
+        @Override
+        public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return (orientation == SwingConstants.VERTICAL) ? visibleRect.height : visibleRect.width;
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportHeight() {
+            return false;
+        }
+
+        private static final long serialVersionUID = 1L;
+    }
 
     /**
      * The red of the bin which closes an area while Shift is held down.
@@ -180,6 +371,7 @@ final class AreaPanel extends JPanel {
             buttons.setOpaque(false);
             buttons.setBorder(null);
             if (floating) {
+                stackButton = null;
                 pinButton = new JToggleButton(Icons.muted("pin", 14));
                 pinButton.setSelectedIcon(Icons.accent("pin", 14));
                 pinButton.setToolTipText("<html><b>Keep on top</b><br>Keep this window in front of other applications too</html>");
@@ -192,6 +384,10 @@ final class AreaPanel extends JPanel {
                 buttons.add(detachButton);
             } else {
                 pinButton = null;
+                stackButton = new JToggleButton(Icons.muted("rows-3", 14));
+                stackButton.setSelectedIcon(Icons.accent("rows-3", 14));
+                stackButton.addActionListener(e -> manager.setStacked(leaf, stackButton.isSelected()));
+                buttons.add(stackButton);
                 maximiseButton = new JButton();
                 maximiseButton.addActionListener(e -> manager.toggleMaximise(leaf));
                 buttons.add(maximiseButton);
@@ -296,6 +492,13 @@ final class AreaPanel extends JPanel {
             if (pinButton != null) {
                 pinButton.setSelected(manager.isOnTop(leaf));
             }
+            if (stackButton != null) {
+                stackButton.setVisible(manager.canStack(leaf) || manager.isStacked(leaf));
+                stackButton.setSelected(manager.isStacked(leaf));
+                stackButton.setToolTipText(manager.isStacked(leaf)
+                        ? "<html><b>One at a time</b><br>Show one page at a time again, with tabs for the others</html>"
+                        : "<html><b>Show all at once</b><br>Show all the pages of this kind one below the other, each under its name, instead of one at a time with tabs</html>");
+            }
             closing = manager.isShiftDown() && manager.canClose(leaf);
             updateMenuButton();
             revalidate();
@@ -325,6 +528,7 @@ final class AreaPanel extends JPanel {
         }
 
         private final JButton typeButton, maximiseButton, detachButton, menuButton;
+        private final JToggleButton stackButton;
         private boolean closing;
         private final JToggleButton pinButton;
         private final JLabel titleLabel;
@@ -400,7 +604,8 @@ final class AreaPanel extends JPanel {
         void update() {
             column.removeAll();
             final List<DockableFrame> pages = (page != null) ? manager.pagesOf(page.getGroup()) : List.of();
-            if (pages.size() < 2) {
+            if ((pages.size() < 2) || manager.isStacked(leaf)) {
+                // No tabs when all the pages are shown at once
                 setVisible(false);
                 return;
             }
@@ -410,6 +615,7 @@ final class AreaPanel extends JPanel {
                 final Leaf shownIn = manager.getLeafOf(key);
                 final boolean elsewhere = (shownIn != null) && (shownIn != leaf);
                 final JToggleButton button = new TabButton(tabPage.getFrameIcon(), elsewhere);
+                button.putClientProperty(DockableFrame.KEY_PAGE, tabPage);
                 button.setSelected(tabPage == page);
                 final StringBuilder toolTip = new StringBuilder("<html><b>").append(tabPage.getTitle()).append("</b>");
                 if (tabPage.getDescription() != null) {

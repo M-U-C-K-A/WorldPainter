@@ -84,5 +84,16 @@ public class DockableFrame extends JPanel {
     private String key, title, group, category, description;
     private Icon frameIcon;
 
+    /**
+     * Client property of a page: a {@code List<Action>} of commands for what it shows, listed first in the menu of the
+     * area which shows it.
+     */
+    public static final String KEY_ACTIONS = "WorldPainter.pageActions";
+
+    /**
+     * Client property of the tabs and headings which stand for a page: the page.
+     */
+    public static final String KEY_PAGE = "WorldPainter.page";
+
     private static final long serialVersionUID = 1L;
 }

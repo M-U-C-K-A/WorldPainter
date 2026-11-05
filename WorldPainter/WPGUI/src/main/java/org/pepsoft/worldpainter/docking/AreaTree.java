@@ -23,7 +23,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Its text form, used to store layouts and to describe the built-in ones, is:
  * <pre>
  * node  = leaf | split
- * leaf  = "L(" group "," page ")"            (both URL encoded, and empty for an empty area)
+ * leaf  = "L(" group "," page ["," "s"] ")"  (both URL encoded, and empty for an empty area; "s" when the area
+ *                                             shows all the pages of its kind at once)
  * split = ("H" | "V") "[" child (";" child)* "]"   (H: side by side; V: one above the other)
  * child = size "=" node
  * size  = "a" (preferred size) | "*" (fill) | pixels | percentage "%"
@@ -476,7 +477,11 @@ final class AreaTree {
     private static void write(Node node, StringBuilder sb) {
         if (node instanceof Leaf) {
             final Leaf leaf = (Leaf) node;
-            sb.append("L(").append(encode(leaf.group)).append(',').append(encode(leaf.page)).append(')');
+            sb.append("L(").append(encode(leaf.group)).append(',').append(encode(leaf.page));
+            if (leaf.stacked) {
+                sb.append(",s");
+            }
+            sb.append(')');
         } else {
             final Split split = (Split) node;
             sb.append(split.horizontal ? 'H' : 'V').append('[');
@@ -565,6 +570,11 @@ final class AreaTree {
         }
 
         String group, page;
+        /**
+         * Whether the area shows all the pages of its kind at once, one below the other, instead of one at a time with
+         * tabs for the others.
+         */
+        boolean stacked;
     }
 
     static final class Split extends Node {
@@ -617,9 +627,14 @@ final class AreaTree {
                     expect('(');
                     final String group = until(',');
                     expect(',');
-                    final String page = until(')');
+                    final String page = untilEither(',', ')');
+                    final Leaf leaf = new Leaf(decode(group), decode(page));
+                    if (text.charAt(pos) == ',') {
+                        expect(',');
+                        leaf.stacked = until(')').equals("s");
+                    }
                     expect(')');
-                    return new Leaf(decode(group), decode(page));
+                    return leaf;
                 case 'H':
                 case 'V':
                     final Split split = new Split(c == 'H');
@@ -669,6 +684,20 @@ final class AreaTree {
                 return true;
             }
             return false;
+        }
+
+        private String untilEither(char c1, char c2) {
+            int end = text.indexOf(c1, pos);
+            final int end2 = text.indexOf(c2, pos);
+            if ((end == -1) || ((end2 != -1) && (end2 < end))) {
+                end = end2;
+            }
+            if (end == -1) {
+                throw new IllegalArgumentException("Expected '" + c1 + "' or '" + c2 + "' after " + pos + ": " + text);
+            }
+            final String result = text.substring(pos, end);
+            pos = end;
+            return result;
         }
 
         private String until(char c) {
