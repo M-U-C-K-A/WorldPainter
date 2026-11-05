@@ -4,6 +4,14 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 ## New in this version
 
+- **Manage your own brushes**: add brushes from images, make, rename and delete groups, move a brush to another group by dragging it onto its page, tab or heading (or with a right click), all without restarting; the custom brushes of the original WorldPainter are copied the first time
+- **Show all at once**: an area can show all the pages of its kind one below the other, such as all your groups of brushes or all your layer palettes, instead of one at a time with tabs
+- **Curvature** in the brush settings: limit a brush to hollows (valleys, dips) or to bumps (ridges, peaks)
+- **Rivers** with the Path tool: dug along the line, flowing downhill, with a bed of sand and gravel, the river biome and sloping banks
+- **Fixes**: custom brushes no longer leave bits of their outline behind on the map; the brushes of a group fill the width of their area in a grid instead of one column; groups of brushes show the shape of their first brush on their tab instead of a letter
+
+## New in 2.27.2-modernised.10
+
 - **Half Blocks tool**: next to Smooth, it smooths the land like Smooth and builds it in half blocks in Minecraft where you drag it: slabs on stone, cobblestone, sandstone and the like (waterlogged under water), snow layers on snow blocks, so that gentle slopes go up by half a block instead of a whole block every other column. Right-drag goes back to whole blocks; the map shows where it applies with amber stripes. Snow lying on rock (Snow on Rock, Frost) is made as thick as the slope asks, so rock and snow follow the same slope. Grass, dirt and sand have no slab and stay whole
 - **The land Minecraft generates around the map meets it smoothly** (Minecraft 1.19 and later): the chunks of the map are marked for Minecraft's *chunk blending*, which it uses for worlds made before 1.18, so that it blends the new land into the edge of the map instead of leaving a step; this also smooths the outer edge of the band added by *Blend edges into this seed*
 - **Trees in the 3D view**: the forest layers and the trees of the tree pack are shown as simple shapes, with their density, size and colour; a button turns them off

@@ -141,7 +141,9 @@ A single **Brushes** panel, with no hidden menu:
 
 - **3 basic shapes**: soft round, flat round and square.
 - **Procedurally generated terrain stamps**, to sculpt in one stroke with the height tools: peak, mountain range, massif, volcano, crater rim, mesa, dunes, hills, eroded dome…
-- Custom brushes (the `brushes` folder of the configuration) are still supported.
+- **Your own brushes**, managed in the app: add them from images, make, rename and delete groups, and drag a brush onto another group to move it, without restarting. The custom brushes of the original WorldPainter are copied the first time. Any area can **show all the pages of its kind at once** (all your brush groups, all your layer palettes) instead of tabs.
+- **Curvature** in the brush settings: limit a brush to hollows (valleys, dips) or to bumps (ridges, peaks), as well as by height, terrain, layers and slope.
+- **Rivers** with the Path tool: dug along a line, flowing downhill, with a bed of sand and gravel, the river biome and sloping banks.
 
 ### Node editor
 

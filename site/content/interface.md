@@ -39,7 +39,7 @@ Hover over a mix of blocks or a plant layer to see what it is made of: each bloc
 
 ![Two maps side by side, one zoomed in and one showing the whole continent, between the tools and the brushes](assets/images/areas.png)
 
-The window is divided into areas, as in Blender. At the left of the header of each one, the **editor type** button chooses what it shows: the map, the 3D view, the tools, their settings, the brushes, the brush settings, the terrain, the layers, the biomes, the packs, the annotations, the surroundings or the info. Pages of the same kind share the tabs down the side of their area, like the tabs of the Properties editor of Blender: the terrain, the layers, the biomes, the packs and the annotations are one kind, the brushes and your custom brushes another. Hover over a choice to see what it is for and a picture of it. The map and the 3D view can be shown in several areas at once, each with its own view, as the editors of Blender can: choosing one of them while it is shown elsewhere opens another one, moved and zoomed on its own, in which the current tool works too. Any other page is shown once: choosing one which is already shown in another area swaps the two.
+The window is divided into areas, as in Blender. At the left of the header of each one, the **editor type** button chooses what it shows: the map, the 3D view, the tools, their settings, the brushes, the brush settings, the terrain, the layers, the biomes, the packs, the annotations, the surroundings or the info. Pages of the same kind share the tabs down the side of their area, like the tabs of the Properties editor of Blender: the terrain, the layers, the biomes, the packs and the annotations are one kind, the brushes and your custom brushes another. To see all the pages of a kind at once instead, such as all your groups of brushes or all your layer palettes, click the **Show all at once** button in the header of the area (or choose it in its menu): they are shown one below the other, each under its name, which folds it away when clicked. Hover over a choice to see what it is for and a picture of it. The map and the 3D view can be shown in several areas at once, each with its own view, as the editors of Blender can: choosing one of them while it is shown elsewhere opens another one, moved and zoomed on its own, in which the current tool works too. Any other page is shown once: choosing one which is already shown in another area swaps the two.
 
 - **Resize** two areas by dragging the gap between them.
 - **Split** an area by dragging from one of its corners into it, or with *Split vertically* or *Split horizontally* in its menu (the ⋮ button, or a right click on its header). The new area shows another page of the same kind, or asks what to show.
@@ -82,7 +82,16 @@ A single **Brushes** panel with six basic shapes and twenty-two **terrain stamps
 | Volcanoes & craters | Volcano, shield volcano, crater rim |
 | Valleys | Valley, to carve with the lower tool (hold <kbd>Ctrl</kbd> with the height tool) |
 
-Hover over a brush to see its shape in 3D, turning slowly on a block of ground. On the map the outline of a brush shows its actual shape, rotation included. Rotate it with <kbd>[</kbd> and <kbd>]</kbd> (or <kbd>Alt</kbd>+scroll), and zoom the map with <kbd>Ctrl</kbd>+scroll or <kbd>⌘</kbd>+scroll. Custom brushes (in the `brushes` folder of the configuration) are still supported.
+Hover over a brush to see its shape in 3D, turning slowly on a block of ground. On the map the outline of a brush shows its actual shape, rotation included. Rotate it with <kbd>[</kbd> and <kbd>]</kbd> (or <kbd>Alt</kbd>+scroll), and zoom the map with <kbd>Ctrl</kbd>+scroll or <kbd>⌘</kbd>+scroll. ### Your own brushes
+
+Brushes made from your own images (greyscale: white paints, black doesn't) come in groups, each with a page of its own, and with the shape of its first brush on its tab. At the bottom of the Brushes page, and in the menu of their area:
+
+- **Add brushes…** copies images into a group (the **+** at the end of each group does the same);
+- **New brush group…**, **Rename group…** and **Delete group…** (which moves it to the Trash);
+- **Open the brushes folder**, where each group is a folder: you can arrange them there too;
+- **Copy brushes from WorldPainter** brings the brushes of the original WorldPainter, which keeps its settings apart. They are copied the first time anyway.
+
+Drag a brush onto another group, its tab or its heading to move it there, or right click it to move it or remove it. Changes show at once, without restarting.
 
 ## Where a brush applies
 
@@ -93,7 +102,7 @@ The **Options** can limit a brush in several independent ways:
 - **Where on the map** limits it to what you selected on the map with a selection tool, or to everything else. With *Inside selection* and nothing selected, the brush paints nowhere, and the panel says so.
 - The **height limits** limit it to certain heights, shown on a scale with a little landscape: the land in the accent colour is the land the brush will change.
 
-- **What is on the map** limits it to certain terrain types or layers (*only on*, *except on*), or to steep or gentle slopes. You can choose as many terrain types and layers as you like, with **Add another**: to turn grass and stone into dirt, paint dirt *only on* grass and stone.
+- **What is on the map** limits it to certain terrain types or layers (*only on*, *except on*), to steep or gentle slopes, or by **curvature**: to *hollows*, where the land around is higher (valleys, dips, the foot of slopes), or to *bumps*, where it is lower (ridges, peaks, the brow of slopes), by at least a number of blocks. You can choose as many terrain types and layers as you like, with **Add another**: to turn grass and stone into dirt, paint dirt *only on* grass and stone.
 
 For the height limits:
 
