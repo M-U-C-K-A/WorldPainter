@@ -25,6 +25,8 @@ WorldPainter Modernised includes a pack of custom trees, generated in eight shap
 | Azalea bushes | Low round bushes with flowering patches |
 | Pale oaks | Thick trunks under broad, grey-green crowns |
 | Giant redwoods | Very tall, thick trunks with a narrow crown in their upper half |
+| Slender spruces | Narrow columns of short layered branches, as on steep mountain slopes, from young trees to tall ones |
+| Larches | Narrow, airy cones of light green needles |
 
 Paint them straight away from the **Packs** panel (see below), or use them with the **Paint flora** node of the [node graph](node-graph.html), where they are listed with *(tree pack)*. Each kind of tree becomes a custom object layer, which you can edit like any other.
 
@@ -34,7 +36,7 @@ The **Packs** panel, next to Terrain, Layers and Biomes, is a library of everyth
 
 | Section | Contains |
 |---|---|
-| Trees | The fourteen kinds of the tree pack |
+| Trees | The sixteen kinds of the tree pack |
 | Flowers | Wildflower meadow, tulip field, sunflower field, roses and lilacs, spring flowers, pink petals, swamp flowers, flowers |
 | Plants & ground cover | Grass and flowers, tall grass, ferns, forest floor, bushes, dry grass, desert plants, jungle undergrowth, pale garden, mushrooms |
 | Water plants | Lily pads, seagrass and kelp, coral garden, sugar cane |
@@ -55,7 +57,7 @@ Natural ground is rarely made of one block. The material mixes are ready made mi
 | Grass and dirt | Trodden path | Alpine scree | Coral reef | White chalk strata | |
 | Grass and stone | Swamp mud | Cobblestone mix | Desert mix | Badlands strata | |
 | Lush grass | Mud and clay | Andesite mix | Red sand mix | | |
-| Dry grass | | Granite mix | | | |
+| Dry grass | Alpine heath | Granite mix | | | |
 | | | Deepslate mix | | | |
 | | | Gravel mix | | | |
 

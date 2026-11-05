@@ -6,6 +6,9 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 - **Large maps**: the map zooms out to 1:64 (1.56%) instead of 1:16, so that a map of 40,000 blocks fits on the screen, and draws faster when zoomed out; the walking distances also show several days and nights of walking on large maps, as far as it takes to cross the map
 - **Fix**: the walking distances no longer leave bits of their rings behind on the map when the mouse moves
+- **Floating islands you can see**: the map draws the tops of the islands with their terrain, trees and relief, a rim of the colour of their layer and their shadows on the land; the 3D view shows them floating, with their rocky undersides and their trees; specks of a few blocks around them and pinholes through them are tidied away when they are made
+- **Slender spruces and larches** in the tree pack, and an **Alpine heath** mix (podzol, coarse dirt, granite, rooted dirt and terracotta) for mountain ground
+- **Trees in the 3D view across the whole map**: on large maps they were only shown in its northern part
 
 ## New in 2.27.2-modernised.11
 
@@ -43,7 +46,7 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 - Surroundings drawn like the map, seed search, and blending the edges of the map into a seed (round maps included, with undo)
 - Paths from point to point with bridges on piers and tunnels, surfaces mixed at random or adapted to the land (beta), in three widths with an optional dynamic width, which clear the trees on their way and can be lined with fences, hedges, walls, lanterns or flowers; and rectangle selection
 - Brush settings which stay when switching tools: limits by map selection, by height on a scale you can drag, by several terrain types or layers at once, and by slope, with undo
-- Packs ready to paint: 14 kinds of custom trees, 24 presets of flowers and plants, 39 mixes of blocks, and 22 terrain stamp brushes
+- Packs ready to paint: 16 kinds of custom trees, 24 presets of flowers and plants, 40 mixes of blocks, and 22 terrain stamp brushes
 
 ## Downloads
 

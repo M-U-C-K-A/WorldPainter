@@ -22,7 +22,7 @@ WorldPainter Modernised starts from WorldPainter 2.27, which supports Minecraft 
 
 - **[Paths](paths.html)**: roads through points you click, following the land, with bridges and tunnels.
 - **[Seed search](surroundings-and-seeds.html#find-a-matching-seed)**: find a seed for which the land around the map matches its edges, and blend the edges into it.
-- **[Packs](trees-and-materials.html#the-packs-panel)**: fourteen kinds of custom trees, twenty-four presets of flowers, plants, water plants and crops, and thirty-nine mixes of blocks (grass, dirt, stone, sand, cliffs…), ready to paint, with what each is made of on hover.
+- **[Packs](trees-and-materials.html#the-packs-panel)**: sixteen kinds of custom trees, twenty-four presets of flowers, plants, water plants and crops, and forty mixes of blocks (grass, dirt, stone, sand, cliffs…), ready to paint, with what each is made of on hover.
 - **[Terrain stamps](interface.html#brushes)**: twenty-two brushes shaped like peaks, ranges, cirques, plateaus, volcanoes, valleys…
 
 ## Use

@@ -35,7 +35,9 @@ public final class TreePack {
         WILLOW("Willows", 0x5d8a3a, 7, 3),
         AZALEA("Azalea bushes", 0x7fa04a, 3, 3),
         PALE_OAK("Pale oaks", 0x9a9a8a, 6, 4),
-        REDWOOD("Giant redwoods", 0x6b3a2a, 7, 3);
+        REDWOOD("Giant redwoods", 0x6b3a2a, 7, 3),
+        SLENDER_SPRUCE("Slender spruces", 0x234a32, 3, 3),
+        LARCH("Larches", 0x8aa64a, 3, 3);
 
         Kind(String displayName, int colour, int grid, int density) {
             this.displayName = displayName;
@@ -136,6 +138,10 @@ public final class TreePack {
                 return paleOak(variant, random);
             case REDWOOD:
                 return redwood(variant, random);
+            case SLENDER_SPRUCE:
+                return slenderSpruce(variant, random);
+            case LARCH:
+                return larch(variant, random);
             default:
                 throw new InternalError();
         }
@@ -166,6 +172,45 @@ public final class TreePack {
             }
         }
         b.column(leaves, height, height + 2);
+        return b.build();
+    }
+
+    /**
+     * A slender mountain spruce: a narrow column of short layered branches, as on steep alpine slopes, from young
+     * trees to tall ones.
+     */
+    private static WPObject slenderSpruce(int variant, Random random) {
+        final int height = 9 + random.nextInt(14);
+        final Builder b = new Builder("Slender spruce " + (variant + 1));
+        final Material log = log("spruce"), leaves = leaves("spruce");
+        b.trunk(log, height, 1);
+        final int bottom = 1 + random.nextInt(2);
+        final double width = 1.3 + random.nextDouble() * 0.7 + height * 0.03;
+        for (int z = bottom; z < height; z++) {
+            final double t = (double) (z - bottom) / (height - bottom);
+            // Narrowing slowly up the trunk, and quickly near the top, with every other layer a little wider
+            final double radius = 0.6 + width * Math.pow(1 - t, 0.6) + (((z - bottom) % 2 == 0) ? 0.45 : 0);
+            b.disc(leaves, 0.5, 0.5, z, radius, 0.9, random);
+        }
+        b.column(leaves, height, height + 2);
+        return b.build();
+    }
+
+    /**
+     * A larch: a narrow, airy cone of light green needles on a straight trunk.
+     */
+    private static WPObject larch(int variant, Random random) {
+        final int height = 11 + random.nextInt(10);
+        final Builder b = new Builder("Larch " + (variant + 1));
+        final Material log = log("spruce"), leaves = leaves("birch");
+        b.trunk(log, height, 1);
+        final int bottom = 2 + random.nextInt(3);
+        for (int z = bottom; z < height; z++) {
+            final double t = (double) (z - bottom) / (height - bottom);
+            final double radius = 0.6 + (1 - t) * (2.2 + random.nextDouble() * 0.4);
+            b.disc(leaves, 0.5, 0.5, z, radius, 0.72, random);
+        }
+        b.column(leaves, height, height + 1);
         return b.build();
     }
 

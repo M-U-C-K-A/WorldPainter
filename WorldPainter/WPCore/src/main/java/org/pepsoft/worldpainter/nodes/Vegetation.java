@@ -15,6 +15,8 @@ public enum Vegetation {
     SWAMP_TREES("Swamp trees", SwampLand.INSTANCE, null, 0x4a5d23),
     TALL_SPRUCES(TreePack.Kind.TALL_SPRUCE),
     FIRS(TreePack.Kind.FIR),
+    SLENDER_SPRUCES(TreePack.Kind.SLENDER_SPRUCE),
+    LARCHES(TreePack.Kind.LARCH),
     RAINFOREST(TreePack.Kind.RAINFOREST),
     BIG_OAKS(TreePack.Kind.BIG_OAK),
     BIRCHES(TreePack.Kind.BIRCH),

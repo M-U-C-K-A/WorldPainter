@@ -111,6 +111,11 @@ public enum MaterialGroup {
             return blobs(this, 0.5f, row("podzol", 50), row("coarse_dirt", 20), row("moss_block", 15), row("dirt", 15));
         }
     },
+    ALPINE_HEATH("Alpine heath", 0x7a4e34, Family.SOIL) {
+        @Override MixedMaterial createMaterial() {
+            return blobs(this, 0.45f, row("podzol", 30), row("coarse_dirt", 22), row("granite", 14), row("rooted_dirt", 10), row("terracotta", 8), row("grass_block", 10), row("brown_terracotta", 6));
+        }
+    },
     MOSSY_GROUND("Mossy ground", 0x5a7a32, Family.GRASS) {
         @Override MixedMaterial createMaterial() {
             return blobs(this, 0.5f, row("moss_block", 50), row("grass_block", 30), row("mossy_cobblestone", 10), row("coarse_dirt", 10));

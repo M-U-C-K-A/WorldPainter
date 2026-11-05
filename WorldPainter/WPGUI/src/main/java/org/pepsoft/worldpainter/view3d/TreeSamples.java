@@ -5,6 +5,7 @@ import org.pepsoft.worldpainter.Dimension;
 import org.pepsoft.worldpainter.Tile;
 import org.pepsoft.worldpainter.layers.*;
 import org.pepsoft.worldpainter.layers.bo2.TreePack;
+import org.pepsoft.worldpainter.layers.tunnel.TunnelLayer;
 import org.pepsoft.worldpainter.objects.WPObject;
 
 import java.awt.*;
@@ -35,6 +36,19 @@ final class TreeSamples {
      * Find the trees in an area of a dimension.
      */
     static TreeSamples sample(Dimension dimension, Rectangle area) {
+        TreeSamples trees = sample(dimension, area, null, null);
+        // The trees on top of the floating islands, which are painted on the floor dimensions of their layers
+        for (TunnelLayer layer: IslandSamples.floatingLayers(dimension)) {
+            trees = merge(trees, sample(IslandSamples.getFloorDimension(dimension, layer), area, dimension, layer));
+        }
+        return trees;
+    }
+
+    /**
+     * Find the trees in an area of a dimension, optionally only where a layer is set in another dimension (for the
+     * floor dimension of a floating layer, which has trees only where its islands are).
+     */
+    private static TreeSamples sample(Dimension dimension, Rectangle area, Dimension maskDimension, Layer maskLayer) {
         final List<Style> styles = new ArrayList<>();
         for (Layer layer: dimension.getAllLayers(false)) {
             final Style style = Style.of(layer);
@@ -45,11 +59,26 @@ final class TreeSamples {
         if (styles.isEmpty()) {
             return NONE;
         }
-        // One candidate place for a tree every few blocks, fewer on large maps so that there are not too many to draw
+        // One candidate place for a tree every few blocks, fewer on large maps so that there are not too many to draw.
+        // If there are still too many trees, start again with fewer candidates, so that the trees are spread over the
+        // whole map rather than only its northern part
         int spacing = 4;
         while (((long) (area.width / spacing)) * (area.height / spacing) > MAX_CANDIDATES) {
             spacing *= 2;
         }
+        TreeSamples trees;
+        do {
+            trees = sample(dimension, area, maskDimension, maskLayer, styles, spacing);
+            spacing *= 2;
+        } while ((trees == null) && (spacing <= 1024));
+        return (trees != null) ? trees : NONE;
+    }
+
+    /**
+     * Find the trees with one candidate place every {@code spacing} blocks, or {@code null} if there are more than
+     * {@link #MAX_TREES}.
+     */
+    private static TreeSamples sample(Dimension dimension, Rectangle area, Dimension maskDimension, Layer maskLayer, List<Style> styles, int spacing) {
         TreeSamples trees = new TreeSamples(1024);
         int count = 0;
         for (int cy = area.y; cy < area.y + area.height; cy += spacing) {
@@ -57,6 +86,9 @@ final class TreeSamples {
                 final int x = cx + (int) (random(cx, cy, 1) * spacing), y = cy + (int) (random(cx, cy, 2) * spacing);
                 final Tile tile = dimension.getTile(x >> TILE_SIZE_BITS, y >> TILE_SIZE_BITS);
                 if (tile == null) {
+                    continue;
+                }
+                if ((maskLayer != null) && (! maskDimension.getBitLayerValueAt(maskLayer, x, y))) {
                     continue;
                 }
                 final int xInTile = x & TILE_SIZE_MASK, yInTile = y & TILE_SIZE_MASK;
@@ -87,8 +119,7 @@ final class TreeSamples {
                         trees.trunk[count] = style.trunk;
                         count++;
                         if (count >= MAX_TREES) {
-                            trees.count = count;
-                            return trees;
+                            return null;
                         }
                         break;
                     }
@@ -97,6 +128,31 @@ final class TreeSamples {
         }
         trees.count = count;
         return trees;
+    }
+
+    /**
+     * Both sets of trees together.
+     */
+    private static TreeSamples merge(TreeSamples a, TreeSamples b) {
+        if (b.count == 0) {
+            return a;
+        } else if (a.count == 0) {
+            return b;
+        }
+        final TreeSamples merged = new TreeSamples(a.count + b.count);
+        for (TreeSamples from: new TreeSamples[] {a, b}) {
+            final int at = (from == a) ? 0 : a.count;
+            System.arraycopy(from.x, 0, merged.x, at, from.count);
+            System.arraycopy(from.y, 0, merged.y, at, from.count);
+            System.arraycopy(from.base, 0, merged.base, at, from.count);
+            System.arraycopy(from.height, 0, merged.height, at, from.count);
+            System.arraycopy(from.width, 0, merged.width, at, from.count);
+            System.arraycopy(from.shape, 0, merged.shape, at, from.count);
+            System.arraycopy(from.leaves, 0, merged.leaves, at, from.count);
+            System.arraycopy(from.trunk, 0, merged.trunk, at, from.count);
+        }
+        merged.count = a.count + b.count;
+        return merged;
     }
 
     private TreeSamples grow() {
@@ -197,6 +253,10 @@ final class TreeSamples {
                     return new Style(layer, CONIFER, 28, 7, spacing, 0x2f5a35, SPRUCE);
                 case FIR:
                     return new Style(layer, CONIFER, 16, 8, spacing, 0x2b5a3a, SPRUCE);
+                case SLENDER_SPRUCE:
+                    return new Style(layer, CONIFER, 15, 4, spacing, 0x2a5236, SPRUCE);
+                case LARCH:
+                    return new Style(layer, CONIFER, 15, 5, spacing, 0x7f9c45, SPRUCE);
                 case REDWOOD:
                     return new Style(layer, CONIFER, 36, 9, spacing, 0x2f5a35, 0x6b3a2a);
                 case RAINFOREST:
