@@ -100,9 +100,39 @@ public final class PathGenerator {
                 last = terrain[i];
             }
         }
+        if (settings.isRiver()) {
+            // The surface of the water, along the whole river, which is all on the ground
+            return new PathPlan(points, terrain, water, riverSurface(terrain, water), new byte[n]);
+        }
         final float[] profile = profile(terrain, water, settings);
         final byte[] types = segments(terrain, water, profile, settings);
         return new PathPlan(points, terrain, water, profile, types);
+    }
+
+    /**
+     * The surface of the water of a river along its course: it flows from the higher end to the lower one and never
+     * rises on the way, a little below the land everywhere, and reaches the level of the water it flows into.
+     */
+    static float[] riverSurface(float[] terrain, float[] water) {
+        final int n = terrain.length;
+        final float[] surface = new float[n];
+        final boolean reversed = terrain[n - 1] > terrain[0];
+        float level = Float.MAX_VALUE;
+        for (int k = 0; k < n; k++) {
+            final int i = reversed ? (n - 1 - k) : k;
+            level = Math.min(level, terrain[i] - 0.8f);
+            if (! Float.isNaN(water[i])) {
+                // Into a lake or the sea: its level, and no lower
+                level = water[i];
+            }
+            surface[i] = level;
+        }
+        // Smooth out the steps, which keeps the water flowing one way
+        final float[] smoothed = movingAverage(surface, 6);
+        for (int i = 0; i < n; i++) {
+            smoothed[i] = Math.min(smoothed[i], surface[i]);
+        }
+        return smoothed;
     }
 
     /**
@@ -224,6 +254,10 @@ public final class PathGenerator {
                     // No trees, plants or objects on the path or overhanging it
                     clearVegetation(dimension, wx, wy);
                 }
+                if (settings.isRiver()) {
+                    digRiver(dimension, wx, wy, target, d, half, falloff, settings.getRiverDepth());
+                    continue;
+                }
                 switch (types[i]) {
                     case PathPlan.GROUND:
                         if (d <= half) {
@@ -253,7 +287,7 @@ public final class PathGenerator {
         }
 
         // What lines the sides, on the ground on either side of the path
-        if (settings.getSides() != PathSettings.Sides.NONE) {
+        if ((settings.getSides() != PathSettings.Sides.NONE) && (! settings.isRiver())) {
             createdLayers.addAll(lineSides(dimension, settings.getSides(), layerNumber, distances, nearest, types, halves, x0, y0, width, height));
         }
 
@@ -282,6 +316,37 @@ public final class PathGenerator {
         }
         return createdLayers;
     }
+
+    /**
+     * Dig a block of a river: in its bed, down to a rounded bottom under the surface of the water, with sand at the sides
+     * and gravel in the middle, filled with water and given the river biome; on its banks, a slope from just above the
+     * water up (or down) to the land.
+     */
+    private static void digRiver(Dimension dimension, int x, int y, float surface, float d, float half, float falloff, int depth) {
+        final int waterLevel = Math.round(surface);
+        final float current = dimension.getHeightAt(x, y);
+        if (d <= half) {
+            final float across = d / half;
+            final float bottom = waterLevel - Math.max(0.7f, depth * (1 - across * across));
+            dimension.setHeightAt(x, y, Math.min(current, bottom));
+            dimension.setTerrainAt(x, y, (across < 0.55f) ? Terrain.GRAVEL : Terrain.SAND);
+            if (dimension.getWaterLevelAt(x, y) < waterLevel) {
+                dimension.setWaterLevelAt(x, y, waterLevel);
+            }
+            dimension.setLayerValueAt(org.pepsoft.worldpainter.layers.Biome.INSTANCE, x, y, BIOME_RIVER);
+        } else {
+            // Just above the water at the edge of the bed, then the land; lower land is raised into a low bank, so that
+            // the water stays in its bed
+            final float bank = waterLevel + 0.6f;
+            final float t = smoothstep((d - half) / falloff);
+            dimension.setHeightAt(x, y, bank + (current - bank) * t);
+            if ((d - half) < 1.5f) {
+                dimension.setTerrainAt(x, y, Terrain.SAND);
+            }
+        }
+    }
+
+    private static final int BIOME_RIVER = 7;
 
     /**
      * Half the width of the path at each of its points: as set, or, for a dynamic width, varying with the land around

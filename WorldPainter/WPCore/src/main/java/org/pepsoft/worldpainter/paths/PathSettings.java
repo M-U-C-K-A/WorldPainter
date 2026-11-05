@@ -159,6 +159,30 @@ public class PathSettings implements Cloneable {
         this.adaptiveSurface = adaptiveSurface;
     }
 
+    /**
+     * Whether this is a river rather than a road: dug into the land along the line, with its water flowing from the
+     * higher end to the lower one and its surface never rising on the way, a bed of sand and gravel, the river biome,
+     * and banks sloping down to it. Rivers have no bridges, tunnels or sides.
+     */
+    public boolean isRiver() {
+        return river;
+    }
+
+    public void setRiver(boolean river) {
+        this.river = river;
+    }
+
+    /**
+     * How deep a river is in its middle, in blocks below its surface.
+     */
+    public int getRiverDepth() {
+        return riverDepth;
+    }
+
+    public void setRiverDepth(int riverDepth) {
+        this.riverDepth = riverDepth;
+    }
+
     @Override
     public PathSettings clone() {
         try {
@@ -168,8 +192,8 @@ public class PathSettings implements Cloneable {
         }
     }
 
-    private int width = Size.MEDIUM.width, curvature = 60, maxSpan = 96, tunnelHeight = 5;
-    private boolean bridges = true, tunnels, borders = true, dynamicWidth = true, clearVegetation = true, adaptiveSurface;
+    private int width = Size.MEDIUM.width, curvature = 60, maxSpan = 96, tunnelHeight = 5, riverDepth = 3;
+    private boolean bridges = true, tunnels, borders = true, dynamicWidth = true, clearVegetation = true, adaptiveSurface, river;
     private Sides sides = Sides.NONE;
     private double maxGrade = 0.25;
     private Terrain material = Terrain.GRAVEL, borderMaterial = Terrain.STONE;

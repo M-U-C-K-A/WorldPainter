@@ -50,7 +50,39 @@ public class PathDialog extends WorldPainterDialog {
         c.anchor = GridBagConstraints.WEST;
         c.gridy = 0;
 
+        // Road or river
+        c.gridx = 0;
+        form.add(new JLabel("Kind:"), c);
+        c.gridx = 1;
+        c.gridwidth = 2;
+        final JPanel kinds = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
+        roadRadioButton = new JRadioButton("Road", ! last.isRiver());
+        riverRadioButton = new JRadioButton("River", last.isRiver());
+        riverRadioButton.setToolTipText("<html>Dig a river along the line instead: its water flows from the higher end to the lower one,<br>never rising on the way, in a rounded bed of sand and gravel with the river biome, between sloping banks</html>");
+        final ButtonGroup kindGroup = new ButtonGroup();
+        kindGroup.add(roadRadioButton);
+        kindGroup.add(riverRadioButton);
+        kinds.add(roadRadioButton);
+        kinds.add(riverRadioButton);
+        kinds.add(new JLabel("     Depth:"));
+        depthSpinner = new JSpinner(new SpinnerNumberModel(last.getRiverDepth(), 1, 12, 1));
+        depthSpinner.setToolTipText("How deep the river is in its middle, in blocks below its surface");
+        depthSpinner.addChangeListener(e -> schedulePlan());
+        kinds.add(depthSpinner);
+        kinds.add(new JLabel("blocks"));
+        roadRadioButton.addActionListener(e -> {
+            updateKindControls();
+            schedulePlan();
+        });
+        riverRadioButton.addActionListener(e -> {
+            updateKindControls();
+            schedulePlan();
+        });
+        form.add(kinds, c);
+        c.gridwidth = 1;
+
         // Curvature
+        c.gridy++;
         c.gridx = 0;
         form.add(new JLabel("Bends:"), c);
         c.gridx = 1;
@@ -190,6 +222,7 @@ public class PathDialog extends WorldPainterDialog {
         content.add(buttons, BorderLayout.SOUTH);
         setContentPane(content);
 
+        updateKindControls();
         planTimer = new Timer(200, e -> plan());
         planTimer.setRepeats(false);
         plan();
@@ -222,7 +255,32 @@ public class PathDialog extends WorldPainterDialog {
         settings.setBorders(bordersCheckBox.isSelected());
         settings.setBorderMaterial((Terrain) borderComboBox.getSelectedItem());
         settings.setAdaptiveSurface(adaptiveSurfaceCheckBox.isSelected());
+        settings.setRiver(riverRadioButton.isSelected());
+        settings.setRiverDepth((Integer) depthSpinner.getValue());
         return settings;
+    }
+
+    /**
+     * A river has a depth, and none of the crossings, slopes, surfaces or sides of a road.
+     */
+    private void updateKindControls() {
+        final boolean river = riverRadioButton.isSelected();
+        depthSpinner.setEnabled(river);
+        crossingsComboBox.setEnabled(! river);
+        slopeSpinner.setEnabled(! river);
+        spanSpinner.setEnabled(! river);
+        sidesComboBox.setEnabled(! river);
+        adaptiveSurfaceCheckBox.setEnabled(! river);
+        if (river) {
+            materialComboBox.setEnabled(false);
+            bordersCheckBox.setEnabled(false);
+            borderComboBox.setEnabled(false);
+        } else {
+            updateSurfaceControls();
+        }
+        if (applyButton != null) {
+            applyButton.setText(river ? "Dig River" : "Build Path");
+        }
     }
 
     private void updateSurfaceControls() {
@@ -285,6 +343,12 @@ public class PathDialog extends WorldPainterDialog {
 
     private void updateInfo() {
         final int length = plan.getPoints().size();
+        if (planSettings.isRiver()) {
+            final float[] surface = plan.getProfile();
+            infoLabel.setText(String.format("<html>A river <b>%,d</b> blocks long, falling <b>%d</b> blocks from its source to its mouth</html>",
+                    length, Math.round(Math.abs(surface[0] - surface[surface.length - 1]))));
+            return;
+        }
         final int bridges = plan.count(PathPlan.BRIDGE), tunnels = plan.count(PathPlan.TUNNEL);
         final float[] cutAndFill = plan.getCutAndFill();
         final float[] profile = plan.getProfile();
@@ -348,6 +412,8 @@ public class PathDialog extends WorldPainterDialog {
     private final List<Point> waypoints;
     private final int layerNumber;
     private final JSlider curvatureSlider;
+    private final JRadioButton roadRadioButton, riverRadioButton;
+    private final JSpinner depthSpinner;
     private final JLabel curvatureLabel, infoLabel;
     private final JComboBox<Crossings> crossingsComboBox;
     private final JSpinner slopeSpinner, spanSpinner;

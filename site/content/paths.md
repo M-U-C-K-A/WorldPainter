@@ -5,7 +5,7 @@ description: Lay out roads and tracks through points you click, following the la
 
 # Paths
 
-The **Path** tool, in the *Sculpt terrain* group, lays out a road or a track through points you click, following the land.
+The **Path** tool, in the *Sculpt terrain* group, lays out a road or a track through points you click, following the land, or digs a river along them.
 
 1. Select the Path tool.
 2. **Left-click** the points the path should pass through, in order. They are joined by a dashed line on the map. **Right-click** or <kbd>Backspace</kbd> removes the last point, <kbd>Escape</kbd> starts again.
@@ -19,6 +19,7 @@ The **Path** tool, in the *Sculpt terrain* group, lays out a road or a track thr
 
 | Option | |
 |---|---|
+| **Kind** | A *road*, or a *river* with its **depth**: see [Rivers](#rivers) |
 | **Bends** | 0 is a straight line between the points; 100 is the route which follows the land best, going round hills rather than over them |
 | **Crossings** | *Natural*: the path goes up and down with the land. *Bridges* over valleys and water, *Tunnels* through hills, or both |
 | **Width** | Narrow (3 blocks), medium (5) or wide (7). With **Dynamic**, the width varies with the land: narrower across steep hillsides, on bridges and in tunnels, wider on flat open ground, and always gradually |
@@ -33,6 +34,10 @@ The **Path** tool, in the *Sculpt terrain* group, lays out a road or a track thr
 The preview shows the route over the land (orange on the ground, purple on bridges, grey and dashed in tunnels) and the height profile of the path over the land. Below them: the length, how much is on bridges and in tunnels, the steepest slope, and how much land is dug out and filled in.
 
 **Build Path** carves the path into the land, with a smooth transition to the land on either side.
+
+## Rivers
+
+With **River**, the line becomes a river instead. Its water flows from the higher end to the lower one, whichever you clicked first, and its surface never rises on the way, a little below the land; where it reaches a lake or the sea it takes their level. Its bed is rounded, as deep as you set in the middle, with gravel in the middle and sand at the sides, and has the river biome; its banks slope down to just above the water, and land lower than the river is raised into a low bank so that the water stays in its bed. Rivers have no bridges, tunnels, surfaces or sides. **Dig River** digs it; Undo takes it away.
 
 ## Bridges and tunnels
 
