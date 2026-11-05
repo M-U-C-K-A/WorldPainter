@@ -4,6 +4,8 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 ## New in this version
 
+- **Glass becomes Liquid Glass**, after Apple's: a vivid backdrop, areas floating as panes of clear glass with a specular rim, capsule buttons of glass (the default one tinted blue), switches for check boxes, and sliders whose thumb magnifies the track like a lens
+- **Tactile becomes a piece of hardware**: tools, brushes and tabs are keys with a light that comes on in the colour of their kind, sliders are faders over a row of lights, check boxes and radio buttons are lit keys, and the map lies on graph paper
 - **A fourth design, Tactile**: controls you feel you could touch, light or dark: buttons standing half out of the window, the default one in orange, sliders sunk into grooves with their ticks inside and a pill shaped thumb, selected tools standing out as tiles, and the map on a grid of fine lines
 - **A Classic design that really is classic**: the look of a classic desktop application, as WorldPainter used to have, instead of a variant of Modern: a grey window (charcoal in the dark), square controls with clear borders, buttons with a slight gradient, title bars on the areas, scroll bars with arrows, card shaped tabs, yellow tooltips, the font of the system and the original colour icons of WorldPainter
 - **Smooth the whole map at once**: *Global operations* can smooth the terrain everywhere, with a radius, optionally in half blocks (slabs and snow layers), within the limits of its filters (selection, heights, terrain, slope); undone in one go

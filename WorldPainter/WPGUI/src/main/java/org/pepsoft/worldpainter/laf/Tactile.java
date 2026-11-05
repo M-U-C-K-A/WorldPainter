@@ -12,7 +12,7 @@ import java.awt.geom.RoundRectangle2D;
  * darker lip along their bottom edge, a thin highlight along their top and a soft shadow, as if they could be pressed;
  * and the hollows into which sliders are sunk. The colours come from the {@code Tactile.*} keys of the theme.
  */
-final class Tactile {
+public final class Tactile {
     private Tactile() {
         // Prevent instantiation
     }
@@ -28,54 +28,87 @@ final class Tactile {
     }
 
     /**
-     * Paint a raised surface.
+     * Paint a key, like that of a mechanical keyboard: a body whose sides show around a slightly smaller top face, the
+     * thickest side along the bottom, lit from above, with a thin highlight along the top of the face and a soft shadow
+     * under it.
      *
-     * @param pressed Whether it is pushed in: the lip disappears and the surface moves down.
+     * @param pressed Whether it is pushed in: the sides almost disappear and the face moves down.
      * @param hover   Whether the mouse is over it: it lightens a little.
      */
     static void paintRaised(Graphics2D g2, float x, float y, float width, float height, float arc, Colours colours, boolean pressed, boolean hover, boolean enabled) {
-        final float lip = UIScale.scale(pressed ? 1f : 3f), offset = pressed ? UIScale.scale(2f) : 0f;
+        final float bottomSide = UIScale.scale(pressed ? 1.5f : 4.5f), side = UIScale.scale(pressed ? 1f : 1.6f), topSide = UIScale.scale(1f);
+        final float sink = pressed ? UIScale.scale(2.5f) : 0f;
         final Composite savedComposite = g2.getComposite();
         if (! enabled) {
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.55f));
         }
         try {
-            // A soft shadow under the button, stronger close to it
+            // A soft shadow under the key, stronger close to it
             if (! pressed) {
                 g2.setColor(withAlpha(colours.shadow, 0.45f));
-                g2.fill(new RoundRectangle2D.Float(x, y + UIScale.scale(2f), width, height, arc, arc));
+                g2.fill(new RoundRectangle2D.Float(x, y + UIScale.scale(2.5f), width, height, arc, arc));
                 g2.setColor(withAlpha(colours.shadow, 1f));
                 g2.fill(new RoundRectangle2D.Float(x + UIScale.scale(0.5f), y + UIScale.scale(1f), width - UIScale.scale(1f), height, arc, arc));
             }
-            // The lip: the darker side of the button, seen along its bottom edge
-            g2.setColor(colours.lip);
-            g2.fill(new RoundRectangle2D.Float(x, y + offset, width, height - offset, arc, arc));
-            // The face, lit from above
-            final float faceTop = y + offset, faceHeight = height - offset - lip;
+            // The body: its sides, darker towards the bottom
+            final float bodyTop = y + sink;
+            g2.setPaint(new GradientPaint(0, bodyTop, colours.bottom, 0, y + height, colours.lip));
+            g2.fill(new RoundRectangle2D.Float(x, bodyTop, width, height - sink, arc, arc));
+            // The face, a little smaller, lit from above
+            final float faceX = x + side, faceY = bodyTop + topSide, faceWidth = width - 2 * side, faceHeight = height - sink - topSide - bottomSide;
+            final float faceArc = Math.max(0, arc - 2 * side);
             Color top = colours.top, bottom = colours.bottom;
             if (hover && (! pressed)) {
-                top = lighten(top, 0.06f);
-                bottom = lighten(bottom, 0.06f);
+                top = lighten(top, 0.07f);
+                bottom = lighten(bottom, 0.07f);
             } else if (pressed) {
-                top = darken(top, 0.04f);
-                bottom = darken(bottom, 0.04f);
+                top = darken(top, 0.03f);
+                bottom = darken(bottom, 0.03f);
             }
-            g2.setPaint(new GradientPaint(0, faceTop, top, 0, faceTop + faceHeight, bottom));
-            g2.fill(new RoundRectangle2D.Float(x, faceTop, width, faceHeight, arc, arc));
+            g2.setPaint(new GradientPaint(0, faceY, top, 0, faceY + faceHeight, bottom));
+            g2.fill(new RoundRectangle2D.Float(faceX, faceY, faceWidth, faceHeight, faceArc, faceArc));
             // A thin highlight along the top of the face, fading out downwards
             final Shape savedClip = g2.getClip();
-            g2.clip(new RoundRectangle2D.Float(x, faceTop, width, faceHeight, arc, arc));
-            g2.setPaint(new GradientPaint(0, faceTop, colours.highlight, 0, faceTop + Math.min(faceHeight, UIScale.scale(8f)), withAlpha(colours.highlight, 0f)));
+            g2.clip(new RoundRectangle2D.Float(faceX, faceY, faceWidth, faceHeight, faceArc, faceArc));
+            g2.setPaint(new GradientPaint(0, faceY, colours.highlight, 0, faceY + Math.min(faceHeight, UIScale.scale(7f)), withAlpha(colours.highlight, 0f)));
             g2.setStroke(new BasicStroke(UIScale.scale(1.2f)));
-            g2.draw(new RoundRectangle2D.Float(x + UIScale.scale(0.6f), faceTop + UIScale.scale(0.6f), width - UIScale.scale(1.2f), faceHeight + arc, arc, arc));
+            g2.draw(new RoundRectangle2D.Float(faceX + UIScale.scale(0.6f), faceY + UIScale.scale(0.6f), faceWidth - UIScale.scale(1.2f), faceHeight + faceArc, faceArc, faceArc));
             g2.setClip(savedClip);
-            // The outline
+            // The edge between the face and the sides, and the outline of the key
+            g2.setColor(withAlpha(colours.lip, 0.55f));
+            g2.setStroke(new BasicStroke(UIScale.scale(0.8f)));
+            g2.draw(new RoundRectangle2D.Float(faceX, faceY, faceWidth, faceHeight, faceArc, faceArc));
             g2.setColor(colours.border);
             g2.setStroke(new BasicStroke(UIScale.scale(1f)));
-            g2.draw(new RoundRectangle2D.Float(x + 0.5f, y + offset + 0.5f, width - 1, height - offset - 1, arc, arc));
+            g2.draw(new RoundRectangle2D.Float(x + 0.5f, bodyTop + 0.5f, width - 1, height - sink - 1, arc, arc));
         } finally {
             g2.setComposite(savedComposite);
         }
+    }
+
+    /**
+     * Paint a small light: dark when off, glowing in its colour when on.
+     */
+    static void paintLed(Graphics2D g2, float centreX, float centreY, float radius, Color colour, boolean on) {
+        if (on) {
+            g2.setPaint(new RadialGradientPaint(centreX, centreY, radius * 3.2f, new float[] {0f, 1f}, new Color[] {withAlpha(colour, 0.55f), withAlpha(colour, 0f)}));
+            g2.fill(new java.awt.geom.Ellipse2D.Float(centreX - radius * 3.2f, centreY - radius * 3.2f, radius * 6.4f, radius * 6.4f));
+            g2.setPaint(new RadialGradientPaint(centreX - radius * 0.3f, centreY - radius * 0.3f, radius, new float[] {0f, 0.45f, 1f}, new Color[] {Color.WHITE, lighten(colour, 0.25f), colour}));
+        } else {
+            final Color off = colour("Tactile.led.off", new Color(0x9a9a9a));
+            g2.setPaint(new RadialGradientPaint(centreX - radius * 0.3f, centreY - radius * 0.4f, radius * 1.2f, new float[] {0f, 1f}, new Color[] {lighten(off, 0.3f), darken(off, 0.25f)}));
+        }
+        g2.fill(new java.awt.geom.Ellipse2D.Float(centreX - radius, centreY - radius, 2 * radius, 2 * radius));
+    }
+
+    /**
+     * The colour of the light of a button: that of the kind of tool it is for (sculpt, paint, water, selection), or the
+     * accent.
+     */
+    static Color ledColour(JComponent component) {
+        final Object kind = component.getClientProperty(KEY_KIND);
+        final Color accent = colour("Component.accentColor", new Color(0xea6a2a));
+        return (kind != null) ? colour("Tactile.led." + kind, accent) : accent;
     }
 
     /**
@@ -114,12 +147,16 @@ final class Tactile {
         try {
             final Object[] hints = com.formdev.flatlaf.ui.FlatUIUtils.setRenderingHints(g2);
             final int width = button.getWidth(), height = button.getHeight();
-            if (isToolBarButton(button)) {
-                // Tool bar buttons lie flat until the mouse is over them; when selected they stand out as a tile
+            if (isToolBarButton(button) && (button instanceof JToggleButton)) {
+                // The tools, terrain types, brushes… are keys, pushed in and lit when selected
+                final float inset = UIScale.scale(1f), arc = UIScale.scale(9f);
+                paintRaised(g2, inset, inset, width - 2 * inset, height - 2 * inset - UIScale.scale(1f), arc, Colours.of("Tactile.raised"), pressed || selected, rollover, enabled);
+                final float radius = UIScale.scale(2.2f);
+                paintLed(g2, width - inset - UIScale.scale(5.5f), inset + UIScale.scale(selected ? 6.5f : 4.5f), radius, ledColour(button), selected);
+            } else if (isToolBarButton(button)) {
+                // The commands of the tool bars lie flat until the mouse is over them
                 final float inset = UIScale.scale(1f), arc = UIScale.scale(10f);
-                if (selected) {
-                    paintRaised(g2, inset, inset, width - 2 * inset, height - 2 * inset - UIScale.scale(1f), arc, Colours.of("Tactile.raised"), pressed, rollover, enabled);
-                } else if (pressed || rollover) {
+                if (pressed || rollover) {
                     g2.setColor(colour(pressed ? "Tactile.toolbar.pressed" : "Tactile.toolbar.hover", new Color(0, 0, 0, 20)));
                     g2.fill(new RoundRectangle2D.Float(inset, inset, width - 2 * inset, height - 2 * inset, arc, arc));
                 }
@@ -151,6 +188,27 @@ final class Tactile {
         final Object type = button.getClientProperty("JButton.buttonType");
         return (type == null) || "toolBarButton".equals(type);
     }
+
+    /**
+     * How far down the icon and the text of a button are moved, to stay on the face of its key: a little up when the
+     * key is out (its face sits above its thick bottom side), down when it is pushed in.
+     */
+    static int contentOffset(AbstractButton button) {
+        if (! paints(button)) {
+            return 0;
+        }
+        final ButtonModel model = button.getModel();
+        final boolean pressed = (model.isArmed() && model.isPressed()) || model.isSelected();
+        if (isToolBarButton(button) && (! (button instanceof JToggleButton))) {
+            return 0;
+        }
+        return Math.round(UIScale.scale(pressed ? 1.5f : -1.5f));
+    }
+
+    /**
+     * The client property which tells which kind of tool a button is for, to colour its light.
+     */
+    public static final String KEY_KIND = "Tactile.kind";
 
     static boolean isToolBarButton(AbstractButton button) {
         return "toolBarButton".equals(button.getClientProperty("JButton.buttonType")) || (button.getParent() instanceof JToolBar);

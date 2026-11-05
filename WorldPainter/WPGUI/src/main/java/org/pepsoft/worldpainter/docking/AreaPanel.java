@@ -46,6 +46,40 @@ final class AreaPanel extends JPanel {
         return manager;
     }
 
+    /**
+     * In the Glass theme each area is a pane of liquid glass floating on the backdrop, inset from its neighbours,
+     * except those holding the map or the 3D view, which have a glass frame of their own.
+     */
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        if (org.pepsoft.worldpainter.design.Design.isGlass() && (! holdsGlassFrame(content, 4))) {
+            final Graphics2D g2 = (Graphics2D) g.create();
+            try {
+                final float margin = glassMargin();
+                org.pepsoft.worldpainter.design.Glass.paintSurface(g2, margin, margin, getWidth() - 2 * margin, getHeight() - 2 * margin, com.formdev.flatlaf.util.UIScale.scale(18f));
+            } finally {
+                g2.dispose();
+            }
+        }
+    }
+
+    private int glassMargin() {
+        return (org.pepsoft.worldpainter.design.Design.isGlass() && (! holdsGlassFrame(content, 4))) ? Math.round(com.formdev.flatlaf.util.UIScale.scale(4f)) : 0;
+    }
+
+    private static boolean holdsGlassFrame(Container container, int depth) {
+        for (Component child: container.getComponents()) {
+            if ((child instanceof JComponent) && (((JComponent) child).getClientProperty(org.pepsoft.worldpainter.design.Glass.KEY_FRAME) != null)) {
+                return true;
+            }
+            if ((depth > 1) && (child instanceof Container) && holdsGlassFrame((Container) child, depth - 1)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     Leaf getLeaf() {
         return leaf;
     }
@@ -338,14 +372,16 @@ final class AreaPanel extends JPanel {
 
         @Override
         public void layoutContainer(Container parent) {
-            final int width = parent.getWidth(), height = parent.getHeight();
+            // Inside the pane of glass in the Glass theme
+            final int margin = glassMargin(), inner = Math.round(margin * 1.5f);
+            final int width = parent.getWidth() - 2 * inner, height = parent.getHeight() - 2 * inner;
             final int headerHeight = Math.min(height, header.getPreferredSize().height);
-            header.setBounds(0, 0, width, headerHeight);
+            header.setBounds(inner, inner, width, headerHeight);
             final int tabsWidth = tabStrip.isVisible() ? Math.min(width, tabStrip.getPreferredSize().width) : 0;
-            tabStrip.setBounds(0, headerHeight, tabsWidth, height - headerHeight);
-            content.setBounds(tabsWidth, headerHeight, width - tabsWidth, height - headerHeight);
+            tabStrip.setBounds(inner, inner + headerHeight, tabsWidth, height - headerHeight);
+            content.setBounds(inner + tabsWidth, inner + headerHeight, width - tabsWidth, height - headerHeight);
             if (corners != null) {
-                corners.setBounds(0, 0, width, height);
+                corners.setBounds(0, 0, parent.getWidth(), parent.getHeight());
             }
         }
     }

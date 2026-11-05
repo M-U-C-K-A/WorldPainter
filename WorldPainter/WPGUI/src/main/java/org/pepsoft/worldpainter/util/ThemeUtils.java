@@ -235,17 +235,41 @@ public final class ThemeUtils {
      */
     public static BufferedImage createCanvasDotPattern() {
         final boolean grid = UIManager.getBoolean("WorldPainter.canvasGrid");
-        final int cell = grid ? 32 : 22;
+        if (grid) {
+            // Graph paper: fine lines every 32 pixels with a dot where they cross, and a stronger line every fourth
+            final int cell = 32, size = cell * 4;
+            final BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+            final Graphics2D g2 = image.createGraphics();
+            try {
+                g2.setColor(getCanvasBackground());
+                g2.fillRect(0, 0, size, size);
+                g2.setColor(getColour("WorldPainter.canvasGridLine", Color.LIGHT_GRAY));
+                for (int i = 0; i < 4; i++) {
+                    g2.fillRect(i * cell + cell / 2, 0, 1, size);
+                    g2.fillRect(0, i * cell + cell / 2, size, 1);
+                }
+                g2.setColor(getColour("WorldPainter.canvasGridMajor", Color.GRAY));
+                g2.fillRect(cell / 2, 0, 1, size);
+                g2.fillRect(0, cell / 2, size, 1);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(getColour("WorldPainter.canvasDot", Color.GRAY));
+                for (int i = 0; i < 4; i++) {
+                    for (int j = 0; j < 4; j++) {
+                        final float r = ((i == 0) && (j == 0)) ? 1.6f : 1.1f;
+                        g2.fill(new java.awt.geom.Ellipse2D.Float(i * cell + cell / 2f + 0.5f - r, j * cell + cell / 2f + 0.5f - r, 2 * r, 2 * r));
+                    }
+                }
+            } finally {
+                g2.dispose();
+            }
+            return image;
+        }
+        final int cell = 22;
         final BufferedImage image = new BufferedImage(cell, cell, BufferedImage.TYPE_INT_RGB);
         final Graphics2D g2 = image.createGraphics();
         try {
             g2.setColor(getCanvasBackground());
             g2.fillRect(0, 0, cell, cell);
-            if (grid) {
-                g2.setColor(getColour("WorldPainter.canvasGridLine", Color.LIGHT_GRAY));
-                g2.fillRect(cell / 2, 0, 1, cell);
-                g2.fillRect(0, cell / 2, cell, 1);
-            }
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(getColour("WorldPainter.canvasDot", Color.GRAY));
             g2.fill(new java.awt.geom.Ellipse2D.Float(cell / 2f - 1.1f, cell / 2f - 1.1f, 2.2f, 2.2f));

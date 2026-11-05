@@ -3819,6 +3819,14 @@ public final class App extends JFrame implements BrushControl,
         constraints.fill = GridBagConstraints.HORIZONTAL;
         constraints.anchor = GridBagConstraints.FIRST_LINE_START;
         constraints.weightx = 1.0;
+        // The kind of each tool, for the colour of its light in the Tactile theme
+        for (Object[] section: new Object[][] {{sculptPanel, "sculpt"}, {paintPanel, "paint"}, {waterPanel, "water"}, {otherPanel, "select"}}) {
+            for (Component component: ((JPanel) section[0]).getComponents()) {
+                if (component instanceof JComponent) {
+                    ((JComponent) component).putClientProperty(org.pepsoft.worldpainter.laf.Tactile.KEY_KIND, section[1]);
+                }
+            }
+        }
         addToolSection(toolPanel, constraints, "Sculpt terrain", "mountain", "Change the shape of the land: raise, lower, flatten, smooth", sculptPanel, true);
         addToolSection(toolPanel, constraints, "Paint", "brush", "Paint the selected terrain, layer or biome onto the land, without changing its shape", paintPanel, false);
         addToolSection(toolPanel, constraints, "Water", "waves", "Flood areas with water or lava, or dry them out", waterPanel, false);

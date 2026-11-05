@@ -32,6 +32,7 @@ public class TactileSliderUI extends FlatSliderUI {
             if (slider.getPaintTicks()) {
                 paintNotches(g2, groove);
             }
+            paintMeter(g2, groove);
             FlatUIUtils.resetRenderingHints(g2, hints);
         } finally {
             g2.dispose();
@@ -53,17 +54,34 @@ public class TactileSliderUI extends FlatSliderUI {
         {
             g2.setColor(Tactile.colour("Tactile.tick", new Color(0xb5b5b5)));
             g2.setStroke(new BasicStroke(UIScale.scale(1.5f), BasicStroke.CAP_ROUND, BasicStroke.CAP_ROUND));
-            final float middle = groove.y + groove.height / 2f;
+            // Short notches along the top of the groove
+            final float top = groove.y + UIScale.scale(3f);
             final int major = slider.getMajorTickSpacing(), minor = slider.getMinorTickSpacing();
             final int spacing = (minor > 0) ? minor : major;
             if (spacing > 0) {
                 for (int value = slider.getMinimum(); value <= slider.getMaximum(); value += spacing) {
                     final boolean isMajor = (major > 0) && (((value - slider.getMinimum()) % major) == 0);
-                    final float half = groove.height * (isMajor ? 0.22f : 0.13f);
+                    final float length = UIScale.scale(isMajor ? 4f : 2.5f);
                     final float x = xPositionForValue(value);
-                    g2.draw(new Line2D.Float(x, middle - half, x, middle + half));
+                    g2.draw(new Line2D.Float(x, top, x, top + length));
                 }
             }
+        }
+    }
+
+    /**
+     * A row of lights along the groove, lit up to the value, as on the meters of a mixing desk.
+     */
+    private void paintMeter(Graphics2D g2, Rectangle groove) {
+        final float spacing = UIScale.scale(7f), radius = UIScale.scale(1.6f);
+        final float y = groove.y + groove.height * 0.62f;
+        final float from = trackRect.x, to = trackRect.x + trackRect.width;
+        final int count = Math.max(2, Math.round((to - from) / spacing) + 1);
+        final float valueX = xPositionForValue(slider.getValue());
+        final Color colour = Tactile.ledColour(slider);
+        for (int i = 0; i < count; i++) {
+            final float x = from + (to - from) * i / (count - 1);
+            Tactile.paintLed(g2, x, y, radius, colour, slider.isEnabled() && (x <= valueX + 0.5f));
         }
     }
 
@@ -80,7 +98,22 @@ public class TactileSliderUI extends FlatSliderUI {
             final float inset = UIScale.scale(3f);
             final float width = thumbRect.width - UIScale.scale(2f), height = groove.height - 2 * inset;
             final float x = thumbRect.x + UIScale.scale(1f), y = groove.y + inset - UIScale.scale(1f);
-            Tactile.paintRaised(g2, x, y, width, height, width, Tactile.Colours.of("Tactile.thumb"), isDragging(), false, slider.isEnabled());
+            Tactile.paintRaised(g2, x, y, width, height, UIScale.scale(5f), Tactile.Colours.of("Tactile.thumb"), isDragging(), false, slider.isEnabled());
+            // The grip of a fader cap: ridges across it, and a line in the accent colour in the middle
+            final float sink = isDragging() ? UIScale.scale(2.5f) : 0f;
+            final float faceTop = y + sink + UIScale.scale(2f), faceBottom = y + height - UIScale.scale(isDragging() ? 2f : 5f);
+            final float centre = x + width / 2f;
+            g2.setStroke(new BasicStroke(UIScale.scale(1f)));
+            for (int i = -1; i <= 1; i += 2) {
+                final float gx = centre + i * UIScale.scale(3f);
+                g2.setColor(Tactile.colour("Tactile.thumb.lip", Color.GRAY));
+                g2.draw(new Line2D.Float(gx, faceTop + UIScale.scale(2f), gx, faceBottom - UIScale.scale(2f)));
+                g2.setColor(Tactile.colour("Tactile.highlight", Color.WHITE));
+                g2.draw(new Line2D.Float(gx + UIScale.scale(1f), faceTop + UIScale.scale(2f), gx + UIScale.scale(1f), faceBottom - UIScale.scale(2f)));
+            }
+            g2.setColor(Tactile.ledColour(slider));
+            g2.setStroke(new BasicStroke(UIScale.scale(2f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g2.draw(new Line2D.Float(centre, faceTop + UIScale.scale(3f), centre, faceBottom - UIScale.scale(3f)));
             FlatUIUtils.resetRenderingHints(g2, hints);
         } finally {
             g2.dispose();

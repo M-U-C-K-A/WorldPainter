@@ -37,7 +37,7 @@ public class ResponsiveColumnsLayout implements LayoutManager {
         synchronized (parent.getTreeLock()) {
             final Insets insets = parent.getInsets();
             final int width = parent.getWidth() - insets.left - insets.right;
-            final int columns = (width > 0) ? columns(width) : 1;
+            final int columns = (width > 0) ? columns(parent, width) : 1;
             int height = 0, rowHeight = 0, index = 0;
             for (Component component: parent.getComponents()) {
                 if (component.isVisible()) {
@@ -50,7 +50,7 @@ public class ResponsiveColumnsLayout implements LayoutManager {
                 }
             }
             height += (rowHeight > 0) ? rowHeight : ((height > 0) ? -gap : 0);
-            return new Dimension(insets.left + insets.right + columnWidth, insets.top + insets.bottom + height);
+            return new Dimension(insets.left + insets.right + effectiveColumnWidth(parent), insets.top + insets.bottom + height);
         }
     }
 
@@ -64,7 +64,7 @@ public class ResponsiveColumnsLayout implements LayoutManager {
         synchronized (parent.getTreeLock()) {
             final Insets insets = parent.getInsets();
             final int width = parent.getWidth() - insets.left - insets.right;
-            final int columns = columns(width), cellWidth = (width - (columns - 1) * gap) / columns;
+            final int columns = columns(parent, width), cellWidth = (width - (columns - 1) * gap) / columns;
             final Component[] components = parent.getComponents();
             int y = insets.top, column = 0, rowStart = 0;
             for (int i = 0; i <= components.length; i++) {
@@ -107,8 +107,22 @@ public class ResponsiveColumnsLayout implements LayoutManager {
         }
     }
 
-    private int columns(int width) {
-        return Math.max(1, Math.min(maxColumns, (width + gap) / (columnWidth + gap)));
+    private int columns(Container parent, int width) {
+        return Math.max(1, Math.min(maxColumns, (width + gap) / (effectiveColumnWidth(parent) + gap)));
+    }
+
+    /**
+     * The width of the columns: the narrowest allowed, or that of the widest component if it is wider, so that
+     * nothing is cut off (for instance with the wider switches of the Glass theme).
+     */
+    private int effectiveColumnWidth(Container parent) {
+        int width = columnWidth;
+        for (Component component: parent.getComponents()) {
+            if (component.isVisible()) {
+                width = Math.max(width, component.getPreferredSize().width);
+            }
+        }
+        return width;
     }
 
     private final int columnWidth, gap, maxColumns;

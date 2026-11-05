@@ -10,12 +10,15 @@ import java.awt.*;
 import java.awt.event.ContainerEvent;
 import java.awt.geom.Area;
 import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 
 /**
- * The frosted glass of the Glass theme: a soft gradient behind the windows, and translucent surfaces with a light
- * edge and a soft shadow on it. For the gradient to show, the panels between the window and the surfaces are made see
+ * The liquid glass of the Glass theme, after the Liquid Glass of Apple: a vivid backdrop of colours melting into each
+ * other behind the windows, and on it panes of clear glass which catch the light: a bright specular rim, strongest at
+ * their top left and with a reflection at their bottom right, a glow just inside their edges, as thick glass bends the
+ * light there, and a soft shadow. For the gradient to show, the panels between the window and the surfaces are made see
  * through while the Glass theme is in use, and opaque again when switching to another theme.
  */
 public final class Glass {
@@ -29,9 +32,68 @@ public final class Glass {
     public static void paintBackdrop(Graphics2D g2, int width, int height) {
         g2.setPaint(new GradientPaint(0, 0, colour("WorldPainter.glass.backdropTop", Design.background()), width * 0.3f, height, colour("WorldPainter.glass.backdropBottom", Design.background())));
         g2.fillRect(0, 0, width, height);
+        // Colours melting into each other, like the wallpapers behind Liquid Glass
         final float radius = Math.max(width, height) * 0.6f;
         paintGlow(g2, colour("WorldPainter.glass.glow", null), width * 0.05f, height * 0.02f, radius, width, height);
         paintGlow(g2, colour("WorldPainter.glass.glow2", null), width * 0.98f, height * 0.98f, radius * 0.8f, width, height);
+        paintGlow(g2, colour("WorldPainter.glass.glow3", null), width * 0.92f, height * 0.08f, radius * 0.7f, width, height);
+        paintGlow(g2, colour("WorldPainter.glass.glow4", null), width * 0.12f, height * 0.95f, radius * 0.75f, width, height);
+        paintGlow(g2, colour("WorldPainter.glass.glow5", null), width * 0.55f, height * 0.5f, radius * 0.45f, width, height);
+    }
+
+    /**
+     * Paint a piece of liquid glass in a shape: clear glass (or glass tinted with a colour), a glow just inside its
+     * edge where the thick glass bends the light, and a specular rim, bright at the top left with a reflection at the
+     * bottom right. Nothing is painted outside the shape.
+     *
+     * @param tint The colour of tinted glass, such as that of a default button, or {@code null} for clear glass.
+     */
+    public static void paintLiquid(Graphics2D g2, Shape shape, Color tint) {
+        final Graphics2D g = (Graphics2D) g2.create();
+        try {
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+            final Rectangle2D bounds = shape.getBounds2D();
+            final float x = (float) bounds.getX(), y = (float) bounds.getY(), width = (float) bounds.getWidth(), height = (float) bounds.getHeight();
+            // The glass, lighter at the top
+            if (tint != null) {
+                g.setPaint(new GradientPaint(0, y, lighten(tint, 0.18f), 0, y + height, tint));
+            } else {
+                g.setPaint(new GradientPaint(0, y, colour("WorldPainter.glass.surfaceTop", Design.surface()), 0, y + Math.min(height, UIScale.scale(120f)), colour("WorldPainter.glass.surface", Design.surface())));
+            }
+            g.fill(shape);
+            // The glow inside the edge: the light gathered by the rounded edge of thick glass
+            g.clip(shape);
+            final Color glow = colour("WorldPainter.glass.innerGlow", new Color(255, 255, 255, 90));
+            final float glowWidth = Math.min(Math.min(width, height) / 2f, UIScale.scale(7f));
+            for (int i = 0; i < 4; i++) {
+                final float t = (i + 1) / 4f;
+                g.setStroke(new BasicStroke(glowWidth * 2 * t));
+                g.setColor(new Color(glow.getRed(), glow.getGreen(), glow.getBlue(), Math.round(glow.getAlpha() * (1 - t) * 0.6f)));
+                g.draw(shape);
+            }
+            // A faint shade along the inside of the bottom edge
+            g.setPaint(new GradientPaint(0, y + height - UIScale.scale(5f), new Color(0, 0, 0, 0), 0, y + height, colour("WorldPainter.glass.innerShade", new Color(0, 0, 0, 18))));
+            g.fill(new Rectangle2D.Float(x, y + height - UIScale.scale(5f), width, UIScale.scale(5f)));
+            // The specular rim: bright where the light comes from (the top left), dim along the sides, and reflected
+            // at the bottom right
+            final Color specular = colour("WorldPainter.glass.specular", Color.WHITE);
+            g.setStroke(new BasicStroke(UIScale.scale(2.2f)));
+            g.setPaint(new LinearGradientPaint(new Point2D.Float(x, y), new Point2D.Float(x + width, y + height), new float[] {0f, 0.32f, 0.68f, 1f},
+                    new Color[] {withAlpha(specular, 1f), withAlpha(specular, 0.18f), withAlpha(specular, 0.12f), withAlpha(specular, 0.7f)}));
+            g.draw(shape);
+        } finally {
+            g.dispose();
+        }
+    }
+
+    private static Color withAlpha(Color colour, float factor) {
+        return new Color(colour.getRed(), colour.getGreen(), colour.getBlue(), Math.round(colour.getAlpha() * factor));
+    }
+
+    private static Color lighten(Color colour, float amount) {
+        return new Color(Math.round(colour.getRed() + (255 - colour.getRed()) * amount), Math.round(colour.getGreen() + (255 - colour.getGreen()) * amount),
+                Math.round(colour.getBlue() + (255 - colour.getBlue()) * amount), colour.getAlpha());
     }
 
     /**
@@ -45,11 +107,7 @@ public final class Glass {
             g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
             final RoundRectangle2D shape = new RoundRectangle2D.Float(x, y, width, height, arc, arc);
             paintShadow(g, shape);
-
-            // The glass, lighter at the top
-            g.setPaint(new GradientPaint(0, y, colour("WorldPainter.glass.surfaceTop", Design.surface()), 0, y + Math.min(height, UIScale.scale(120f)), colour("WorldPainter.glass.surface", Design.surface())));
-            g.fill(shape);
-            paintEdge(g, shape);
+            paintLiquid(g, shape, null);
         } finally {
             g.dispose();
         }
@@ -94,6 +152,18 @@ public final class Glass {
         final float x = (float) shape.getX(), y = (float) shape.getY(), width = (float) shape.getWidth(), height = (float) shape.getHeight(), arc = (float) shape.getArcWidth();
         g.setPaint(new GradientPaint(0, y, colour("WorldPainter.glass.edge", Design.surfaceBorder()), 0, y + height, colour("WorldPainter.glass.edgeBottom", Design.surfaceBorder())));
         g.draw(new RoundRectangle2D.Float(x + 0.5f, y + 0.5f, width - 1, height - 1, arc - 1, arc - 1));
+    }
+
+    /**
+     * The specular rim alone, around something which is not glass itself, such as the map.
+     */
+    private static void paintRim(Graphics2D g, RoundRectangle2D shape) {
+        final float x = (float) shape.getX(), y = (float) shape.getY(), width = (float) shape.getWidth(), height = (float) shape.getHeight();
+        final Color specular = colour("WorldPainter.glass.specular", Color.WHITE);
+        g.setStroke(new BasicStroke(UIScale.scale(2.5f)));
+        g.setPaint(new LinearGradientPaint(new Point2D.Float(x, y), new Point2D.Float(x + width, y + height), new float[] {0f, 0.3f, 0.7f, 1f},
+                new Color[] {withAlpha(specular, 1f), withAlpha(specular, 0.25f), withAlpha(specular, 0.2f), withAlpha(specular, 0.8f)}));
+        g.draw(shape);
     }
 
     /**
@@ -217,6 +287,7 @@ public final class Glass {
     private static final class Frame extends JPanel {
         Frame(JComponent content) {
             super(new BorderLayout());
+            putClientProperty(KEY_FRAME, Boolean.TRUE);
             layer = new JLayer<>(content, new LayerUI<>() {
                 @Override
                 public void paint(Graphics g, JComponent c) {
@@ -228,7 +299,7 @@ public final class Glass {
                             g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
                             final float arc = UIScale.scale(FRAME_ARC);
                             paintCorners(g2, c, arc);
-                            paintEdge(g2, new RoundRectangle2D.Float(0, 0, c.getWidth(), c.getHeight(), arc, arc));
+                            paintRim(g2, new RoundRectangle2D.Float(0.5f, 0.5f, c.getWidth() - 1, c.getHeight() - 1, arc, arc));
                         } finally {
                             g2.dispose();
                         }
@@ -305,6 +376,10 @@ public final class Glass {
         private static final long serialVersionUID = 1L;
     }
 
+    /**
+     * The client property by which the glass frame around the map can be recognised.
+     */
+    public static final String KEY_FRAME = "WorldPainter.glass.frame";
     private static final String CLEARED = "WorldPainter.glass.cleared";
     private static final int SHADOW_SIZE = 10, FRAME_MARGIN = 8;
     private static final float FRAME_ARC = 20f;
