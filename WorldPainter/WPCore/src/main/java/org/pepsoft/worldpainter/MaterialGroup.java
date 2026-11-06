@@ -289,23 +289,41 @@ public enum MaterialGroup {
         return Terrain.getCustomTerrain(free);
     }
 
+    /**
+     * Whether the colour of a mixed material is only the preview colour of the group it was made from, which earlier
+     * versions gave the materials of the groups. The map then shows its blocks instead of one colour for all of them.
+     */
+    public static boolean isPreviewColour(MixedMaterial material) {
+        final Integer colour = material.getColour();
+        if (colour == null) {
+            return false;
+        }
+        for (MaterialGroup group: values()) {
+            if ((group.colour == (colour & 0xffffff)) && group.displayName.equals(material.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static Row row(String block, int count) {
         return new Row(Material.get("minecraft:" + block), Math.max(1, count), 1.0f);
     }
 
     private static MixedMaterial noise(MaterialGroup group, Row... rows) {
-        return new MixedMaterial(group.displayName, rows, -1, group.colour);
+        // (No colour of its own, so that the map shows its blocks, as Minecraft will)
+        return new MixedMaterial(group.displayName, rows, -1, null);
     }
 
     private static MixedMaterial blobs(MaterialGroup group, float scale, Row... rows) {
-        return new MixedMaterial(group.displayName, rows, -1, group.colour, scale);
+        return new MixedMaterial(group.displayName, rows, -1, null, scale);
     }
 
     /**
      * Horizontal bands of rock which repeat upwards and dip slightly, as in a cliff of sedimentary rock.
      */
     private static MixedMaterial strata(MaterialGroup group, Row... rows) {
-        return new MixedMaterial(group.displayName, rows, -1, group.colour, null, 0.08, 0.03, true);
+        return new MixedMaterial(group.displayName, rows, -1, null, null, 0.08, 0.03, true);
     }
 
     private final String displayName;

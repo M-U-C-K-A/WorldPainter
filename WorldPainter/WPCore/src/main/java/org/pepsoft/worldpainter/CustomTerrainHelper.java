@@ -67,13 +67,15 @@ public class CustomTerrainHelper {
 
     public int getColour(long seed, int x, int y, float z, int height, ColourScheme colourScheme) {
         MixedMaterial material = Terrain.customMaterials[index];
-        Integer colour = (material != null) ? material.getColour() : UNKNOWN_COLOUR;
+        // (The preview colour of a ready made mix is not its colour: show its blocks)
+        Integer colour = (material != null) ? (MaterialGroup.isPreviewColour(material) ? null : material.getColour()) : UNKNOWN_COLOUR;
         return (colour != null) ? colour : colourScheme.getColour(getMaterial(seed, x, y, z, height));
     }
     
     public int getColour(long seed, int x, int y, int z, int height, ColourScheme colourScheme) {
         MixedMaterial material = Terrain.customMaterials[index];
-        Integer colour = (material != null) ? material.getColour() : UNKNOWN_COLOUR;
+        // (The preview colour of a ready made mix is not its colour: show its blocks)
+        Integer colour = (material != null) ? (MaterialGroup.isPreviewColour(material) ? null : material.getColour()) : UNKNOWN_COLOUR;
         return (colour != null) ? colour : colourScheme.getColour(getMaterial(seed, x, y, z, height));
     }
     
