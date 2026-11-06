@@ -32,13 +32,13 @@ public class Flood extends MouseOrTabletOperation {
         optionsPanel = floodWithLava
                 ? new StandardOptionsPanel("Flood with Lava", "<ul><li>Left-click on dry land to flood with lava\n" +
                 "<li>Left-click on lava to raise it by one\n" +
-                "<li>Right-click on lava to lower it by one\n" +
-                "<li>Click on water to turn it to lava\n" +
+                "<li>Left-click on water to turn it to lava\n" +
+                "<li>Right-click on lava or water to lower it by one, leaving it as it is\n" +
                 "</ul>")
                 : new StandardOptionsPanel("Flood with Water", "<ul><li>Left-click on dry land to flood with water\n" +
                 "<li>Left-click on water to raise it by one\n" +
-                "<li>Right-click on water to lower it by one\n" +
-                "<li>Click on lava to turn it to water\n" +
+                "<li>Left-click on lava to turn it to water\n" +
+                "<li>Right-click on water or lava to lower it by one, leaving it as it is\n" +
                 "</ul>");
     }
     
@@ -72,9 +72,11 @@ public class Flood extends MouseOrTabletOperation {
                 return;
             }
             final GeneralQueueLinearFloodFiller.FillMethod fillMethod;
-            if (fluidPresent && (floodWithLava != dimension.getBitLayerValueAt(FloodWithLava.INSTANCE, centreX, centreY))) {
+            final boolean lavaPresent = fluidPresent && dimension.getBitLayerValueAt(FloodWithLava.INSTANCE, centreX, centreY);
+            if (fluidPresent && (! inverse) && (floodWithLava != lavaPresent)) {
                 // There is fluid present of a different type; don't change the
-                // height, just change the type
+                // height, just change the type (only with the left button: the
+                // right button lowers whichever fluid it is)
                 if (floodWithLava) {
                     fillMethod = new FloodFillMethod("Changing water to lava", dimensionBounds) {
                         @Override public boolean isBoundary(int x, int y) {
@@ -110,35 +112,21 @@ public class Flood extends MouseOrTabletOperation {
                 }
                 final int floodToHeight = inverse ? (height - 1): (height + 1);
                 if (inverse) {
-                    if (floodWithLava) {
-                        fillMethod = new FloodFillMethod("Lowering lava level", dimensionBounds) {
-                            @Override public boolean isBoundary(int x, int y) {
-                                final int height = dimension.getIntHeightAt(x, y);
-                                return (height == Integer.MIN_VALUE) // Not on a tile
-                                        || (dimension.getWaterLevelAt(x, y) <= height) // Not flooded
-                                        || (dimension.getWaterLevelAt(x, y) <= floodToHeight); // Already at the required level or lower
-                            }
+                    // Lower the fluid that was clicked, leaving it water or lava, and not the fluid of the other kind
+                    // next to it
+                    fillMethod = new FloodFillMethod(lavaPresent ? "Lowering lava level" : "Lowering water level", dimensionBounds) {
+                        @Override public boolean isBoundary(int x, int y) {
+                            final int height = dimension.getIntHeightAt(x, y);
+                            return (height == Integer.MIN_VALUE) // Not on a tile
+                                    || (dimension.getWaterLevelAt(x, y) <= height) // Not flooded
+                                    || (dimension.getWaterLevelAt(x, y) <= floodToHeight) // Already at the required level or lower
+                                    || (dimension.getBitLayerValueAt(FloodWithLava.INSTANCE, x, y) != lavaPresent); // The other kind of fluid
+                        }
 
-                            @Override public void fill(int x, int y) {
-                                dimension.setWaterLevelAt(x, y, floodToHeight);
-                                dimension.setBitLayerValueAt(FloodWithLava.INSTANCE, x, y, true);
-                            }
-                        };
-                    } else {
-                        fillMethod = new FloodFillMethod("Lowering water level", dimensionBounds) {
-                            @Override public boolean isBoundary(int x, int y) {
-                                final int height = dimension.getIntHeightAt(x, y);
-                                return (height == Integer.MIN_VALUE) // Not on a tile
-                                        || (dimension.getWaterLevelAt(x, y) <= height) // Not flooded
-                                        || (dimension.getWaterLevelAt(x, y) <= floodToHeight); // Already at the required level or lower
-                            }
-
-                            @Override public void fill(int x, int y) {
-                                dimension.setWaterLevelAt(x, y, floodToHeight);
-                                dimension.setBitLayerValueAt(FloodWithLava.INSTANCE, x, y, false);
-                            }
-                        };
-                    }
+                        @Override public void fill(int x, int y) {
+                            dimension.setWaterLevelAt(x, y, floodToHeight);
+                        }
+                    };
                 } else {
                     if (floodWithLava) {
                         fillMethod = new FloodFillMethod(fluidPresent ? "Raising lava level" : "Flooding with lava", dimensionBounds) {

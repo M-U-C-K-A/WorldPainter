@@ -8,6 +8,7 @@ import org.pepsoft.worldpainter.Platform;
 import org.pepsoft.worldpainter.Terrain;
 import org.pepsoft.worldpainter.Tile;
 import org.pepsoft.worldpainter.layers.Biome;
+import org.pepsoft.worldpainter.layers.FloodWithLava;
 
 import java.awt.*;
 
@@ -47,6 +48,7 @@ final class TerrainModel {
         colours = new int[width * height];
         biomes = new int[width * height];
         present = new boolean[width * height];
+        lava = new boolean[width * height];
         final long seed = dimension.getSeed();
         final Platform platform = dimension.getWorld().getPlatform();
         float lowest = Float.MAX_VALUE, highest = -Float.MAX_VALUE;
@@ -71,6 +73,7 @@ final class TerrainModel {
                 final float h = tile.getHeight(xInTile, yInTile);
                 heights[i] = h;
                 waterLevels[i] = tile.getWaterLevel(xInTile, yInTile);
+                lava[i] = tile.getBitLayerValue(FloodWithLava.INSTANCE, xInTile, yInTile);
                 final Terrain terrain = tile.getTerrain(xInTile, yInTile);
                 final int intHeight = Math.round(h);
                 colours[i] = terrain.getColour(seed, x, y, intHeight, intHeight, platform, colourScheme) & 0xffffff;
@@ -198,6 +201,10 @@ final class TerrainModel {
     final float[] gradientsX, gradientsY;
     final int[] colours, biomes;
     final boolean[] present;
+    /**
+     * Whether the fluid above the land, if any, is lava rather than water.
+     */
+    final boolean[] lava;
 
     private static final long MAX_SAMPLES = 1_048_576;
 

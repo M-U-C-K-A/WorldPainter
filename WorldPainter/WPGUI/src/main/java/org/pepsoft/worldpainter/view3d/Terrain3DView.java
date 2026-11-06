@@ -532,7 +532,7 @@ class Terrain3DView extends JComponent {
             }
             if (isWater(model, i)) {
                 final float depth = Math.min(1, (flat ? Math.round(model.waterLevels[i] - h) : (model.waterLevels[i] - h)) / 24f);
-                final int water = blend(0x4a8fe7, 0x1d3f8f, depth);
+                final int water = model.lava[i] ? lavaColour(depth) : blend(0x4a8fe7, 0x1d3f8f, depth);
                 colour = (mode == Mode.TERRAIN) ? water : blend(colour, water, 0.55f + 0.35f * depth);
             }
             result[i] = colour;
@@ -1298,6 +1298,17 @@ class Terrain3DView extends JComponent {
                 final float bx = xs[i], by = ys[i];
                 final double zc = camera.orthographic ? (ORTHO_DEPTH - depthBuffer[i]) : (1 / depthBuffer[i]);
                 final float fog = (float) Math.max(0, Math.min(0.6, (zc - fogStart) / (fogEnd - fogStart)));
+                if (isLavaAt(detail, bx, by)) {
+                    // Lava glows, and reflects nothing
+                    if (recolour) {
+                        int base = lavaColour((float) Math.min(1, waterDepthAt(detail, bx, by) / 24));
+                        if (fog > 0) {
+                            base = blend(base, fogColour, fog);
+                        }
+                        pixels[i] = base;
+                    }
+                    continue;
+                }
                 if (recolour) {
                     final double depth = waterDepthAt(detail, bx, by);
                     int base;
@@ -1390,6 +1401,34 @@ class Terrain3DView extends JComponent {
         final double fx = x - x0, fy = y - y0;
         return (sampleDepth(m, x0, y0) * (1 - fx) + sampleDepth(m, x0 + 1, y0) * fx) * (1 - fy)
                 + (sampleDepth(m, x0, y0 + 1) * (1 - fx) + sampleDepth(m, x0 + 1, y0 + 1) * fx) * fy;
+    }
+
+    /**
+     * Whether the fluid at a location in blocks from the corner of the overview model is lava, from the nearest
+     * sample. The full resolution detail model is used where there is one.
+     */
+    private boolean isLavaAt(TerrainModel detail, double bx, double by) {
+        TerrainModel m = model;
+        double x = bx / model.step, y = by / model.step;
+        if (detail != null) {
+            final double dx = bx - (detail.x0 - model.x0), dy = by - (detail.y0 - model.y0);
+            if ((dx >= 0) && (dy >= 0) && (dx < detail.width) && (dy < detail.height)) {
+                m = detail;
+                x = dx;
+                y = dy;
+            }
+        }
+        final int sx = Math.max(0, Math.min(m.width - 1, (int) Math.floor(x))), sy = Math.max(0, Math.min(m.height - 1, (int) Math.floor(y)));
+        return m.lava[sy * m.width + sx];
+    }
+
+    /**
+     * The colour of lava: bright orange at the surface of a shallow pool, deeper red where it is deep.
+     *
+     * @param depth How deep it is, from 0 to 1.
+     */
+    static int lavaColour(float depth) {
+        return blend(0xff9a2e, 0xd2410c, depth);
     }
 
     private static double sampleDepth(TerrainModel m, int sx, int sy) {
@@ -1895,8 +1934,9 @@ class Terrain3DView extends JComponent {
         final float height = relativeHeight + m.lowestHeight, terrain = m.heights[s];
         // (The sides of the block mesh reach to the top of the top block, one above the height of the terrain)
         if (height > terrain + (blocks ? 1.05f : 0.05f)) {
-            // Above the ground: water
-            return blend(0x3f7fdc, 0x1d3f8f, Math.min(1, (m.waterLevels[s] - height) / 24));
+            // Above the ground: water or lava
+            final float depth = Math.min(1, (m.waterLevels[s] - height) / 24);
+            return m.lava[s] ? lavaColour(depth) : blend(0x3f7fdc, 0x1d3f8f, depth);
         }
         final float depth = terrain - height;
         final int surface = m.colours[s];
