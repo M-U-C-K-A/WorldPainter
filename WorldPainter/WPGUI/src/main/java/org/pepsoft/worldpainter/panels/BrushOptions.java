@@ -65,13 +65,14 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         // Eliminate thousands separators to make spinners smaller:
         spinnerAbove.setEditor(new NumberEditor(spinnerAbove, "0"));
         spinnerBelow.setEditor(new NumberEditor(spinnerBelow, "0"));
+        spinnerCurvature.setEditor(new NumberEditor(spinnerCurvature, "0.0"));
 
         heightScale.setListener(this::heightScaleChanged);
         updateHeightScale();
 
         // A value which has been typed counts, however the user goes on to do something else. Clicking on the map doesn't
         // even move the focus, so also watch for that
-        for (JSpinner spinner: new JSpinner[] {spinnerAbove, spinnerBelow, spinnerSlope, spinnerCurvature}) {
+        for (JSpinner spinner: new JSpinner[] {spinnerAbove, spinnerBelow, spinnerSlope, spinnerCurvature, spinnerCurvatureRadius}) {
             final JFormattedTextField field = ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField();
             field.setFocusLostBehavior(JFormattedTextField.PERSIST);
             field.addFocusListener(new FocusAdapter() {
@@ -133,7 +134,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
                     exceptOn,
                     (checkBoxAboveSlope.isSelected() || checkBoxBelowSlope.isSelected()) ? (Integer) spinnerSlope.getValue() : -1,
                     checkBoxAboveSlope.isSelected())
-                    .withCurvature(curvatureMode(), ((Number) spinnerCurvature.getValue()).floatValue());
+                    .withCurvature(curvatureMode(), ((Number) spinnerCurvature.getValue()).floatValue(), (Integer) spinnerCurvatureRadius.getValue());
         } else {
             return null;
         }
@@ -183,6 +184,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
             checkBoxBumps.setSelected(filter.getCurvatureMode() == DefaultFilter.CURVATURE_BUMPS);
             if (filter.getCurvatureMode() != DefaultFilter.CURVATURE_NONE) {
                 spinnerCurvature.setValue((double) filter.getCurvatureDepth());
+                spinnerCurvatureRadius.setValue(filter.getCurvatureRadius());
             }
             checkBoxReplace.setSelected(filter.onlyOn);
             checkBoxExceptOn.setSelected(filter.exceptOn);
@@ -548,7 +550,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
     private void commitOnClickElsewhere(AWTEvent event) {
         if ((event.getID() == MouseEvent.MOUSE_PRESSED) && (event.getSource() instanceof Component)) {
             final Component clicked = (Component) event.getSource();
-            for (JSpinner spinner: new JSpinner[] {spinnerAbove, spinnerBelow, spinnerSlope, spinnerCurvature}) {
+            for (JSpinner spinner: new JSpinner[] {spinnerAbove, spinnerBelow, spinnerSlope, spinnerCurvature, spinnerCurvatureRadius}) {
                 if (((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().isFocusOwner() && (! SwingUtilities.isDescendingFrom(clicked, spinner))) {
                     commit(spinner);
                     if (! clicked.isFocusable()) {
@@ -579,7 +581,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
 
     private boolean undo() {
         // First take back a value which is still being typed
-        for (JSpinner spinner: new JSpinner[] {spinnerAbove, spinnerBelow, spinnerSlope, spinnerCurvature}) {
+        for (JSpinner spinner: new JSpinner[] {spinnerAbove, spinnerBelow, spinnerSlope, spinnerCurvature, spinnerCurvatureRadius}) {
             final JFormattedTextField field = ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField();
             if (field.isFocusOwner() && (! field.getText().trim().equals(spinner.getValue().toString()))) {
                 field.setValue(spinner.getValue());
@@ -645,7 +647,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
                 checkBoxAbove.isSelected(), (Integer) spinnerAbove.getValue(), checkBoxBelow.isSelected(), (Integer) spinnerBelow.getValue(),
                 checkBoxFeather.isSelected(), checkBoxReplace.isSelected(), onlyOn, checkBoxExceptOn.isSelected(), exceptOn,
                 checkBoxAboveSlope.isSelected(), checkBoxBelowSlope.isSelected(), (Integer) spinnerSlope.getValue(),
-                curvatureMode(), ((Number) spinnerCurvature.getValue()).doubleValue());
+                curvatureMode(), ((Number) spinnerCurvature.getValue()).doubleValue(), (Integer) spinnerCurvatureRadius.getValue());
     }
 
     private int curvatureMode() {
@@ -671,6 +673,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
             checkBoxHollows.setSelected(options.curvatureMode == DefaultFilter.CURVATURE_HOLLOWS);
             checkBoxBumps.setSelected(options.curvatureMode == DefaultFilter.CURVATURE_BUMPS);
             spinnerCurvature.setValue(options.curvatureDepth);
+            spinnerCurvatureRadius.setValue(options.curvatureRadius);
             installPaint(onlyOn, buttonReplace);
             installPaint(exceptOn, buttonExceptOn);
             setControlStates();
@@ -711,6 +714,7 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         spinnerBelow.setEnabled(checkBoxBelow.isSelected());
         spinnerSlope.setEnabled(checkBoxAboveSlope.isSelected() || checkBoxBelowSlope.isSelected());
         spinnerCurvature.setEnabled(checkBoxHollows.isSelected() || checkBoxBumps.isSelected());
+        spinnerCurvatureRadius.setEnabled(checkBoxHollows.isSelected() || checkBoxBumps.isSelected());
         // The buttons to choose what from only appear when they are needed
         buttonReplace.setVisible(checkBoxReplace.isSelected());
         listReplace.setVisible(checkBoxReplace.isSelected());
@@ -1195,8 +1199,10 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         otherFields.add(withCard(block(slopeLabel, row(checkBoxAboveSlope, checkBoxBelowSlope), row(spinnerSlope, jLabel1)), OptionCards.slope()));
         final JLabel curvatureLabel = new JLabel("curvature");
         curvatureLabel.setFont(curvatureLabel.getFont().deriveFont(curvatureLabel.getFont().getSize() - 1f));
-        final JLabel blocksLabel = new JLabel("blocks");
+        final JLabel blocksLabel = new JLabel("blocks deep");
         blocksLabel.setFont(blocksLabel.getFont().deriveFont(blocksLabel.getFont().getSize() - 1f));
+        final JLabel aroundLabel = new JLabel("blocks around");
+        aroundLabel.setFont(aroundLabel.getFont().deriveFont(aroundLabel.getFont().getSize() - 1f));
         for (JCheckBox checkBox: new JCheckBox[] {checkBoxHollows, checkBoxBumps}) {
             checkBox.setFont(checkBox.getFont().deriveFont(checkBox.getFont().getSize() - 1f));
             checkBox.addActionListener(e -> {
@@ -1211,7 +1217,12 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
         spinnerCurvature.setFont(spinnerCurvature.getFont().deriveFont(spinnerCurvature.getFont().getSize() - 1f));
         spinnerCurvature.setEnabled(false);
         spinnerCurvature.addChangeListener(e -> filterChanged());
-        otherFields.add(withCard(block(curvatureLabel, row(checkBoxHollows, checkBoxBumps), row(spinnerCurvature, blocksLabel)), OptionCards.curvature()));
+        spinnerCurvature.setToolTipText("<html><b>Depth</b><br>How much higher (for hollows) or lower (for bumps) the land around must be, in blocks.<br>Small values also take in gentle hollows and bumps</html>");
+        spinnerCurvatureRadius.setFont(spinnerCurvatureRadius.getFont().deriveFont(spinnerCurvatureRadius.getFont().getSize() - 1f));
+        spinnerCurvatureRadius.setEnabled(false);
+        spinnerCurvatureRadius.addChangeListener(e -> filterChanged());
+        spinnerCurvatureRadius.setToolTipText("<html><b>Reach</b><br>How far around each point the land is compared with it, in blocks.<br>Larger values find broader valleys and ridges and reach further up their sides;<br>smaller ones keep to the very bottom of hollows and the very top of bumps</html>");
+        otherFields.add(withCard(block(curvatureLabel, row(checkBoxHollows, checkBoxBumps), row(spinnerCurvature, blocksLabel), row(spinnerCurvatureRadius, aroundLabel)), OptionCards.curvature()));
         constraints.insets = new Insets(2, 0, 0, 0);
         add(otherFields, constraints);
     }
@@ -1457,10 +1468,11 @@ public class BrushOptions extends javax.swing.JPanel implements Observer {
      */
     private record Options(MapArea mapArea, boolean above, int aboveLevel, boolean below, int belowLevel,
                            boolean feather, boolean replace, Object onlyOn, boolean exceptOnEnabled, Object exceptOn,
-                           boolean aboveSlope, boolean belowSlope, int slope, int curvatureMode, double curvatureDepth) {}
+                           boolean aboveSlope, boolean belowSlope, int slope, int curvatureMode, double curvatureDepth, int curvatureRadius) {}
 
     private final JCheckBox checkBoxHollows = new JCheckBox("hollows"), checkBoxBumps = new JCheckBox("bumps");
-    private final JSpinner spinnerCurvature = new JSpinner(new SpinnerNumberModel(1.0, 0.5, 20.0, 0.5));
+    private final JSpinner spinnerCurvature = new JSpinner(new SpinnerNumberModel(1.0, 0.1, 40.0, 0.1));
+    private final JSpinner spinnerCurvatureRadius = new JSpinner(new SpinnerNumberModel(DefaultFilter.CURVATURE_RADIUS, 2, 48, 1));
 
     /**
      * Options to go back to, and the state of the map when they were left, since they only apply to that.

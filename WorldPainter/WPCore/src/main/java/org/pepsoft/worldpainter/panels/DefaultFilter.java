@@ -71,9 +71,27 @@ public final class DefaultFilter implements Filter {
      * @return This filter.
      */
     public DefaultFilter withCurvature(int mode, float depth) {
+        return withCurvature(mode, depth, CURVATURE_RADIUS);
+    }
+
+    /**
+     * Also limit the brush by the curvature of the land, measured over a particular distance.
+     *
+     * @param mode   {@link #CURVATURE_NONE}, {@link #CURVATURE_HOLLOWS} or {@link #CURVATURE_BUMPS}.
+     * @param depth  How much higher (for hollows) or lower (for bumps) the land around must be on average, in blocks.
+     * @param radius How far around each location the land is compared with it, in blocks: the larger, the broader the
+     *               hollows and bumps which are found, and the further up their sides the brush reaches.
+     * @return This filter.
+     */
+    public DefaultFilter withCurvature(int mode, float depth, int radius) {
         curvatureMode = mode;
         curvatureDepth = depth;
+        curvatureRadius = Math.max(2, radius);
         return this;
+    }
+
+    public int getCurvatureRadius() {
+        return curvatureRadius;
     }
 
     public int getCurvatureMode() {
@@ -86,23 +104,48 @@ public final class DefaultFilter implements Filter {
 
     /**
      * How much higher the land around a location is than the location itself, on average, in blocks: positive in a
-     * hollow, negative on a bump. The land is sampled at {@link #CURVATURE_RADIUS} blocks in eight directions.
+     * hollow, negative on a bump, measured over {@link #CURVATURE_RADIUS} blocks.
      */
     public static float curvatureAt(Dimension dimension, int x, int y) {
-        final float height = dimension.getHeightAt(x, y);
-        if (height == -Float.MAX_VALUE) {
+        return curvatureAt(dimension, x, y, CURVATURE_RADIUS);
+    }
+
+    /**
+     * How much higher the land around a location is than the location itself, on average, in blocks: positive in a
+     * hollow, negative on a bump.
+     *
+     * <p>The land around is sampled on a ring of sixteen points at {@code radius} blocks, and the location itself as
+     * the average of nine points around it, a quarter of the radius apart. On land which goes up in steps of whole
+     * blocks, a straight slope then measures close to zero everywhere, instead of half a block up or down at every
+     * step.
+     */
+    public static float curvatureAt(Dimension dimension, int x, int y, int radius) {
+        final int spacing = Math.max(1, Math.round(radius / 4f));
+        float centreSum = 0.0f;
+        int centreCount = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                final float height = dimension.getHeightAt(x + dx * spacing, y + dy * spacing);
+                if (height != -Float.MAX_VALUE) {
+                    centreSum += height;
+                    centreCount++;
+                }
+            }
+        }
+        if (centreCount == 0) {
             return 0.0f;
         }
         float sum = 0.0f;
         int count = 0;
-        for (int i = 0; i < 8; i++) {
-            final float around = dimension.getHeightAt(x + CURVATURE_DX[i], y + CURVATURE_DY[i]);
+        for (int i = 0; i < RING_POINTS; i++) {
+            final double angle = i * 2 * Math.PI / RING_POINTS;
+            final float around = dimension.getHeightAt(x + (int) Math.round(Math.cos(angle) * radius), y + (int) Math.round(Math.sin(angle) * radius));
             if (around != -Float.MAX_VALUE) {
                 sum += around;
                 count++;
             }
         }
-        return (count > 0) ? (sum / count - height) : 0.0f;
+        return (count > 0) ? (sum / count - centreSum / centreCount) : 0.0f;
     }
 
     public int getAboveLevel() {
@@ -203,10 +246,12 @@ public final class DefaultFilter implements Filter {
                 }
             }
             if (curvatureMode != CURVATURE_NONE) {
-                final float curvature = curvatureAt(dimension, x, y) * ((curvatureMode == CURVATURE_HOLLOWS) ? 1 : -1);
+                final float curvature = curvatureAt(dimension, x, y, curvatureRadius) * ((curvatureMode == CURVATURE_HOLLOWS) ? 1 : -1);
                 if (curvature < curvatureDepth) {
-                    // Fade out over half a block, so that the edge of the area is not ragged
-                    return Math.max(0.0f, 1.0f - (curvatureDepth - curvature) * 2) * strength;
+                    // Fade out gradually, over most of the depth, so that the edge of the area is soft rather than
+                    // ragged
+                    final float fade = Math.max(0.2f, curvatureDepth * 0.75f);
+                    return Math.max(0.0f, 1.0f - (curvatureDepth - curvature) / fade) * strength;
                 }
             }
             return strength;
@@ -261,7 +306,7 @@ public final class DefaultFilter implements Filter {
             }
         }
         if (curvatureMode != CURVATURE_NONE) {
-            sb.append((curvatureMode == CURVATURE_HOLLOWS) ? "hollows " : "bumps ").append(curvatureDepth).append(' ');
+            sb.append((curvatureMode == CURVATURE_HOLLOWS) ? "hollows " : "bumps ").append(curvatureDepth).append(" over ").append(curvatureRadius).append(' ');
         }
         if (checkSlope) {
             if (inSelection || outsideSelection || onlyOn || exceptOn || checkLevel) {
@@ -280,11 +325,11 @@ public final class DefaultFilter implements Filter {
     final int aboveLevel, belowLevel, degrees;
     int curvatureMode = CURVATURE_NONE;
     float curvatureDepth = 1.0f;
+    int curvatureRadius = CURVATURE_RADIUS;
 
     public static final int CURVATURE_NONE = 0, CURVATURE_HOLLOWS = 1, CURVATURE_BUMPS = 2;
     public static final int CURVATURE_RADIUS = 4;
-    private static final int[] CURVATURE_DX = {CURVATURE_RADIUS, -CURVATURE_RADIUS, 0, 0, 3, 3, -3, -3};
-    private static final int[] CURVATURE_DY = {0, 0, CURVATURE_RADIUS, -CURVATURE_RADIUS, 3, -3, 3, -3};
+    private static final int RING_POINTS = 16;
     final float slope;
     final Filter onlyOnFilter;
     final Filter exceptOnFilter;

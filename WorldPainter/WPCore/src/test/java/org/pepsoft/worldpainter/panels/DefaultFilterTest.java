@@ -8,6 +8,7 @@ import org.pepsoft.worldpainter.selection.SelectionChunk;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.pepsoft.worldpainter.DefaultPlugin.JAVA_ANVIL_1_20_5;
 import static org.pepsoft.worldpainter.Dimension.Anchor.NORMAL_DETAIL;
 
@@ -117,5 +118,33 @@ public class DefaultFilterTest {
         assertEquals(1.0f, bumps.modifyStrength(96, 64, 1.0f), 0.0f);
         assertEquals(0.0f, bumps.modifyStrength(32, 64, 1.0f), 0.0f);
         assertEquals(0.0f, bumps.modifyStrength(110, 64, 1.0f), 0.0f);
+    }
+
+    /**
+     * Land which goes up in steps of whole blocks along a straight slope is neither a hollow nor a bump, even with a
+     * small depth: the curvature is measured over several blocks, not from one step to the next.
+     */
+    @Test
+    public void testSteppedSlopeIsNotCurved() {
+        final org.pepsoft.worldpainter.Dimension dimension = org.pepsoft.worldpainter.TestData.createDimension(new java.awt.Rectangle(0, 0, 256, 128), 62);
+        for (int x = 0; x < 256; x++) {
+            for (int y = 0; y < 128; y++) {
+                // One block up every three columns, in whole blocks
+                dimension.setHeightAt(x, y, 40 + x / 3);
+            }
+        }
+        float largest = 0;
+        for (int x = 40; x < 216; x++) {
+            largest = Math.max(largest, Math.abs(DefaultFilter.curvatureAt(dimension, x, 64, 4)));
+        }
+        assertTrue("largest curvature on a stepped slope " + largest, largest < 0.25f);
+        // And a broader radius still finds a real valley
+        for (int x = 0; x < 256; x++) {
+            for (int y = 0; y < 128; y++) {
+                dimension.setHeightAt(x, y, 40 + Math.abs(x - 128) / 2);
+            }
+        }
+        assertTrue(DefaultFilter.curvatureAt(dimension, 128, 64, 12) > 2.5f);
+        assertTrue(Math.abs(DefaultFilter.curvatureAt(dimension, 60, 64, 12)) < 0.3f);
     }
 }
