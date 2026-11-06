@@ -148,19 +148,14 @@ public class Structure extends AbstractObject implements Bo2ObjectProvider {
         }
 
         // Load the palette
-        final ListTag<CompoundTag> paletteTag = (ListTag<CompoundTag>) root.getTag(TAG_PALETTE_);
+        final ListTag<? extends Tag> paletteTag = (ListTag<? extends Tag>) root.getTag(TAG_PALETTE_);
         if (paletteTag == null) {
             throw new IllegalArgumentException(TAG_PALETTE_ + " tag missing from object " + objectName + " (root tag contents: " + root.getValue() + ")");
         }
         final Material[] palette = new Material[paletteTag.getValue().size()];
         for (int i = 0; i < palette.length; i++) {
-            final CompoundTag entryTag = paletteTag.getValue().get(i);
-            final String name = ((StringTag) entryTag.getTag(TAG_NAME)).getValue();
-            final CompoundTag propertiesTag = (CompoundTag) entryTag.getTag(TAG_PROPERTIES);
-            final Map<String, String> properties = (propertiesTag != null)
-                    ? propertiesTag.getValue().entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> ((StringTag) entry.getValue()).getValue()))
-                    : null;
-            palette[i] = Material.get(name, properties);
+            // (Also as Minecraft 26.1 and later write them: just the name for a block without properties)
+            palette[i] = org.pepsoft.minecraft.PaletteEntries.getMaterial(paletteTag.getValue().get(i), false);
         }
 
         // Load the blocks and tile entities

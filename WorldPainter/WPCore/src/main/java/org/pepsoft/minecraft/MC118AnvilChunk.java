@@ -825,7 +825,9 @@ public final class MC118AnvilChunk extends MCNamedBlocksChunk implements Section
                 if (blockStatesTag == null) {
                     throw new IncompleteSectionException("block_states tag missing");
                 }
-                List<CompoundTag> paletteList = ((ListTag<CompoundTag>) blockStatesTag.getTag(TAG_PALETTE_)).getValue();
+                // (Minecraft 26.1 and later write blocks without properties as just their names, so the entries are
+                // not all compounds)
+                List<? extends Tag> paletteList = ((ListTag<? extends Tag>) blockStatesTag.getTag(TAG_PALETTE_)).getValue();
                 if (paletteList != null) {
                     final Material[] palette = new Material[paletteList.size()];
                     for (int i = 0; i < palette.length; i++) {
@@ -847,11 +849,11 @@ public final class MC118AnvilChunk extends MCNamedBlocksChunk implements Section
 
                 final CompoundTag biomesTag = (CompoundTag) getTag(TAG_BIOMES_);
                 if (biomesTag != null) {
-                    List<StringTag> biomesPaletteList = ((ListTag<StringTag>) biomesTag.getTag(TAG_PALETTE_)).getValue();
+                    List<? extends Tag> biomesPaletteList = ((ListTag<? extends Tag>) biomesTag.getTag(TAG_PALETTE_)).getValue();
                     if (biomesPaletteList != null) {
                         final String[] palette = new String[biomesPaletteList.size()];
                         for (int i = 0; i < palette.length; i++) {
-                            palette[i] = biomesPaletteList.get(i).getValue().intern();
+                            palette[i] = PaletteEntries.getString(biomesPaletteList.get(i)).intern();
                         }
                         final LongArrayTag biomeDataTag = (LongArrayTag) biomesTag.getTag(TAG_DATA_);
                         if (biomeDataTag != null) {
@@ -962,28 +964,8 @@ public final class MC118AnvilChunk extends MCNamedBlocksChunk implements Section
             throw new IOException("MC118AnvilChunk.Section is not serializable");
         }
 
-        private Material getMaterial(List<CompoundTag> palette, int index) {
-            final CompoundTag blockSpecTag = palette.get(index);
-            final String name = ((StringTag) blockSpecTag.getTag(TAG_NAME)).getValue();
-            final CompoundTag propertiesTag = (CompoundTag) blockSpecTag.getTag(TAG_PROPERTIES);
-            if (name.equals(MC_AIR) && propertiesTag == null) {
-                return null;
-            }
-            final Map<String, String> properties;
-            if (propertiesTag != null) {
-                properties = new HashMap<>();
-                for (Map.Entry<String, Tag> entry : propertiesTag.getValue().entrySet()) {
-                    final Tag tag = entry.getValue();
-                    if (tag instanceof StringTag) {
-                        properties.put(entry.getKey(), ((StringTag) tag).getValue());
-                    } else {
-                        logger.warn("Ignoring non-vanilla material property tag {} of unsupported type {}", entry.getKey(), tag.getClass().getSimpleName());
-                    }
-                }
-            } else {
-                properties = null;
-            }
-            return Material.get(name, properties);
+        private Material getMaterial(List<? extends Tag> palette, int index) {
+            return PaletteEntries.getMaterial(palette.get(index), true);
         }
 
         @NotNull
