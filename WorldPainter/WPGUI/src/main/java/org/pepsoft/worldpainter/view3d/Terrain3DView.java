@@ -541,7 +541,17 @@ class Terrain3DView extends JComponent {
     }
 
     private boolean isWater(TerrainModel model, int sample) {
-        return showWater && (mode != Mode.SLOPE) && (model.waterLevels[sample] > model.heights[sample]);
+        // As in Minecraft: under water when the water is above the top block of the land, which is at the height
+        // rounded to the nearest whole block
+        return showWater && (mode != Mode.SLOPE) && (model.waterLevels[sample] > Math.round(model.heights[sample]));
+    }
+
+    /**
+     * The height of the top of the topmost block of a column, as Minecraft builds it: the land at its height rounded
+     * to the nearest whole block (as the export and the Flood tool round it), or the water above it.
+     */
+    private float blockTop(TerrainModel model, int sample) {
+        return (isWater(model, sample) ? model.waterLevels[sample] : Math.round(model.heights[sample])) + 1;
     }
 
     /**
@@ -812,7 +822,7 @@ class Terrain3DView extends JComponent {
         // The height of the top of each column in blocks above the base, or NaN where there is no land
         final float[] tops = new float[nx * ny];
         for (int i = 0; i < nx * ny; i++) {
-            tops[i] = model.present[i] ? ((float) Math.floor(surfaceHeight(model, i)) + 1 - base) : Float.NaN;
+            tops[i] = model.present[i] ? (blockTop(model, i) - base) : Float.NaN;
         }
         final QuadList quads = new QuadList();
 
@@ -938,7 +948,7 @@ class Terrain3DView extends JComponent {
             // Outside the block area: if that is still on the map, go down to the smooth surface there
             final int ox = (model.x0 + gx * model.step - overview.x0) / overview.step, oy = (model.y0 + gy * model.step - overview.y0) / overview.step;
             if ((ox >= 0) && (oy >= 0) && (ox < overview.width) && (oy < overview.height) && overview.present[oy * overview.width + ox]) {
-                final float neighbour = (float) Math.floor(surfaceHeight(overview, oy * overview.width + ox)) + 1 - base;
+                final float neighbour = blockTop(overview, oy * overview.width + ox) - base;
                 return Math.min(neighbour, top);
             }
             return Float.NaN;
