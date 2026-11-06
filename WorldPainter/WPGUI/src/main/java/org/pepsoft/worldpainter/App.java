@@ -3209,6 +3209,7 @@ public final class App extends JFrame implements BrushControl,
         areaManager.setCategories(CATEGORY_VIEW, CATEGORY_TOOLS, CATEGORY_PAINT, CATEGORY_WORLD);
         areaManager.defineGroup(GROUP_MAP, "Map", "map", CATEGORY_VIEW);
         areaManager.defineGroup(GROUP_3D, "3D View", "box", CATEGORY_VIEW);
+        areaManager.defineGroup(GROUP_COMPOSITION, "Composition", "pickaxe", CATEGORY_VIEW);
         areaManager.defineGroup(GROUP_TOOLS, "Tools", "pencil-ruler", CATEGORY_TOOLS);
         areaManager.defineGroup(GROUP_TOOL_SETTINGS, "Tool Settings", "sliders-horizontal", CATEGORY_TOOLS);
         areaManager.defineGroup(GROUP_BRUSHES, "Brushes", "brush", CATEGORY_TOOLS);
@@ -3240,6 +3241,21 @@ public final class App extends JFrame implements BrushControl,
         threeDeePage.add(terrain3DPanel, BorderLayout.CENTER);
         preview3D(threeDeePage, terrain3DPanel);
         areaManager.addPage(threeDeePage);
+        // What the land in view is made of, following the 3D view (or the map, or the selection)
+        final org.pepsoft.worldpainter.composition.CompositionPanel compositionPanel = new org.pepsoft.worldpainter.composition.CompositionPanel(
+                () -> dimension, () -> selectedColourScheme,
+                () -> {
+                    if ((dimension == null) || (view.getWidth() == 0)) {
+                        return null;
+                    }
+                    final Point topLeft = view.viewToWorld(0, 0), bottomRight = view.viewToWorld(view.getWidth(), view.getHeight());
+                    return new Rectangle(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
+                },
+                () -> terrain3DPanel.getLookedAtArea(), () -> terrain3DPanel.getLookedAtColumn(),
+                () -> areaManager.isPageShown(PAGE_3D));
+        areaManager.addPage(new DockableFrameBuilder(compositionPanel, "Composition", GROUP_COMPOSITION).withIcon(Icons.get("pickaxe")).scrollable()
+                .withSummary("What the land in view is made of: its terrain, heights and slopes, water, biomes, what is painted on it and under it (caves, ores), and the rock of a column down to the bottom of the world. It follows the 3D view, the map or the selection.").build());
+        terrain3DPanel.setCompositionAction(() -> areaManager.showPage(PAGE_COMPOSITION));
         // Build the 3D view when it comes into sight
         areaManager.addPageVisibilityListener((key, shown) -> {
             if (PAGE_3D.equals(key) && shown && (dimension != null)) {
@@ -8349,10 +8365,11 @@ public final class App extends JFrame implements BrushControl,
     /**
      * The pages of the areas which are not built with a {@link DockableFrameBuilder}.
      */
-    private static final String PAGE_MAP = AreaManager.MAIN_PAGE, PAGE_3D = AreaManager.MAIN_PAGE_2;
+    private static final String PAGE_MAP = AreaManager.MAIN_PAGE, PAGE_3D = AreaManager.MAIN_PAGE_2, PAGE_COMPOSITION = "composition";
     /**
      * The kinds of editors; the pages of each kind share the tabs of the area which shows them.
      */
+    static final String GROUP_COMPOSITION = "composition";
     static final String GROUP_MAP = "map", GROUP_3D = "view3d", GROUP_TOOLS = "tools", GROUP_TOOL_SETTINGS = "toolSettings",
             GROUP_BRUSHES = "brushes", GROUP_PROPERTIES = "properties", GROUP_PAINT = "paint";
     /**

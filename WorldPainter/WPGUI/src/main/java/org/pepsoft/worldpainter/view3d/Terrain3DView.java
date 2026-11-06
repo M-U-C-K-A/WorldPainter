@@ -247,6 +247,26 @@ class Terrain3DView extends JComponent {
     }
 
     /**
+     * The area the camera looks at, in blocks: around the point it orbits, as far as it is from it, within the model.
+     */
+    Rectangle getLookedAtArea() {
+        if (model == null) {
+            return null;
+        }
+        final int centreX = model.x0 + (int) Math.round(targetX * model.step), centreY = model.y0 + (int) Math.round(targetY * model.step);
+        final int half = (int) Math.max(32, Math.min(distance * model.step * 0.6, Math.max(model.width, model.height) * model.step / 2.0));
+        final Rectangle area = new Rectangle(centreX - half, centreY - half, half * 2, half * 2);
+        return area.intersection(new Rectangle(model.x0, model.y0, model.width * model.step, model.height * model.step));
+    }
+
+    /**
+     * The block column at the point the camera orbits around.
+     */
+    Point getLookedAtColumn() {
+        return (model != null) ? new Point(model.x0 + (int) Math.round(targetX * model.step), model.y0 + (int) Math.round(targetY * model.step)) : null;
+    }
+
+    /**
      * Set a listener which is notified when the point the camera looks at moves.
      */
     void setTargetListener(Runnable targetListener) {

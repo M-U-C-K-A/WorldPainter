@@ -137,6 +137,15 @@ public class Terrain3DPanel extends JPanel {
         refreshButton.setToolTipText(App.richToolTip("Refresh", "Update the 3D view with the latest changes to the map", null));
         refreshButton.addActionListener(e -> refresh(true));
         actions.add(refreshButton);
+        compositionButton = new JButton(Icons.get("pickaxe", 18));
+        compositionButton.setToolTipText(App.richToolTip("Composition", "What the land in view is made of: terrain, heights, slopes, water, biomes, what is on it and under it, and the rock down to the bottom of the world", null));
+        compositionButton.addActionListener(e -> {
+            if (compositionAction != null) {
+                compositionAction.run();
+            }
+        });
+        compositionButton.setVisible(false);
+        actions.add(compositionButton);
         popOutButton = new JButton(Icons.get("picture-in-picture-2", 18));
         popOutButton.setToolTipText(App.richToolTip("Detach", "Show the 3D view in a panel of its own, which can float next to the map or be docked like the other panels", null));
         popOutButton.addActionListener(e -> {
@@ -300,6 +309,28 @@ public class Terrain3DPanel extends JPanel {
         return group;
     }
 
+    /**
+     * The area the 3D view looks at, in blocks, or {@code null} if it shows nothing.
+     */
+    public Rectangle getLookedAtArea() {
+        return view.getLookedAtArea();
+    }
+
+    /**
+     * The block column at the point the 3D view orbits around, or {@code null} if it shows nothing.
+     */
+    public Point getLookedAtColumn() {
+        return view.getLookedAtColumn();
+    }
+
+    /**
+     * Set what the Composition button does: show the page with what the land in view is made of.
+     */
+    public void setCompositionAction(Runnable compositionAction) {
+        this.compositionAction = compositionAction;
+        compositionButton.setVisible(compositionAction != null);
+    }
+
     public void setPopOutAction(Runnable popOutAction, boolean detached) {
         this.popOutAction = popOutAction;
         popOutButton.setVisible(popOutAction != null);
@@ -457,6 +488,8 @@ public class Terrain3DPanel extends JPanel {
     private final JToggleButton blocksButton;
     private JComboBox<Integer> detailSizeComboBox;
     private final JButton popOutButton;
+    private final JButton compositionButton;
+    private Runnable compositionAction;
     private Runnable popOutAction;
     private Rectangle detailArea;
     private boolean detailLoading, detailPending;

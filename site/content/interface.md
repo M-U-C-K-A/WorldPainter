@@ -133,6 +133,19 @@ The legend next to the buttons gives the heights or slopes at either end of the 
 
 ![The Slope mode of the map: flat valleys in blue, steep slopes in red](assets/images/map-slope.jpg)
 
+## What the land is made of
+
+The **Composition** page (in the editor type menu of any area, or the pickaxe button of the 3D view) tells at a glance what the land in view is made of, and follows it as it moves:
+
+- **Surface**: the lowest, highest and average height, the share of flat, gentle, steep and cliff land, and of each terrain type;
+- **Water**: how much of it is under water or lava, and how deep;
+- **Biomes**: the share of each, and how much of it is painted;
+- **On the land**: the layers painted on it (trees, plants, frost…), on how much of it and how densely;
+- **Underground**: the caves, tunnels, pockets and ores painted under it, those which apply everywhere, and from which height to which;
+- **Rock column**: the blocks of a column from the top down to the bottom of the world, as they will be exported before the caves and ores: the top layer of its terrain, then the rock under it (stone with granite, diorite and andesite, deepslate and tuff below Y 0), down to the bedrock.
+
+The buttons at its top choose what it follows: the **3D view** (the land it looks at, and the column at the point it turns around), the **Map** (what the map shows) or the **Selection**.
+
 ## Canvas
 
 The map sits on a dotted canvas instead of a dark blue background. On macOS the toolbar doubles as the title bar.
