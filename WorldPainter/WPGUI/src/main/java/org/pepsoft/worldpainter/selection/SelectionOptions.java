@@ -76,6 +76,29 @@ public class SelectionOptions {
         this.removeExistingLayers = removeExistingLayers;
     }
 
+    /**
+     * How many quarter turns clockwise the copy is turned, from 0 to 3.
+     */
+    public int getRotation() {
+        return rotation;
+    }
+
+    public void setRotation(int rotation) {
+        this.rotation = ((rotation % 4) + 4) % 4;
+    }
+
+    /**
+     * Whether the copy is mirrored from left to right (before it is turned).
+     */
+    public boolean isMirror() {
+        return mirror;
+    }
+
+    public void setMirror(boolean mirror) {
+        this.mirror = mirror;
+    }
+
     boolean copyHeights = true, copyTerrain = true, copyFluids = true, copyLayers = true, copyBiomes = true,
-        copyAnnotations, doBlending, createNewTiles = false, removeExistingLayers = true;
+        copyAnnotations, doBlending, createNewTiles = false, removeExistingLayers = true, mirror;
+    int rotation;
 }

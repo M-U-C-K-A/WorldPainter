@@ -3,6 +3,7 @@ package org.pepsoft.worldpainter.selection;
 import org.pepsoft.util.MathUtils;
 import org.pepsoft.util.ProgressReceiver;
 import org.pepsoft.worldpainter.Dimension;
+import org.pepsoft.worldpainter.Terrain;
 import org.pepsoft.worldpainter.Tile;
 import org.pepsoft.worldpainter.brushes.Brush;
 import org.pepsoft.worldpainter.layers.*;
@@ -13,6 +14,7 @@ import java.util.*;
 
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE;
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE_BITS;
+import static org.pepsoft.worldpainter.Constants.TILE_SIZE_MASK;
 
 // TODO: allow new tiles to be filled with void
 
@@ -280,6 +282,10 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
             // No selection
             return;
         }
+        if ((options.rotation != 0) || options.mirror) {
+            copyTransformedSelection(bounds, targetX, targetY);
+            return;
+        }
         final int dx = targetX - bounds.x;
         final int dy = targetY - bounds.y;
         if ((dx == 0) && (dy == 0)) {
@@ -366,6 +372,142 @@ chunks:         for (int chunkX = 0; chunkX < TILE_SIZE; chunkX += 16) {
                     if (progressReceiver != null) {
                         progressReceiver.setProgress((float) (tileX - tileX1 + 1) / (tileX2 - tileX1 + 1));
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * The size of the copy of a selection, once turned: the width and height swap for a quarter turn.
+     */
+    public static java.awt.Dimension transformedSize(int width, int height, int rotation) {
+        return ((rotation % 2) == 0) ? new java.awt.Dimension(width, height) : new java.awt.Dimension(height, width);
+    }
+
+    /**
+     * Where a column of the selection ends up in the copy, relative to the top left corner of the copy, for a
+     * selection of a particular size which is mirrored from left to right (if so) and then turned clockwise.
+     */
+    static Point transform(int x, int y, int width, int height, int rotation, boolean mirror) {
+        if (mirror) {
+            x = width - 1 - x;
+        }
+        switch (rotation) {
+            case 1:
+                return new Point(height - 1 - y, x);
+            case 2:
+                return new Point(width - 1 - x, height - 1 - y);
+            case 3:
+                return new Point(y, width - 1 - x);
+            default:
+                return new Point(x, y);
+        }
+    }
+
+    /**
+     * Copy the selection turned and/or mirrored. All of it is read first, so that it does not matter whether the copy
+     * overlaps the original.
+     */
+    private void copyTransformedSelection(Rectangle bounds, int targetX, int targetY) {
+        final int width = bounds.width, height = bounds.height, count = width * height;
+        final boolean[] selected = new boolean[count];
+        final int[] rawHeights = new int[count], waterLevels = new int[count], annotations = new int[count], biomes = new int[count];
+        final boolean[] lava = new boolean[count];
+        final Terrain[] terrains = new Terrain[count];
+        @SuppressWarnings("unchecked") final Map<Layer, Integer>[] layers = new Map[count];
+        final float[] blends = new float[count];
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                final int srcX = bounds.x + x, srcY = bounds.y + y;
+                final Tile tile = dimension.getTile(srcX >> TILE_SIZE_BITS, srcY >> TILE_SIZE_BITS);
+                if (tile == null) {
+                    continue;
+                }
+                final int xInTile = srcX & TILE_SIZE_MASK, yInTile = srcY & TILE_SIZE_MASK;
+                if (! (tile.getBitLayerValue(SelectionChunk.INSTANCE, xInTile, yInTile) || tile.getBitLayerValue(SelectionBlock.INSTANCE, xInTile, yInTile))) {
+                    continue;
+                }
+                final int i = x + y * width;
+                selected[i] = true;
+                rawHeights[i] = tile.getRawHeight(xInTile, yInTile);
+                terrains[i] = tile.getTerrain(xInTile, yInTile);
+                waterLevels[i] = tile.getWaterLevel(xInTile, yInTile);
+                lava[i] = tile.getBitLayerValue(FloodWithLava.INSTANCE, xInTile, yInTile);
+                layers[i] = tile.getLayersAt(xInTile, yInTile);
+                annotations[i] = tile.getLayerValue(Annotations.INSTANCE, xInTile, yInTile);
+                biomes[i] = tile.getLayerValue(Biome.INSTANCE, xInTile, yInTile);
+                if (options.doBlending) {
+                    final float distanceFromEdge = distanceToSelectionEdge(srcX, srcY);
+                    blends[i] = (distanceFromEdge < 16.0f) ? (float) (-Math.cos(distanceFromEdge / DISTANCE_TO_BLEND) / 2 + 0.5) : 1.0f;
+                } else {
+                    blends[i] = 1.0f;
+                }
+            }
+        }
+        boolean clearUndo = options.createNewTiles;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                final int i = x + y * width;
+                if (! selected[i]) {
+                    continue;
+                }
+                final Point offset = transform(x, y, width, height, options.rotation, options.mirror);
+                final int dstX = targetX + offset.x, dstY = targetY + offset.y;
+                if (options.createNewTiles && (! dimension.isTilePresent(dstX >> TILE_SIZE_BITS, dstY >> TILE_SIZE_BITS))) {
+                    if (clearUndo) {
+                        dimension.clearUndo();
+                        clearUndo = false;
+                    }
+                    dimension.addTile(dimension.getTileFactory().createTile(dstX >> TILE_SIZE_BITS, dstY >> TILE_SIZE_BITS));
+                }
+                if (! dimension.isTilePresent(dstX >> TILE_SIZE_BITS, dstY >> TILE_SIZE_BITS)) {
+                    continue;
+                }
+                final float blend = blends[i];
+                final boolean whole = blend >= 1.0f;
+                if (options.copyHeights) {
+                    dimension.setRawHeightAt(dstX, dstY, whole ? rawHeights[i] : Math.round(blend * rawHeights[i] + (1 - blend) * dimension.getRawHeightAt(dstX, dstY)));
+                }
+                if (options.copyTerrain && (whole || (RANDOM.nextFloat() <= blend))) {
+                    dimension.setTerrainAt(dstX, dstY, terrains[i]);
+                }
+                if (options.copyFluids) {
+                    dimension.setWaterLevelAt(dstX, dstY, whole ? waterLevels[i] : Math.round(blend * waterLevels[i] + (1 - blend) * dimension.getWaterLevelAt(dstX, dstY)));
+                    if (whole || (RANDOM.nextFloat() <= blend)) {
+                        dimension.setBitLayerValueAt(FloodWithLava.INSTANCE, dstX, dstY, lava[i]);
+                    }
+                }
+                if (options.copyLayers) {
+                    if (options.removeExistingLayers && (whole || (RANDOM.nextFloat() <= blend))) {
+                        dimension.clearLayerData(dstX, dstY, SKIP_LAYERS);
+                    }
+                    for (Map.Entry<Layer, Integer> entry: layers[i].entrySet()) {
+                        final Layer layer = entry.getKey();
+                        final int value = entry.getValue();
+                        if (SKIP_LAYERS.contains(layer)) {
+                            continue;
+                        }
+                        switch (layer.getDataSize()) {
+                            case BIT:
+                            case BIT_PER_CHUNK:
+                                if (whole || (RANDOM.nextFloat() <= blend)) {
+                                    dimension.setBitLayerValueAt(layer, dstX, dstY, value != 0);
+                                }
+                                break;
+                            case BYTE:
+                            case NIBBLE:
+                                dimension.setLayerValueAt(layer, dstX, dstY, whole ? value : Math.round(blend * value + (1 - blend) * dimension.getLayerValueAt(layer, dstX, dstY)));
+                                break;
+                            case NONE:
+                                throw new UnsupportedOperationException("Don't know how to copy layer " + layer);
+                        }
+                    }
+                }
+                if (options.copyAnnotations && (whole || (RANDOM.nextFloat() <= blend))) {
+                    dimension.setLayerValueAt(Annotations.INSTANCE, dstX, dstY, annotations[i]);
+                }
+                if (options.copyBiomes && (whole || (RANDOM.nextFloat() <= blend))) {
+                    dimension.setLayerValueAt(Biome.INSTANCE, dstX, dstY, biomes[i]);
                 }
             }
         }

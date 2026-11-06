@@ -19,13 +19,19 @@ import java.awt.geom.Path2D;
  */
 public class EditSelectionOperation extends AbstractBrushOperation {
     public EditSelectionOperation(WorldPainterView view, ObservableBoolean selectionState) {
-        super("Edit Selection", "Expand or shrink the selection", view, "operation.selection.edit", "edit_selection");
+        super("Select with Brush", "Paint the selection with the brush: its size and shape set what is selected", view, "operation.selection.edit", "edit_selection");
         this.selectionState = selectionState;
     }
 
     @Override
     public JPanel getOptionsPanel() {
         return OPTIONS_PANEL;
+    }
+
+    @Override
+    protected void activate() throws java.beans.PropertyVetoException {
+        super.activate();
+        SelectionShapes.toolActivated(true);
     }
 
     @Override
@@ -76,6 +82,11 @@ public class EditSelectionOperation extends AbstractBrushOperation {
 
     private final ObservableBoolean selectionState;
 
-    private static final JPanel OPTIONS_PANEL = new StandardOptionsPanel("Edit Selection", "<ul><li>Left-click to add to the selection<li>Right-click to remove from the selection</ul>");
+    private final JPanel OPTIONS_PANEL = new StandardOptionsPanel("Select with Brush", "<ul><li>Paint with the left mouse button to add to the selection<li>Paint with the right one to remove from it</ul>The size and shape of the brush set what is selected, as in the original WorldPainter. Choose <em>Rectangle</em> or <em>Ellipse</em> to drag a shape instead.") {
+        @Override
+        protected void addAdditionalComponents(GridBagConstraints constraints) {
+            add(SelectionShapes.createChooser(), constraints);
+        }
+    };
     private static final double DEGREES_TO_RADIANS = 360 / (Math.PI * 2);
 }

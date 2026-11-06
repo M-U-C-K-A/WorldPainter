@@ -19,7 +19,7 @@ import java.awt.geom.Rectangle2D;
  */
 public class RectangleSelectionOperation extends AbstractOperation {
     public RectangleSelectionOperation(WorldPainter view) {
-        super("Select Rectangle", "Drag to select a rectangle or an ellipse", "edit_selection");
+        super("Select", "Drag to select a rectangle or an ellipse", "edit_selection");
         setView(view);
         mapView = view;
     }
@@ -31,6 +31,7 @@ public class RectangleSelectionOperation extends AbstractOperation {
 
     @Override
     protected void activate() {
+        SelectionShapes.toolActivated(false);
         mapView.addMouseListener(mouseHandler);
         mapView.addMouseMotionListener(mouseHandler);
         mapView.setToolOverlay(this::paintOverlay);
@@ -152,12 +153,18 @@ public class RectangleSelectionOperation extends AbstractOperation {
 
         private void update(MouseEvent e) {
             square = e.isShiftDown();
-            ellipse = e.isControlDown() || e.isMetaDown();
+            // An ellipse when chosen in the options; Ctrl (Cmd on a Mac) switches between the two while dragging
+            ellipse = (SelectionShapes.getShape() == SelectionShapes.Shape.ELLIPSE) != (e.isControlDown() || e.isMetaDown());
             mapView.repaint();
         }
     };
     private volatile Point start, end;
     private volatile boolean removing, square, ellipse;
 
-    private static final JPanel OPTIONS_PANEL = new StandardOptionsPanel("Select Rectangle", "<ul><li>Drag to add a rectangle to the selection<li>Drag with the right mouse button (or with Alt held) to remove it<li>Hold Shift for a square, Ctrl (Cmd on a Mac) for an ellipse</ul>The other tools then only work inside the selection when <em>inside selection</em> is ticked in their options.");
+    private final JPanel OPTIONS_PANEL = new StandardOptionsPanel("Select", "<ul><li>Drag to add a rectangle or an ellipse to the selection, as chosen below<li>Drag with the right mouse button (or with Alt held) to remove it<li>Hold Shift for a square or a circle</ul>Choose <em>Brush</em> to paint the selection with the brush instead. The other tools then only work inside the selection when <em>inside selection</em> is ticked in their options.") {
+        @Override
+        protected void addAdditionalComponents(GridBagConstraints constraints) {
+            add(SelectionShapes.createChooser(), constraints);
+        }
+    };
 }

@@ -3770,8 +3770,11 @@ public final class App extends JFrame implements BrushControl,
 
         final AbstractButton copySelectionButton = createButtonForOperation(new CopySelectionOperation(view));
         copySelectionButton.setEnabled(selectionState.getValue());
-        otherPanel.add(createButtonForOperation(new RectangleSelectionOperation(view)));
-        otherPanel.add(createButtonForOperation(new EditSelectionOperation(view, selectionState)));
+        final AbstractButton dragSelectionButton = createButtonForOperation(new RectangleSelectionOperation(view));
+        final AbstractButton brushSelectionButton = createButtonForOperation(new EditSelectionOperation(view, selectionState));
+        org.pepsoft.worldpainter.selection.SelectionShapes.setTools(dragSelectionButton, brushSelectionButton);
+        otherPanel.add(dragSelectionButton);
+        otherPanel.add(brushSelectionButton);
         otherPanel.add(copySelectionButton);
         final JButton clearSelectionButton = org.pepsoft.worldpainter.help.ToolCard.button();
         clearSelectionButton.setIcon(Icons.get("square-x", 18));
