@@ -425,6 +425,13 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
             }
 
             tileProvider = new WPTileProvider(dimension, colourScheme, customBiomeManager, hiddenLayers, drawContours, contourSeparation, lightOrigin, true, null, backgroundDimension == null, colourRamp);
+            if (viewMode == TileRenderer.ViewMode.HEIGHT) {
+                // The colours run from the lowest to the highest land as it is now
+                final float[] oldHeightRange = heightRange;
+                heightRange = TileRenderer.measureLandHeights(dimension);
+                firePropertyChange("heightRange", oldHeightRange, heightRange);
+            }
+            tileProvider.setViewMode(viewMode, heightRange[0], heightRange[1]);
             setTileProvider(LAYER_DETAILS, tileProvider);
 
             if (backgroundDimension != null) {
@@ -500,6 +507,8 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
         tileRenderer.setContourSeparation(contourSeparation);
         tileRenderer.setHiddenLayers(hiddenLayers);
         tileRenderer.setLightOrigin(lightOrigin);
+        tileRenderer.setViewMode(viewMode);
+        tileRenderer.setHeightRange(heightRange[0], heightRange[1]);
         int xOffset = dimension.getLowestX(), yOffset = dimension.getLowestY();
         BufferedImage image = new BufferedImage(dimension.getWidth() << TILE_SIZE_BITS, dimension.getHeight() << TILE_SIZE_BITS, BufferedImage.TYPE_INT_ARGB);
         for (Tile tile: dimension.getTiles()) {
@@ -522,6 +531,34 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
         return lightOrigin;
     }
     
+    public TileRenderer.ViewMode getViewMode() {
+        return viewMode;
+    }
+
+    /**
+     * Set what the map shows: the terrain and layers as painted, or the height, slope, biome or relief of the land on
+     * its own. Setting {@link TileRenderer.ViewMode#HEIGHT} again fits its colours to the heights of the land as they
+     * are now.
+     */
+    public void setViewMode(TileRenderer.ViewMode viewMode) {
+        if (viewMode == null) {
+            throw new NullPointerException();
+        }
+        final TileRenderer.ViewMode oldViewMode = this.viewMode;
+        if ((viewMode != oldViewMode) || (viewMode == TileRenderer.ViewMode.HEIGHT)) {
+            this.viewMode = viewMode;
+            refreshTiles();
+            firePropertyChange("viewMode", oldViewMode, viewMode);
+        }
+    }
+
+    /**
+     * The heights between which the colours of {@link TileRenderer.ViewMode#HEIGHT} run, lowest first.
+     */
+    public float[] getHeightRange() {
+        return heightRange.clone();
+    }
+
     public void setLightOrigin(LightOrigin lightOrigin) {
         if (lightOrigin == null) {
             throw new NullPointerException();
@@ -1232,6 +1269,8 @@ public class WorldPainter extends WorldPainterView implements MouseMotionListene
     private Shape customBrushShape;
     private OverlayType overlayType;
     private ColourRamp colourRamp;
+    private TileRenderer.ViewMode viewMode = TileRenderer.ViewMode.TERRAIN;
+    private float[] heightRange = {org.pepsoft.minecraft.Constants.DEFAULT_WATER_LEVEL, org.pepsoft.minecraft.Constants.DEFAULT_WATER_LEVEL + 64};
     private Timer repaintTimer;
 
     private static final int FIVE_MINUTE_WALK_DISTANCE_RADIUS = 1280;

@@ -125,6 +125,7 @@ The world seed can be changed directly in the **Surroundings** panel (a number, 
 - **[Lucide](https://lucide.dev) icons** for the toolbar, the tools, the layers and the panels, and a new application icon.
 - **Explanatory cards** when hovering over each tool (name, shortcut, explanation) instead of the old yellow tooltips.
 - A **dotted grid canvas** around the map.
+- **What the map shows**: the bar at the top of the map shows the land as painted, or its **height** (with contour lines), **slope**, **biome** or **relief** on its own, as the 3D view does, while the tools paint as usual.
 - **Areas as in Blender**: the window is divided into areas, which are resized by dragging the gaps between them, split and joined from their corners, moved and swapped by dragging their header, maximised with <kbd>Ctrl</kbd>+<kbd>Space</kbd> and detached into a window which floats over the main one. The button at the top left of each area chooses what it shows (the map and the 3D view can be shown in several areas, each with its own view), and **workspace tabs** keep several arrangements (Layout, Sculpting, Painting, 3D, Minimal, and your own). Hold <kbd>Shift</kbd> to close areas with one click; hover over a choice of the editor type menu for a card with a picture of the page.
 - On macOS, the toolbar doubles as a **unified title bar**, and the Finder shows the **map of a world as the icon of its `.world` file**.
 - A **faster export**: *Export FAST*, next to the classic *Export*, is about a third faster on large maps, with exactly the same blocks and light.

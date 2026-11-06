@@ -40,7 +40,7 @@ Hover over the land to see, in the card at the top left:
 | **Biome** | The biome of every column |
 | **Relief** | Plain shaded relief, to judge the shape of the land |
 
-The toolbar also turns the water, the trees and the contour lines (one every 8 blocks) on and off.
+The toolbar also turns the water, the trees and the contour lines (one every 8 blocks) on and off. The map has the same modes, in the bar at its top (see [What the map shows](interface.html#what-the-map-shows)).
 
 ## Trees
 

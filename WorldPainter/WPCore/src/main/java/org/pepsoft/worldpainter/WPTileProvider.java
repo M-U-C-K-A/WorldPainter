@@ -20,6 +20,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.unmodifiableSet;
+import static org.pepsoft.minecraft.Constants.DEFAULT_WATER_LEVEL;
 import static org.pepsoft.worldpainter.Constants.TILE_SIZE;
 
 /**
@@ -66,6 +67,21 @@ public class WPTileProvider implements org.pepsoft.util.swing.TileProvider, Dime
 
     public boolean isHideAllLayers() {
         return hideAllLayers;
+    }
+
+    /**
+     * Set what the tiles show (see {@link TileRenderer#setViewMode(TileRenderer.ViewMode)}), and the heights between
+     * which the colours of {@link TileRenderer.ViewMode#HEIGHT} run. Call before the tiles are first drawn.
+     */
+    public synchronized void setViewMode(TileRenderer.ViewMode viewMode, float lowestHeight, float highestHeight) {
+        this.viewMode = viewMode;
+        this.lowestHeight = lowestHeight;
+        this.highestHeight = highestHeight;
+        tileRendererRef = createNewTileRendererRef();
+    }
+
+    public synchronized TileRenderer.ViewMode getViewMode() {
+        return viewMode;
     }
 
     public void setHideAllLayers(boolean hideAllLayers) {
@@ -333,6 +349,8 @@ public class WPTileProvider implements org.pepsoft.util.swing.TileProvider, Dime
                 } else if (hiddenLayers != null) {
                     tileRenderer.addHiddenLayers(hiddenLayers);
                 }
+                tileRenderer.setViewMode(viewMode);
+                tileRenderer.setHeightRange(lowestHeight, highestHeight);
             }
             tileRenderer.setContourLines(contourLines);
             tileRenderer.setContourSeparation(contourSeparation);
@@ -369,6 +387,8 @@ public class WPTileProvider implements org.pepsoft.util.swing.TileProvider, Dime
     private final CustomBiomeManager customBiomeManager;
     private final Effect effect;
     private final ColourRamp colourRamp;
+    private TileRenderer.ViewMode viewMode = TileRenderer.ViewMode.TERRAIN;
+    private float lowestHeight = DEFAULT_WATER_LEVEL, highestHeight = DEFAULT_WATER_LEVEL + 64;
 
     private int zoom = 0;
     private boolean hideAllLayers;

@@ -1709,8 +1709,9 @@ class Terrain3DView extends JComponent {
     private HoverListener hoverListener;
     private Runnable targetListener;
 
-    static final int[] HEIGHT_RAMP = {0x2e6b3f, 0x5f9e4a, 0xa9c56b, 0xe6d79a, 0xc39a68, 0x8b6a52, 0xf5f5f4};
-    static final int[] SLOPE_RAMP = {0x3b82f6, 0x22c55e, 0xeab308, 0xf97316, 0xdc2626};
+    // The same colours as the map
+    static final int[] HEIGHT_RAMP = org.pepsoft.worldpainter.TileRenderer.HEIGHT_RAMP;
+    static final int[] SLOPE_RAMP = org.pepsoft.worldpainter.TileRenderer.SLOPE_RAMP;
     static final int CONTOUR_INTERVAL = 8;
     private static final int EARTH = 0x6b5442, DIRT = 0x7a5638, SAND_SOIL = 0xcdb98a, STONE = 0x7f7f7f, DEEPSLATE = 0x4d4d55, BEDROCK = 0x3a3a3a, PLINTH = 0x2b2622;
     private static final int CELL_BUDGET = 1_100_000;

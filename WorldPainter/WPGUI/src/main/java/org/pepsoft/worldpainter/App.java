@@ -3222,6 +3222,8 @@ public final class App extends JFrame implements BrushControl,
         mapPage.setGroup(GROUP_MAP);
         mapPage.setDescription("Paint and edit the map from above");
         mapPage.add(org.pepsoft.worldpainter.design.Glass.frame(viewContainer), BorderLayout.CENTER);
+        // What the map shows: the terrain as painted, or the height, slope, biome or relief on its own
+        mapPage.add(new MapModeBar(view), BorderLayout.NORTH);
         // What is under the mouse, and the zoom, belong to the map, so they are at its foot rather than at the bottom
         // of the window
         mapPage.add(createStatusBar(), BorderLayout.SOUTH);
@@ -5193,6 +5195,21 @@ public final class App extends JFrame implements BrushControl,
             colourSchemeMenu.add(schemeMenuItem);
         }
         menu.add(colourSchemeMenu);
+
+        // What the map shows, as the bar at the top of the map chooses
+        final JMenu viewModeMenu = new JMenu("Show on the Map");
+        final ButtonGroup viewModeGroup = new ButtonGroup();
+        final Map<TileRenderer.ViewMode, JRadioButtonMenuItem> viewModeItems = new EnumMap<>(TileRenderer.ViewMode.class);
+        for (TileRenderer.ViewMode mode: TileRenderer.ViewMode.values()) {
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(mode.getDisplayName(), mode == view.getViewMode());
+            item.setToolTipText(MapModeBar.getDescription(mode));
+            item.addActionListener(e -> view.setViewMode(mode));
+            viewModeGroup.add(item);
+            viewModeItems.put(mode, item);
+            viewModeMenu.add(item);
+        }
+        view.addPropertyChangeListener("viewMode", e -> viewModeItems.get(view.getViewMode()).setSelected(true));
+        menu.add(viewModeMenu);
 
         menuItem = new JMenuItem(strings.getString("configure.view") + "...");
         menuItem.addActionListener(e -> {

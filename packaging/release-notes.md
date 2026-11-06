@@ -4,6 +4,10 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 ## New in this version
 
+- **Look at one property of the land at a time on the map**: the bar at the top of the map shows the land as painted (**Terrain**), or on its own its **Height** (a gradient from the lowest to the highest land, with contour lines and the water by depth), its **Slope** (blue for flat, red for steep), its **Biome** (painted or automatic) or its **Relief** (shaded), as the 3D view does, with a legend; only the selection is drawn over it, and the tools paint as usual. Each area showing the map has its own, so that one can show the land as painted and another its slopes. Also in *View > Show on the Map*
+
+## New in 2.27.2-modernised.13
+
 - **Custom terrain in any order**: drag a custom terrain onto another one to put it in its place, or move it from its right click menu (to the start, left, right, to the end); the order is saved with the world
 
 ## New in 2.27.2-modernised.12

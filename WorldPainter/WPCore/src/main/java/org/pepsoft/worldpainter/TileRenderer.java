@@ -15,6 +15,9 @@ import org.pepsoft.worldpainter.layers.renderers.*;
 import org.pepsoft.worldpainter.layers.tunnel.TunnelLayer;
 import org.pepsoft.worldpainter.layers.tunnel.TunnelLayerHelper;
 import org.pepsoft.worldpainter.ramps.ColourRamp;
+import org.pepsoft.worldpainter.selection.SelectionBlock;
+import org.pepsoft.worldpainter.selection.SelectionChunk;
+import org.pepsoft.worldpainter.vanilla.VanillaBiomes;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -127,6 +130,30 @@ public final class TileRenderer {
         this.hideAllLayers = hideAllLayers;
     }
 
+    public ViewMode getViewMode() {
+        return viewMode;
+    }
+
+    /**
+     * Set what the map shows: the terrain and layers as painted, or one property of the land on its own (its height,
+     * slope, biome or relief), with only the selection on top of it.
+     */
+    public void setViewMode(ViewMode viewMode) {
+        if (viewMode == null) {
+            throw new NullPointerException();
+        }
+        this.viewMode = viewMode;
+    }
+
+    /**
+     * Set the heights between which the colours of {@link ViewMode#HEIGHT} run, from the bottom to the top of
+     * {@link #HEIGHT_RAMP}. See {@link #measureLandHeights(Dimension)}.
+     */
+    public void setHeightRange(float lowest, float highest) {
+        heightRangeLow = lowest;
+        heightRangeHigh = Math.max(lowest + 1, highest);
+    }
+
     /**
      * Render the tile to an image, with an optional offset. This will
      * completely paint the square covered by the tile, replacing any existing
@@ -221,6 +248,10 @@ public final class TileRenderer {
             layerList.clear();
         } else {
             layerList.removeIf(layer -> (layer instanceof Void) || (layer instanceof NotPresent) || (layer instanceof NotPresentBlock));
+            if (viewMode != ViewMode.TERRAIN) {
+                // Only the selection over the colours of the mode, so that what it shows stands on its own
+                layerList.removeIf(layer -> (layer != SelectionChunk.INSTANCE) && (layer != SelectionBlock.INSTANCE));
+            }
         }
         final Layer[] layers = layerList.toArray(new Layer[layerList.size()]);
         final LayerRenderer[] renderers = new LayerRenderer[layers.length];
@@ -246,10 +277,12 @@ public final class TileRenderer {
                             // TODO still render ReadOnly, and layers which might still be exported over Void
                         } else {
                             int colour = getPixelColour(tile, worldX, worldY, layers, renderers, contourLines, hideTerrain, hideFluids, bottomless, topLayersRelativeToTerrain, seed);
-                            colour = ColourUtils.multiply(colour, getTerrainBrightenAmount());
-                            final int offset = x + y * TILE_SIZE;
-                            if (intFluidHeightCache[offset] > intHeightCache[offset]) {
-                                colour = ColourUtils.multiply(colour, getFluidBrightenAmount());
+                            if (viewMode == ViewMode.TERRAIN) {
+                                colour = ColourUtils.multiply(colour, getTerrainBrightenAmount());
+                                final int offset = x + y * TILE_SIZE;
+                                if (intFluidHeightCache[offset] > intHeightCache[offset]) {
+                                    colour = ColourUtils.multiply(colour, getFluidBrightenAmount());
+                                }
                             }
                             renderBuffer[x | (y << TILE_SIZE_BITS)] = 0xff000000 | colour;
                         }
@@ -270,10 +303,12 @@ public final class TileRenderer {
                             renderBuffer[x / scale + y * tileSize] = voidColour;
                         } else {
                             int colour = getPixelColour(tile, worldX, worldY, layers, renderers, contourLines, hideTerrain, hideFluids, bottomless, topLayersRelativeToTerrain, seed);
-                            colour = ColourUtils.multiply(colour, getTerrainBrightenAmount());
-                            final int offset = x + y * TILE_SIZE;
-                            if (intFluidHeightCache[offset] > intHeightCache[offset]) {
-                                colour = ColourUtils.multiply(colour, getFluidBrightenAmount());
+                            if (viewMode == ViewMode.TERRAIN) {
+                                colour = ColourUtils.multiply(colour, getTerrainBrightenAmount());
+                                final int offset = x + y * TILE_SIZE;
+                                if (intFluidHeightCache[offset] > intHeightCache[offset]) {
+                                    colour = ColourUtils.multiply(colour, getFluidBrightenAmount());
+                                }
                             }
                             renderBuffer[x / scale + y * tileSize] = 0xff000000 | colour;
                         }
@@ -377,6 +412,16 @@ public final class TileRenderer {
         deltas [2][1] = heights[2][1] - intHeight;
         heights[1][2] = getNeighbourHeight(tile, x, y,  0,  1);
         deltas [1][2] = heights[1][2] - intHeight;
+        if (viewMode != ViewMode.TERRAIN) {
+            int colour = getModeColour(tile, x, y, worldX, worldY, offset, intHeight, contourLines, hideFluids);
+            // Only the selection is drawn over it
+            for (int i = 0; i < layers.length; i++) {
+                if ((renderers[i] instanceof BitLayerRenderer) && tile.getBitLayerValue(layers[i], x, y)) {
+                    colour = ((BitLayerRenderer) renderers[i]).getPixelColour(worldX, worldY, colour, true);
+                }
+            }
+            return colour;
+        }
         if (contourLines && ((intHeight % contourSeparation) == 0)
                 && ((deltas[0][1] < 0)
                     || (deltas[2][1] < 0)
@@ -451,6 +496,159 @@ public final class TileRenderer {
             }
         }
         return colour;
+    }
+
+    /**
+     * The colour of a column in one of the modes which show a property of the land on its own: from the same colour
+     * ramps as the 3D view, lit by the slope of the land from the side of {@link #lightOrigin}. Assumes that
+     * {@link #heights} and {@link #deltas} have been filled in for the column.
+     */
+    private int getModeColour(Tile tile, int x, int y, int worldX, int worldY, int offset, int intHeight, boolean contourLines, boolean hideFluids) {
+        final float height = floatHeightCache[offset];
+        // The slopes over the width of a pixel, which is several blocks when zoomed out
+        final int step = (zoom < 0) ? (1 << -zoom) : 1;
+        final float west = getNeighbourFloatHeight(tile, x, y, -step, 0, height), east = getNeighbourFloatHeight(tile, x, y, step, 0, height);
+        final float north = getNeighbourFloatHeight(tile, x, y, 0, -step, height), south = getNeighbourFloatHeight(tile, x, y, 0, step, height);
+        final float dzdx = (east - west) / (2 * step), dzdy = (south - north) / (2 * step);
+        final int waterLevel = tile.getWaterLevel(x, y);
+        final boolean flooded = (! hideFluids) && (viewMode != ViewMode.SLOPE) && (waterLevel > intHeight);
+        int colour;
+        switch (viewMode) {
+            case HEIGHT:
+                colour = shade(ramp(HEIGHT_RAMP, (height - heightRangeLow) / (heightRangeHigh - heightRangeLow)), 0.72f + 0.28f * light(dzdx, dzdy, 1.5f));
+                break;
+            case SLOPE:
+                final float slope = (float) Math.toDegrees(Math.atan(Math.sqrt(dzdx * dzdx + dzdy * dzdy)));
+                colour = shade(ramp(SLOPE_RAMP, Math.min(1, slope / 60f)), 0.82f + 0.18f * light(dzdx, dzdy, 1.5f));
+                break;
+            case BIOME:
+                int biome = tile.getLayerValue(Biome.INSTANCE, x, y);
+                if ((biome == 255) && (tileProvider instanceof Dimension)) {
+                    biome = ((Dimension) tileProvider).getAutoBiome(tile, x, y);
+                }
+                // Only a little relief, so that the borders between the biomes stand out
+                colour = shade(((biome >= 0) && (biome != 255)) ? VanillaBiomes.getColour(VanillaBiomes.fromWorldPainterBiome(biome)) : 0x808080, 0.88f + 0.12f * light(dzdx, dzdy, 1.0f));
+                break;
+            case RELIEF:
+                colour = shade(RELIEF_COLOUR, 0.45f + 0.52f * light(dzdx, dzdy, 1.2f));
+                break;
+            default:
+                throw new InternalError();
+        }
+        if (flooded) {
+            if (tile.getBitLayerValue(FloodWithLava.INSTANCE, x, y)) {
+                colour = lavaColour;
+            } else {
+                final float depth = Math.min(1, (waterLevel - height) / 24f);
+                final int water = blend(0x4a8fe7, 0x1d3f8f, depth);
+                colour = (viewMode == ViewMode.HEIGHT) ? water : blend(colour, water, (viewMode == ViewMode.BIOME) ? 0.4f : 0.55f);
+                // The shore, drawn as a line
+                if ((heights[1][0] >= waterLevel) || (heights[0][1] >= waterLevel) || (heights[2][1] >= waterLevel) || (heights[1][2] >= waterLevel)) {
+                    colour = shade(colour, 0.7f);
+                }
+            }
+        } else if (contourLines && (viewMode == ViewMode.HEIGHT)) {
+            // A line on the upper side wherever a contour runs between this column and the one next to it, so that the
+            // lines stay unbroken on steep and rough land; every fifth one darker
+            // (Further apart when zoomed out far, so that they do not run together)
+            final int interval = contourSeparation * ((zoom < -1) ? (1 << (-zoom - 1)) : 1);
+            final int level = (int) Math.floor(height / interval);
+            final int lowestLevel = (int) Math.floor(Math.min(Math.min(west, east), Math.min(north, south)) / interval);
+            if (lowestLevel < level) {
+                colour = shade(colour, (Math.floorMod(level, 5) == 0) ? 0.55f : 0.75f);
+            }
+        }
+        return colour;
+    }
+
+    /**
+     * How brightly the land is lit, from the side of {@link #lightOrigin}, half way up the sky: 1 for flat land, from 0
+     * for land facing away from the light to about 1.4 for land facing it.
+     *
+     * @param exaggeration How much steeper than it is to light the land, to bring out the shape of gentle land.
+     */
+    private float light(float dzdx, float dzdy, float exaggeration) {
+        dzdx *= exaggeration;
+        dzdy *= exaggeration;
+        final float lightX, lightY;
+        switch (lightOrigin) {
+            case NORTHEAST -> { lightX = 0.5f; lightY = -0.5f; }
+            case SOUTHEAST -> { lightX = 0.5f; lightY = 0.5f; }
+            case SOUTHWEST -> { lightX = -0.5f; lightY = 0.5f; }
+            case ABOVE -> { lightX = 0; lightY = 0; }
+            default -> { lightX = -0.5f; lightY = -0.5f; }
+        }
+        final float lightZ = (lightOrigin == LightOrigin.ABOVE) ? 1.0f : 0.70710677f;
+        final float dot = (-dzdx * lightX - dzdy * lightY + lightZ) / (float) Math.sqrt(dzdx * dzdx + dzdy * dzdy + 1);
+        return Math.max(0, dot) / lightZ;
+    }
+
+    private float getNeighbourFloatHeight(Tile tile, int x, int y, int dx, int dy, float defaultHeight) {
+        x += dx;
+        y += dy;
+        if ((x >= 0) && (x < TILE_SIZE) && (y >= 0) && (y < TILE_SIZE)) {
+            return floatHeightCache[x + y * TILE_SIZE];
+        }
+        final Tile neighbour = tileProvider.getTile(tile.getX() + (x >> TILE_SIZE_BITS), tile.getY() + (y >> TILE_SIZE_BITS));
+        return (neighbour != null) ? neighbour.getHeight(x & TILE_SIZE_MASK, y & TILE_SIZE_MASK) : defaultHeight;
+    }
+
+    /**
+     * Measure the heights of the land of a dimension which is not under water, from a sample of its columns, for the
+     * colours of {@link ViewMode#HEIGHT}. If all of it is under water, the heights of all of it.
+     *
+     * @return The lowest and highest height, in that order.
+     */
+    public static float[] measureLandHeights(Dimension dimension) {
+        float lowestDry = Float.MAX_VALUE, highestDry = -Float.MAX_VALUE, lowest = Float.MAX_VALUE, highest = -Float.MAX_VALUE;
+        final int step = (dimension.getTileCount() > 4096) ? 16 : 4;
+        for (Tile tile: dimension.getTiles()) {
+            for (int y = step / 2; y < TILE_SIZE; y += step) {
+                for (int x = step / 2; x < TILE_SIZE; x += step) {
+                    final float height = tile.getHeight(x, y);
+                    lowest = Math.min(lowest, height);
+                    highest = Math.max(highest, height);
+                    if (tile.getWaterLevel(x, y) <= Math.round(height)) {
+                        lowestDry = Math.min(lowestDry, height);
+                        highestDry = Math.max(highestDry, height);
+                    }
+                }
+            }
+        }
+        if (lowestDry <= highestDry) {
+            return new float[] {lowestDry, Math.max(lowestDry + 1, highestDry)};
+        } else if (lowest <= highest) {
+            return new float[] {lowest, Math.max(lowest + 1, highest)};
+        } else {
+            return new float[] {DEFAULT_WATER_LEVEL, DEFAULT_WATER_LEVEL + 64};
+        }
+    }
+
+    /**
+     * A colour part of the way along a ramp of colours.
+     *
+     * @param stops The colours of the ramp, evenly spaced.
+     * @param t How far along it, from 0 to 1.
+     */
+    public static int ramp(int[] stops, float t) {
+        t = Math.max(0, Math.min(1, t));
+        final float position = t * (stops.length - 1);
+        final int index = Math.min(stops.length - 2, (int) position);
+        return blend(stops[index], stops[index + 1], position - index);
+    }
+
+    private static int blend(int colour1, int colour2, float t) {
+        final int r = (int) (((colour1 >> 16) & 0xff) * (1 - t) + ((colour2 >> 16) & 0xff) * t);
+        final int g = (int) (((colour1 >> 8) & 0xff) * (1 - t) + ((colour2 >> 8) & 0xff) * t);
+        final int b = (int) ((colour1 & 0xff) * (1 - t) + (colour2 & 0xff) * t);
+        return (r << 16) | (g << 8) | b;
+    }
+
+    private static int shade(int colour, float factor) {
+        final int r = Math.min(255, (int) (((colour >> 16) & 0xff) * factor));
+        final int g = Math.min(255, (int) (((colour >> 8) & 0xff) * factor));
+        final int b = Math.min(255, (int) ((colour & 0xff) * factor));
+        return (r << 16) | (g << 8) | b;
     }
 
     /**
@@ -695,6 +893,21 @@ public final class TileRenderer {
     private boolean contourLines = true, hideAllLayers;
     private int contourSeparation = 10;
     private LightOrigin lightOrigin = LightOrigin.NORTHWEST;
+    private ViewMode viewMode = ViewMode.TERRAIN;
+    private float heightRangeLow = DEFAULT_WATER_LEVEL, heightRangeHigh = DEFAULT_WATER_LEVEL + 64;
+
+    /**
+     * The colours of {@link ViewMode#HEIGHT}, from low to high land: green lowlands, sand, brown hills and white peaks.
+     * The 3D view uses the same.
+     */
+    public static final int[] HEIGHT_RAMP = {0x2e6b3f, 0x5f9e4a, 0xa9c56b, 0xe6d79a, 0xc39a68, 0x8b6a52, 0xf5f5f4};
+
+    /**
+     * The colours of {@link ViewMode#SLOPE}, from flat (blue) to 60° and steeper (red). The 3D view uses the same.
+     */
+    public static final int[] SLOPE_RAMP = {0x3b82f6, 0x22c55e, 0xeab308, 0xf97316, 0xdc2626};
+
+    private static final int RELIEF_COLOUR = 0xe2dfdc;
 
     public static final Layer TERRAIN_AS_LAYER = new Layer("org.pepsoft.synthetic.Terrain", "Terrain", "The terrain type of the surface", Layer.DataSize.NONE, false, 0) {
         @Override
@@ -732,6 +945,32 @@ public final class TileRenderer {
             {false, false, false, false, false, false,  true,  true},
             { true, false, false, false, false,  true,  true,  true}};
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TileRenderer.class);
+
+    /**
+     * What the map shows.
+     */
+    public enum ViewMode {
+        TERRAIN("Terrain", "The terrain and the layers, as painted"),
+        HEIGHT("Height", "A colour gradient from the lowest to the highest land, with contour lines: read the altitude at a glance"),
+        SLOPE("Slope", "From blue (flat) to red (steep): find cliffs and flat land to build on"),
+        BIOME("Biome", "The biome of each column, painted or automatic"),
+        RELIEF("Relief", "Plain shaded relief, to judge the shape of the land");
+
+        ViewMode(String displayName, String description) {
+            this.displayName = displayName;
+            this.description = description;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        private final String displayName, description;
+    }
 
     public enum LightOrigin {
         NORTHWEST {

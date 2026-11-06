@@ -41,6 +41,9 @@ final class MapCopy {
         page.setGroup(App.GROUP_MAP);
         page.setDescription("Another view of the map, which you can move and zoom on its own");
         page.add(org.pepsoft.worldpainter.design.Glass.frame(container), BorderLayout.CENTER);
+        // What it shows is its own, so that the map can be seen as painted in one area and its height or slope in
+        // another
+        page.add(new MapModeBar(view), BorderLayout.NORTH);
         page.add(createFoot(), BorderLayout.SOUTH);
         page.putClientProperty(org.pepsoft.worldpainter.docking.PagePreview.KEY_AREA, container);
 

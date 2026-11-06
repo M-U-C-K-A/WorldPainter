@@ -115,6 +115,24 @@ For the height limits:
 - **Between** applies between the two bars; **Beyond** applies below the lower one and above the upper one. Click the highlighted button again to switch the limits off. 
 - Ctrl+Z (⌘Z on macOS) takes back changes to these options, and Ctrl+Y brings them back, as long as you have not changed the map since. After that they undo and redo changes to the map as usual.
 
+## What the map shows
+
+The bar at the top of the map chooses what it shows, as the [3D view](3d-view.html) does, so that one property of the land can be looked at on its own while you paint:
+
+| Mode | Shows |
+|---|---|
+| **Terrain** | The terrain and the layers, as painted |
+| **Height** | A colour gradient from the lowest to the highest land not under water, with contour lines (every fifth one darker) and the water by depth. Click **Height** again to fit the colours to the land as it is after you have changed it |
+| **Slope** | From blue (flat) to red (60° or more): find cliffs, and flat land to build on |
+| **Biome** | The biome of every column, painted or automatic, in the same colours as the 3D view |
+| **Relief** | Plain shaded relief, to judge the shape of the land |
+
+The legend next to the buttons gives the heights or slopes at either end of the colours. In every mode but Terrain only the selection is drawn over the land, and the tools paint as usual: raise a mountain in Height mode and watch it turn white at the top. The light comes from the side chosen for the map, and the contour lines follow the **Contours** button of the toolbar and their spacing in *View > Configure view*; zoomed out far they are drawn further apart. The same choice is in *View > Show on the Map*, and an exported image of the map shows what the map shows. When the map is shown in several areas, each has its own bar: paint in Terrain in one and watch the slopes in another.
+
+![The Height mode of the map: green valleys, brown slopes and contour lines](assets/images/map-height.jpg)
+
+![The Slope mode of the map: flat valleys in blue, steep slopes in red](assets/images/map-slope.jpg)
+
 ## Canvas
 
 The map sits on a dotted canvas instead of a dark blue background. On macOS the toolbar doubles as the title bar.
