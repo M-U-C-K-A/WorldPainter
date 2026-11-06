@@ -4,6 +4,10 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 
 ## New in this version
 
+- **Custom terrain in any order**: drag a custom terrain onto another one to put it in its place, or move it from its right click menu (to the start, left, right, to the end); the order is saved with the world
+
+## New in 2.27.2-modernised.12
+
 - **Curvature, finer and wider**: from 0.1 block deep (instead of 0.5), and a new *blocks around* setting for how far the brush looks, which finds broader valleys and ridges and reaches further up their sides; land going up in whole blocks no longer counts as curved at every step, and the edge fades out softly
 - **Selection by shape or by brush**: the options of **Select** choose a rectangle, an ellipse or the brush; the brush paints the selection as in the original WorldPainter, its size and shape setting what is selected (the **Select with Brush** tool). The ellipse no longer depends on a key which macOS takes for a right click
 - **Turn and mirror a copy**: **Copy Selection** turns the copy a quarter turn at a time and mirrors it, its outline on the map following
