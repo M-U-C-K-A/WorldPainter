@@ -1766,6 +1766,22 @@ public final class App extends JFrame implements BrushControl,
                 popupMenu.add(menuItem);
             }
 
+            // Moving it among the others (they can also be dragged onto each other)
+            popupMenu.addSeparator();
+            final int position = indexInPanel(button), count = customTerrainPanel.getComponentCount() - 1;
+            final JMenuItem moveFirst = new JMenuItem("Move to the start"), moveLeft = new JMenuItem("Move left"), moveRight = new JMenuItem("Move right"), moveLast = new JMenuItem("Move to the end");
+            moveFirst.addActionListener(e -> moveCustomTerrainButton(button, 0));
+            moveLeft.addActionListener(e -> moveCustomTerrainButton(button, position - 1));
+            moveRight.addActionListener(e -> moveCustomTerrainButton(button, position + 1));
+            moveLast.addActionListener(e -> moveCustomTerrainButton(button, count - 1));
+            moveFirst.setEnabled(position > 0);
+            moveLeft.setEnabled(position > 0);
+            moveRight.setEnabled(position < count - 1);
+            moveLast.setEnabled(position < count - 1);
+            popupMenu.add(moveFirst);
+            popupMenu.add(moveLeft);
+            popupMenu.add(moveRight);
+            popupMenu.add(moveLast);
             popupMenu.show(button, button.getWidth(), 0);
         } else {
             Component invoker = (Component) event.getSource();
@@ -1953,6 +1969,7 @@ public final class App extends JFrame implements BrushControl,
         customMaterialButtons[index] = newButton;
         newButton.setToolTipText(MessageFormat.format(strings.getString("customMaterial.0.right.click.to.change"), customMaterial));
         addMaterialSelectionTo(newButton, index);
+        installCustomTerrainDrag(newButton);
         customTerrainPanel.add(newButton, customTerrainPanel.getComponentCount() - 1);
         customTerrainPanel.validate();
         if (Terrain.getConfiguredCustomMaterialCount() == CUSTOM_TERRAIN_COUNT) {
@@ -6971,9 +6988,125 @@ public final class App extends JFrame implements BrushControl,
             }
         }
         if (customTerrainsChanged) {
+            applyCustomTerrainOrder();
             customTerrainPanel.validate();
         }
     }
+
+    /**
+     * Let the custom terrain buttons be put in any order, by dragging one onto another: it takes that one's place.
+     */
+    private void installCustomTerrainDrag(JToggleButton button) {
+        final java.awt.event.MouseAdapter handler = new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                start = SwingUtilities.isLeftMouseButton(e) ? e.getPoint() : null;
+                dragging = false;
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if ((start != null) && (! dragging) && (start.distance(e.getPoint()) > 6)) {
+                    dragging = true;
+                    button.setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+                }
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (dragging && (customTerrainPanel != null)) {
+                    button.setCursor(Cursor.getDefaultCursor());
+                    final Point point = SwingUtilities.convertPoint(button, e.getPoint(), customTerrainPanel);
+                    final Component target = customTerrainPanel.getComponentAt(point);
+                    if ((target instanceof JToggleButton) && (target != button)) {
+                        moveCustomTerrainButton(button, indexInPanel(target));
+                    }
+                }
+                start = null;
+                dragging = false;
+            }
+
+            private Point start;
+            private boolean dragging;
+        };
+        button.addMouseListener(handler);
+        button.addMouseMotionListener(handler);
+    }
+
+    private int indexInPanel(Component component) {
+        final Component[] components = customTerrainPanel.getComponents();
+        for (int i = 0; i < components.length; i++) {
+            if (components[i] == component) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Move a custom terrain button to another place among them (the button to add one stays last), and remember the
+     * order in the world.
+     */
+    private void moveCustomTerrainButton(JToggleButton button, int newIndex) {
+        if ((customTerrainPanel == null) || (indexInPanel(button) < 0)) {
+            return;
+        }
+        customTerrainPanel.remove(button);
+        final int last = customTerrainPanel.getComponentCount() - 1; // Before the button to add one
+        customTerrainPanel.add(button, Math.max(0, Math.min(last, newIndex)));
+        customTerrainPanel.revalidate();
+        customTerrainPanel.repaint();
+        saveCustomTerrainOrder();
+    }
+
+    private void saveCustomTerrainOrder() {
+        if ((world == null) || (customTerrainPanel == null)) {
+            return;
+        }
+        final StringBuilder order = new StringBuilder();
+        for (Component component: customTerrainPanel.getComponents()) {
+            for (int i = 0; i < CUSTOM_TERRAIN_COUNT; i++) {
+                if (customMaterialButtons[i] == component) {
+                    if (order.length() > 0) {
+                        order.append(',');
+                    }
+                    order.append(i);
+                }
+            }
+        }
+        world.setAttribute(ATTRIBUTE_CUSTOM_TERRAIN_ORDER, order.toString());
+    }
+
+    /**
+     * Put the custom terrain buttons in the order saved with the world, if any; buttons not in it stay after those
+     * which are.
+     */
+    private void applyCustomTerrainOrder() {
+        if ((world == null) || (customTerrainPanel == null)) {
+            return;
+        }
+        final String order = world.getAttribute(ATTRIBUTE_CUSTOM_TERRAIN_ORDER).orElse(null);
+        if ((order == null) || order.isEmpty()) {
+            return;
+        }
+        int position = 0;
+        for (String part: order.split(",")) {
+            try {
+                final int index = Integer.parseInt(part.trim());
+                if ((index >= 0) && (index < CUSTOM_TERRAIN_COUNT) && (customMaterialButtons[index] != null)) {
+                    customTerrainPanel.remove(customMaterialButtons[index]);
+                    customTerrainPanel.add(customMaterialButtons[index], position++);
+                }
+            } catch (NumberFormatException e) {
+                // Ignore
+            }
+        }
+    }
+
+    /**
+     * The order in which the custom terrain buttons are shown: their indices, separated by commas.
+     */
+    private static final org.pepsoft.util.AttributeKey<String> ATTRIBUTE_CUSTOM_TERRAIN_ORDER = new org.pepsoft.util.AttributeKey<>("org.pepsoft.worldpainter.modernised.customTerrainOrder");
 
     private void saveCustomLayers() {
         if (dimension != null) {

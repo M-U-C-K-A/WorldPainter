@@ -72,6 +72,8 @@ The tools are grouped by what they do: **Sculpt terrain** (raise, lower, flatten
 
 To select an area, **Select** works as in an image editor: drag across the map to add a rectangle or an ellipse to the selection, as chosen at the top of its options, with the right mouse button to remove one; hold <kbd>Shift</kbd> for a square or a circle (<kbd>Ctrl</kbd>, or <kbd>⌘</kbd> on a Mac, switches between rectangle and ellipse while dragging). Choose **Brush** there, or the **Select with Brush** tool, to paint the selection with the brush as in the original WorldPainter: the size and shape of the brush set what is selected. Tick *inside selection* in the options of a tool to limit it to the selection.
 
+The buttons of your **custom terrain** can be put in any order: drag one onto another to put it in its place, or use *Move left*, *Move right*, *Move to the start* or *Move to the end* in its right click menu. The order is saved with the world.
+
 **Copy Selection** copies the selected area to where you click. Its options choose what to copy, and turn the copy a quarter turn at a time (↺ ↻) or mirror it, the outline on the map showing where it will go.
 
 ## Brushes
