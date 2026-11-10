@@ -72,6 +72,7 @@ import org.pepsoft.worldpainter.docking.PagePreview;
 import org.pepsoft.worldpainter.docking.Side;
 import org.pepsoft.worldpainter.nodes.NodeGraphDialog;
 import org.pepsoft.worldpainter.procedural.EdgeBlendDialog;
+import org.pepsoft.worldpainter.util.KeyBindings;
 import org.pepsoft.worldpainter.util.*;
 import org.pepsoft.worldpainter.util.BetterAction;
 import org.pepsoft.worldpainter.util.FileFilter;
@@ -209,6 +210,7 @@ public final class App extends JFrame implements BrushControl,
 
         MainFrame.setMainFrame(this);
         initComponents();
+        registerKeyBindings();
 
         getRootPane().putClientProperty(KEY_HELP_KEY, "Main");
 
@@ -5474,6 +5476,11 @@ public final class App extends JFrame implements BrushControl,
         menu.setMnemonic('t');
         menu.add(menuItem);
 
+        menuItem = new JMenuItem("Keyboard Shortcuts...");
+        menuItem.setToolTipText("Choose the keyboard shortcut of every command: the menus, the tools, the brush and the map");
+        menuItem.addActionListener(e -> new KeyBindingsDialog(this).setVisible(true));
+        menu.add(menuItem);
+
         // Repair holes in seas and lakes: land lowered under the water next to it without being flooded, which comes
         // out in Minecraft as a dry hole with walls of water around it
         menuItem = new JMenuItem("Fill Holes in the Water");
@@ -5980,6 +5987,99 @@ public final class App extends JFrame implements BrushControl,
      * button in the toolbar or in the preferences.
      */
     /**
+     * Make every command a keyboard shortcut can be given to: the items of the menus, the keys of the brush and the
+     * map, the tools, and a few commands which have no shortcut by default. The user can change them in
+     * Keyboard Shortcuts.
+     */
+    private void registerKeyBindings() {
+        final KeyBindings bindings = KeyBindings.getInstance();
+        final JRootPane rootPane = getRootPane();
+        // The items of the menus
+        final JMenuBar menuBar = getJMenuBar();
+        if (menuBar != null) {
+            for (int i = 0; i < menuBar.getMenuCount(); i++) {
+                final JMenu menu = menuBar.getMenu(i);
+                if (menu != null) {
+                    registerMenuItems(bindings, menu, menu.getText());
+                }
+            }
+        }
+        // The keys of the brush and the map
+        final Map<String, String> names = new LinkedHashMap<>();
+        names.put(ACTION_NAME_INCREASE_RADIUS, "Make the brush larger");
+        names.put(ACTION_NAME_DECREASE_RADIUS, "Make the brush smaller");
+        names.put(ACTION_NAME_INCREASE_RADIUS_BY_ONE, "Make the brush one block larger");
+        names.put(ACTION_NAME_DECREASE_RADIUS_BY_ONE, "Make the brush one block smaller");
+        names.put(ACTION_ROTATE_BRUSH_LEFT.getName(), "Turn the brush left");
+        names.put(ACTION_ROTATE_BRUSH_RIGHT.getName(), "Turn the brush right");
+        names.put(ACTION_ROTATE_BRUSH_RESET.getName(), "Turn the brush back straight");
+        names.put(ACTION_ROTATE_BRUSH_RIGHT_30_DEGREES.getName(), "Turn the brush 30° right");
+        names.put(ACTION_ROTATE_BRUSH_RIGHT_45_DEGREES.getName(), "Turn the brush 45° right");
+        names.put(ACTION_ROTATE_BRUSH_RIGHT_90_DEGREES.getName(), "Turn the brush 90° right");
+        names.put("rotateLightLeft", "Turn the light of the map left");
+        names.put("rotateLightRight", "Turn the light of the map right");
+        for (int percentage = 10; percentage <= 100; percentage += 10) {
+            names.put("intensity" + percentage, "Brush intensity " + percentage + "%");
+        }
+        names.put(ACTION_NAME_REDO, "Redo");
+        names.put(ACTION_NAME_ZOOM_IN, "Zoom in");
+        names.put(ACTION_NAME_ZOOM_OUT, "Zoom out");
+        names.put(ACTION_ZOOM_RESET.getName(), "Zoom to 100%");
+        names.put(ACTION_ESCAPE.getName(), "Cancel (the selection being drawn, the tool…)");
+        bindings.adopt(rootPane.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT), rootPane.getActionMap(), names, "Brush and map");
+        // The tools: Alt and their letter by default, those without a letter without a shortcut
+        for (Object[] tool: toolButtons) {
+            final Operation operation = (Operation) tool[0];
+            final AbstractButton button = (AbstractButton) tool[1];
+            final char mnemonic = (Character) tool[2];
+            final KeyStroke[] defaults = (mnemonic != 0) ? new KeyStroke[] {getKeyStroke(Character.toUpperCase(mnemonic), ALT_DOWN_MASK)} : new KeyStroke[0];
+            bindings.register("tool." + operation.getClass().getSimpleName() + "." + operation.getName(), operation.getName(), "Painting and sculpting tools", KeyBindings.action(operation.getName(), button::doClick), defaults);
+            // (The shortcut does it now, so that it can be changed)
+            button.setMnemonic(0);
+        }
+        // Commands without a shortcut by default
+        for (TileRenderer.ViewMode mode: TileRenderer.ViewMode.values()) {
+            bindings.register("map.viewMode." + mode.name(), "Show " + mode.getDisplayName() + " on the map", "Map", KeyBindings.action(mode.getDisplayName(), () -> view.setViewMode(mode)));
+        }
+        bindings.register("page.composition", "Show the Composition page", "Map", KeyBindings.action("Composition", () -> areaManager.showPage(PAGE_COMPOSITION)));
+        bindings.register("page.3d", "Show the 3D view", "Map", KeyBindings.action("3D View", () -> areaManager.showPage(PAGE_3D)));
+        bindings.register("page.map", "Show the map", "Map", KeyBindings.action("Map", () -> areaManager.showPage(PAGE_MAP)));
+        bindings.install(rootPane);
+    }
+
+    private static void registerMenuItems(KeyBindings bindings, JMenu menu, String category) {
+        for (int i = 0; i < menu.getItemCount(); i++) {
+            final JMenuItem item = menu.getItem(i);
+            if (item == null) {
+                continue;
+            } else if (item instanceof JMenu) {
+                registerMenuItems(bindings, (JMenu) item, category);
+                continue;
+            } else if ((item.getText() == null) || item.getText().trim().isEmpty()) {
+                continue;
+            }
+            final String name = item.getText().replace("...", "").replace("…", "").trim();
+            final Action action = item.getAction();
+            if (action != null) {
+                final Object accelerator = action.getValue(Action.ACCELERATOR_KEY);
+                final String id = "menu." + ((action instanceof org.pepsoft.util.swing.BetterAction) ? ((org.pepsoft.util.swing.BetterAction) action).getName() : (category + "." + name));
+                bindings.register(id, name, category, action, (accelerator instanceof KeyStroke) ? new KeyStroke[] {(KeyStroke) accelerator} : new KeyStroke[0]).inMenu();
+            } else {
+                // An item which does something itself: a command which clicks it, whose shortcut the item shows
+                final KeyStroke accelerator = item.getAccelerator();
+                final Action click = KeyBindings.action(name, item::doClick);
+                click.putValue(Action.ACCELERATOR_KEY, accelerator);
+                click.addPropertyChangeListener(event -> {
+                    if (Action.ACCELERATOR_KEY.equals(event.getPropertyName())) {
+                        item.setAccelerator((KeyStroke) event.getNewValue());
+                    }
+                });
+                bindings.register("menu." + category + "." + name, name, category, click, (accelerator != null) ? new KeyStroke[] {accelerator} : new KeyStroke[0]).inMenu();
+            }
+        }
+    }
+
+    /**
      * Bring a component which was not on screen when the theme was switched (and so still has the colours of the old
      * theme: dark on light, or light on dark) up to date with the current theme.
      */
@@ -6337,6 +6437,7 @@ public final class App extends JFrame implements BrushControl,
         if (mnemonic != 0) {
             button.setMnemonic(mnemonic);
         }
+        toolButtons.add(new Object[] {operation, button, mnemonic});
         button.setToolTipText(richToolTip(operation.getName(), operation.getDescription(), (mnemonic != 0) ? ("Alt+" + Character.toUpperCase(mnemonic)) : null));
         org.pepsoft.worldpainter.help.ToolCard.install(button, org.pepsoft.worldpainter.help.ToolCards.forTool(operation.getClass().getSimpleName(), operation.getName(), operation.getDescription(), (mnemonic != 0) ? ("Alt+" + Character.toUpperCase(mnemonic)) : null, toolDemoFor(operation)));
         if (operation instanceof GlobalOperation) {
@@ -8414,6 +8515,7 @@ public final class App extends JFrame implements BrushControl,
      * The pages of the areas which are not built with a {@link DockableFrameBuilder}.
      */
     private static final String KEY_LOOK_AND_FEEL = "org.pepsoft.worldpainter.lookAndFeel";
+    private final List<Object[]> toolButtons = new ArrayList<>();
     private static final String PAGE_MAP = AreaManager.MAIN_PAGE, PAGE_3D = AreaManager.MAIN_PAGE_2, PAGE_COMPOSITION = "composition";
     /**
      * The kinds of editors; the pages of each kind share the tabs of the area which shows them.

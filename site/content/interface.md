@@ -151,6 +151,10 @@ At the top a small map of the world shows where that land is, with its size; the
 - **Underground**: the caves, tunnels and pockets painted under it, what applies everywhere in the world and between which heights, and a table of the ores with their heights and how common they are;
 - **Rock column**: the blocks of a column from the top down to the bottom of the world, as they will be exported before the caves and ores: the top layer of its terrain, then the rock under it (stone with granite, diorite and andesite, deepslate and tuff below Y 0), down to the bedrock.
 
+## Keyboard shortcuts
+
+*Tools > Keyboard Shortcuts* lists every command which can have a shortcut: the items of the menus, the painting and sculpting tools (Alt and a letter by default, or none), the keys of the brush and the map (its size, its rotation, its intensity, the zoom, the light) and a few commands which have none to begin with (what the map shows, the Composition page, the 3D view, the map). Double-click one, or choose *Change*, and press the keys you want; *Add* gives it one more, *Remove* none, *Reset* the ones it came with. If the keys are already the shortcut of another command, it asks whether to move them. The search field finds commands by name or by shortcut. Your shortcuts are kept in `keybindings.properties` in the configuration folder; *Reset All* puts the original ones back.
+
 ## Canvas
 
 The map sits on a dotted canvas instead of a dark blue background. On macOS the toolbar doubles as the title bar.
