@@ -281,8 +281,11 @@ public class FillDialog extends WPDialogWithPaintSelection implements Listener, 
                         removeFromSelection(progressReceiver);
                     } else if (radioButtonTerrainHeight.isSelected()) {
                         changeTerrainHeight(progressReceiver);
+                        // Let the water flow into land lowered under it
+                        org.pepsoft.worldpainter.operations.WaterSettling.settleEverywhere(dimension, null);
                     } else if (radioButtonSmooth.isSelected()) {
                         GlobalSmooth.smooth(dimension, (Integer) spinnerSmoothRadius.getValue(), filter, checkBoxSmoothHalfBlocks.isSelected(), progressReceiver);
+                        org.pepsoft.worldpainter.operations.WaterSettling.settleEverywhere(dimension, null);
                     }
                     return dimension;
                 }

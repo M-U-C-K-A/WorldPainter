@@ -92,4 +92,10 @@ public class Smooth extends AbstractBrushOperation {
     private final TerrainShapingOptionsPanel optionsPanel;
     private float[][] totals, currentHeights;
     private int[][] sampleCounts;
+
+    @Override
+    protected boolean changesHeights() {
+        // Let the water flow into land lowered under it
+        return true;
+    }
 }

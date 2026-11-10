@@ -77,4 +77,10 @@ public class Height extends AbstractBrushOperation {
 
     private final TerrainShapingOptions<Height> options = new TerrainShapingOptions<>();
     private final TerrainShapingOptionsPanel optionsPanel = new TerrainShapingOptionsPanel("Height", "<ul><li>Left-click to raise the terrain<li>Right-click to lower the terrain</ul>", options);
+
+    @Override
+    protected boolean changesHeights() {
+        // Let the water flow into land lowered under it
+        return true;
+    }
 }

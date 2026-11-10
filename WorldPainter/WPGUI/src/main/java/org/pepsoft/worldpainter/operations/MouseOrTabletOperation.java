@@ -247,6 +247,7 @@ public abstract class MouseOrTabletOperation extends AbstractOperation implement
                         timer = new Timer(delay, e -> {
                             Point worldCoords = view.viewToWorld((int) x, (int) y);
                             tick(worldCoords.x, worldCoords.y, undo, first, (stylus || eraser) ? dynamicLevel : 1.0f);
+                            ticked(worldCoords.x, worldCoords.y);
                             view.updateStatusBar(worldCoords.x, worldCoords.y);
                             first = false;
                         });
@@ -261,6 +262,7 @@ public abstract class MouseOrTabletOperation extends AbstractOperation implement
                             App.getInstance().pauseAutosave();
                             try {
                                 tick(worldCoords.x, worldCoords.y, undo, true, 1.0f);
+                                ticked(worldCoords.x, worldCoords.y);
                                 view.updateStatusBar(worldCoords.x, worldCoords.y);
                                 Dimension dimension = getDimension();
                                 if (dimension != null) {
@@ -311,6 +313,7 @@ public abstract class MouseOrTabletOperation extends AbstractOperation implement
             timer = new Timer(delay, e -> {
                 Point worldCoords = view.viewToWorld((int) x, (int) y);
                 tick(worldCoords.x, worldCoords.y, undo, first, 1.0f);
+                ticked(worldCoords.x, worldCoords.y);
                 view.updateStatusBar(worldCoords.x, worldCoords.y);
                 first = false;
             });
@@ -324,6 +327,7 @@ public abstract class MouseOrTabletOperation extends AbstractOperation implement
             App.getInstance().pauseAutosave();
             try {
                 tick(worldCoords.x, worldCoords.y, undo, true, 1.0f);
+                ticked(worldCoords.x, worldCoords.y);
                 view.updateStatusBar(worldCoords.x, worldCoords.y);
                 Dimension dimension = getDimension();
                 if (dimension != null) {
@@ -426,6 +430,17 @@ public abstract class MouseOrTabletOperation extends AbstractOperation implement
      * operations).
      */
     protected void finished() {
+        // Do nothing
+    }
+
+    /**
+     * Invoked after each {@link #tick(int, int, boolean, boolean, float)}, with the same location.
+     */
+    protected final boolean isOneShot() {
+        return oneShot;
+    }
+
+    protected void ticked(int centreX, int centreY) {
         // Do nothing
     }
 

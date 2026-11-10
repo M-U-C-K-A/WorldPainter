@@ -107,4 +107,10 @@ public class RiverPaint extends AbstractBrushOperation {
 
     private static final double DOUBLE_PI = Math.PI * 2;
     private static final double HALF_PI = Math.PI / 2;
+
+    @Override
+    protected boolean changesHeights() {
+        // Let the water flow into land lowered under it
+        return true;
+    }
 }

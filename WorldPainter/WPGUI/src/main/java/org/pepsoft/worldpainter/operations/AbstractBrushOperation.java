@@ -9,7 +9,10 @@ import org.pepsoft.worldpainter.MapDragControl;
 import org.pepsoft.worldpainter.WorldPainterView;
 import org.pepsoft.worldpainter.brushes.Brush;
 
+import org.pepsoft.worldpainter.Dimension;
+
 import javax.swing.*;
+import java.awt.Rectangle;
 import java.lang.reflect.InvocationTargetException;
 
 /**
@@ -200,6 +203,52 @@ public abstract class AbstractBrushOperation extends MouseOrTabletOperation impl
         }
     }
 
+    /**
+     * Whether this operation changes the height of the land, after which water should flow into land which has been
+     * lowered under the water next to it (see {@link WaterSettling}).
+     */
+    protected boolean changesHeights() {
+        return false;
+    }
+
+    @Override
+    protected void ticked(int centreX, int centreY) {
+        if (changesHeights()) {
+            final int radius = getEffectiveRadius() + 2;
+            final Rectangle area = new Rectangle(centreX - radius, centreY - radius, radius * 2 + 1, radius * 2 + 1);
+            strokeArea = (strokeArea == null) ? area : strokeArea.union(area);
+            if (oneShotStroke()) {
+                settleWater();
+            }
+        }
+    }
+
+    @Override
+    protected void finished() {
+        settleWater();
+        super.finished();
+    }
+
+    /**
+     * Let the water flow into the land the stroke has lowered under it.
+     */
+    private void settleWater() {
+        final Dimension dimension = getDimension();
+        if ((strokeArea != null) && (dimension != null)) {
+            dimension.setEventsInhibited(true);
+            try {
+                WaterSettling.settle(dimension, strokeArea);
+            } finally {
+                dimension.setEventsInhibited(false);
+            }
+        }
+        strokeArea = null;
+    }
+
+    private boolean oneShotStroke() {
+        return isOneShot();
+    }
+
     @Override
     protected void deactivate() {
         mapDragControl.setMapDraggingInhibited(false);
@@ -231,4 +280,6 @@ public abstract class AbstractBrushOperation extends MouseOrTabletOperation impl
     private int radius;
     private boolean filterEnabled;
     private Filter filter = null;
+
+    private Rectangle strokeArea;
 }

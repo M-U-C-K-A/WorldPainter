@@ -167,4 +167,10 @@ public class RaiseMountain extends AbstractBrushOperation {
     private final TerrainShapingOptionsPanel optionsPanel;
     private int peakDX, peakDY;
     private float peakFactor;
+
+    @Override
+    protected boolean changesHeights() {
+        // Let the water flow into land lowered under it
+        return true;
+    }
 }

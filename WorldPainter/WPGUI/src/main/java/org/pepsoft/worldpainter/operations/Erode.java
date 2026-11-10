@@ -106,4 +106,10 @@ public class Erode extends AbstractBrushOperation {
     private static final int ROUNDS = 1;
     private static final int ERODE_AMOUNT = 64;
     private static final float ROOT_OF_TWO = (float) Math.sqrt(2);
+
+    @Override
+    protected boolean changesHeights() {
+        // Let the water flow into land lowered under it
+        return true;
+    }
 }

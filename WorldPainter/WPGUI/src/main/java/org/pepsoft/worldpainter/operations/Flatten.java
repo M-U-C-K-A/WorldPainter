@@ -149,4 +149,10 @@ public class Flatten extends AbstractBrushOperation {
     private static final Icon LOWER_ICON = IconUtils.loadScaledIcon("org/pepsoft/worldpainter/icons/lower.png");
 
     enum Mode { FLATTEN, RAISE, LOWER}
+
+    @Override
+    protected boolean changesHeights() {
+        // Let the water flow into land lowered under it
+        return true;
+    }
 }

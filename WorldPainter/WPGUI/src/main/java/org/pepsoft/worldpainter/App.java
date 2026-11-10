@@ -5474,6 +5474,38 @@ public final class App extends JFrame implements BrushControl,
         menu.setMnemonic('t');
         menu.add(menuItem);
 
+        // Repair holes in seas and lakes: land lowered under the water next to it without being flooded, which comes
+        // out in Minecraft as a dry hole with walls of water around it
+        menuItem = new JMenuItem("Fill Holes in the Water");
+        menuItem.setToolTipText("Let the water (and lava) flow into all the dry land lower than the water next to it, as it would in Minecraft: no more dry holes with walls of water around them");
+        menuItem.addActionListener(e -> {
+            if (dimension == null) {
+                DesktopUtils.beep();
+                return;
+            }
+            final Dimension target = dimension;
+            target.setEventsInhibited(true);
+            final int filled;
+            try {
+                filled = ProgressDialog.executeTask(this, new ProgressTask<Integer>() {
+                    @Override
+                    public String getName() {
+                        return "Filling holes in the water";
+                    }
+
+                    @Override
+                    public Integer execute(ProgressReceiver progressReceiver) throws OperationCancelled {
+                        return org.pepsoft.worldpainter.operations.WaterSettling.settleEverywhere(target, progressReceiver);
+                    }
+                }, NOT_CANCELABLE);
+            } finally {
+                target.setEventsInhibited(false);
+            }
+            target.armSavePoint();
+            showMessageDialog(this, (filled == 0) ? "There were no holes in the water." : String.format("Filled %,d columns with water or lava. Undo to take it back.", filled), "Fill Holes in the Water", INFORMATION_MESSAGE);
+        });
+        menu.add(menuItem);
+
         menuItem = new JMenuItem(strings.getString("open.custom.brushes.folder"));
         menuItem.addActionListener(e -> {
             File brushesDir = new File(Configuration.getConfigDir(), "brushes");
