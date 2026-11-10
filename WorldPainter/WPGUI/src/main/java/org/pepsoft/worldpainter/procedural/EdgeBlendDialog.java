@@ -95,6 +95,19 @@ public class EdgeBlendDialog extends WorldPainterDialog {
         form.add(placementComboBox, c);
         c.gridwidth = 1;
 
+        // Whether to replace an earlier blend or blend further out
+        restartCheckBox = new JCheckBox("Replace the previous blend (start again from the original edge of the map)", true);
+        restartCheckBox.setToolTipText("<html>The edges were blended before. Ticked, blending again replaces that blend: it starts from the edge the map had<br>"
+                + "before it (with the new settings), instead of extending the map further each time. Untick to blend from the current edge.</html>");
+        restartCheckBox.addActionListener(e -> updatePreview());
+        if (EdgeBlendOperation.hasBase(dimension)) {
+            c.gridy++;
+            c.gridx = 1;
+            c.gridwidth = 3;
+            form.add(restartCheckBox, c);
+            c.gridwidth = 1;
+        }
+
         // Curve
         c.gridy++;
         c.gridx = 0;
@@ -226,6 +239,7 @@ public class EdgeBlendDialog extends WorldPainterDialog {
         operation.setApplyWater(applyWaterCheckBox.isSelected());
         operation.setWaterLevel((Integer) waterLevelSpinner.getValue());
         operation.setSeed(dimension.getMinecraftSeed());
+        operation.setRestartFromBase(restartCheckBox.isSelected());
         return operation;
     }
 
@@ -317,6 +331,7 @@ public class EdgeBlendDialog extends WorldPainterDialog {
     private final JSlider widthSlider, irregularitySlider;
     private final JSpinner widthSpinner, targetHeightSpinner, waterLevelSpinner;
     private final JComboBox<EdgeBlendOperation.Placement> placementComboBox;
+    private final JCheckBox restartCheckBox;
     private final JComboBox<EdgeBlendOperation.Curve> curveComboBox;
     private final JComboBox<ProceduralTerrainSettings.Preset> presetComboBox;
     private final JComboBox<Terrain> targetTerrainComboBox;

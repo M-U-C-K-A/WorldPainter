@@ -155,8 +155,13 @@ public class EdgeBlendOperation {
         if (outsideWidth <= 0) {
             return toAdd;
         }
+        // Measured from the original edge when starting again from it: the tiles a previous blend added do not count
+        final EdgeBlendBase base = restartFromBase ? dimension.getAttribute(ATTRIBUTE_BASE) : null;
         final int range = (outsideWidth + TILE_SIZE - 1) >> TILE_SIZE_BITS;
         for (Point coords: original) {
+            if ((base != null) && base.addedTiles.contains(coords)) {
+                continue;
+            }
             for (int dx = -range; dx <= range; dx++) {
                 for (int dy = -range; dy <= range; dy++) {
                     final Point candidate = new Point(coords.x + dx, coords.y + dy);
@@ -173,10 +178,18 @@ public class EdgeBlendOperation {
         if (width <= 0) {
             return;
         }
-        final Set<Point> original = new HashSet<>(dimension.getTileCoords());
-        if (original.isEmpty()) {
+        if (dimension.getTileCount() == 0) {
             return;
         }
+        // Start again from the original edge of the map, if a previous blend left one, so that blending again replaces
+        // that blend instead of extending the map further each time
+        final EdgeBlendBase previousBase = restartFromBase ? dimension.getAttribute(ATTRIBUTE_BASE) : null;
+        if (previousBase != null) {
+            restoreBase(dimension, previousBase);
+        } else {
+            SNAPSHOTS.remove(dimension);
+        }
+        final Set<Point> original = new HashSet<>(dimension.getTileCoords());
         final ProceduralTerrain targetTerrainGenerator = (target != null) ? new ProceduralTerrain(target) : null;
         final SimplexNoise irregularityNoise = new SimplexNoise(seed ^ 0x2545F4914F6CDD1DL);
         final int insideWidth = Math.round(width * (1 - placement.outsideFraction));
@@ -185,10 +198,12 @@ public class EdgeBlendOperation {
         // Add the new tiles first (on this thread)
         final TileFactory tileFactory = dimension.getTileFactory();
         final List<Tile> newTiles = new ArrayList<>();
+        final Set<Point> added = new HashSet<>();
         for (Point coords: getTilesToAdd(dimension)) {
             final Tile tile = tileFactory.createTile(coords.x, coords.y);
             dimension.addTile(tile);
             newTiles.add(dimension.getTileForEditing(coords));
+            added.add(coords);
         }
 
         // Tiles of the map which are only partly present (such as those along the edge of a round map) have their
@@ -223,12 +238,34 @@ public class EdgeBlendOperation {
         // Find the existing tiles which are close enough to the edge to be affected
         final List<Tile> edgeTiles = new ArrayList<>();
         if (insideWidth > 0) {
-            for (Point coords: original) {
-                if (hasMissingNeighbour(coords, original, insideRange) || notPresent.containsKey(coords)) {
+            // (The tiles a previous blend added are not part of the map, when starting again from its original edge)
+            final Set<Point> mapTiles = new HashSet<>(original);
+            if (previousBase != null) {
+                mapTiles.removeAll(previousBase.addedTiles);
+            }
+            for (Point coords: mapTiles) {
+                if (hasMissingNeighbour(coords, mapTiles, insideRange) || notPresent.containsKey(coords)) {
                     edgeTiles.add(dimension.getTileForEditing(coords));
                 }
             }
         }
+
+        // Remember the original edge, for blending again later
+        final EdgeBlendBase base = new EdgeBlendBase();
+        if (previousBase != null) {
+            base.addedTiles.addAll(previousBase.addedTiles);
+            base.missing.putAll(previousBase.missing);
+        } else {
+            for (Map.Entry<Point, boolean[]> entry: notPresent.entrySet()) {
+                base.missing.put(entry.getKey(), entry.getValue().clone());
+            }
+        }
+        base.addedTiles.addAll(added);
+        final Map<Point, TileSnapshot> snapshots = SNAPSHOTS.computeIfAbsent(dimension, d -> new HashMap<>());
+        for (Tile tile: edgeTiles) {
+            snapshots.computeIfAbsent(new Point(tile.getX(), tile.getY()), coords -> new TileSnapshot(tile));
+        }
+        dimension.setAttribute(ATTRIBUTE_BASE, base, true);
 
         // Process the new tiles first, since they need to sample the unmodified edge of the original map
         final Context context = new Context(dimension, original, notPresent, targetTerrainGenerator, irregularityNoise);
@@ -571,6 +608,66 @@ public class EdgeBlendOperation {
         return (float) Math.sqrt(dx * dx + dy * dy);
     }
 
+    /**
+     * Whether a previous blend left the original edge of the map to start again from.
+     */
+    public static boolean hasBase(Dimension dimension) {
+        return dimension.getAttribute(ATTRIBUTE_BASE) != null;
+    }
+
+    /**
+     * Whether to start again from the original edge of the map (replacing a previous blend) rather than from its
+     * current edge (blending further out). Only makes a difference if there was a previous blend.
+     */
+    public boolean isRestartFromBase() {
+        return restartFromBase;
+    }
+
+    public void setRestartFromBase(boolean restartFromBase) {
+        this.restartFromBase = restartFromBase;
+    }
+
+    /**
+     * Put the edge of the map back as it was before the first blend: the tiles the blends added and the blocks which
+     * were missing count as missing again, and the land the blends faded gets its heights, terrain and water back
+     * (as long as they were remembered in this session).
+     */
+    private static void restoreBase(Dimension dimension, EdgeBlendBase base) {
+        for (Point coords: base.addedTiles) {
+            if (dimension.isTilePresent(coords.x, coords.y)) {
+                final Tile tile = dimension.getTileForEditing(coords);
+                for (int x = 0; x < TILE_SIZE; x += 16) {
+                    for (int y = 0; y < TILE_SIZE; y += 16) {
+                        tile.setBitLayerValue(NotPresent.INSTANCE, x, y, true);
+                    }
+                }
+            }
+        }
+        for (Map.Entry<Point, boolean[]> entry: base.missing.entrySet()) {
+            final Point coords = entry.getKey();
+            if (dimension.isTilePresent(coords.x, coords.y) && (! base.addedTiles.contains(coords))) {
+                final Tile tile = dimension.getTileForEditing(coords);
+                final boolean[] mask = entry.getValue();
+                for (int x = 0; x < TILE_SIZE; x++) {
+                    for (int y = 0; y < TILE_SIZE; y++) {
+                        if (mask[x | (y << TILE_SIZE_BITS)]) {
+                            tile.setBitLayerValue(NotPresentBlock.INSTANCE, x, y, true);
+                        }
+                    }
+                }
+            }
+        }
+        final Map<Point, TileSnapshot> snapshots = SNAPSHOTS.get(dimension);
+        if (snapshots != null) {
+            for (Map.Entry<Point, TileSnapshot> entry: snapshots.entrySet()) {
+                final Point coords = entry.getKey();
+                if (dimension.isTilePresent(coords.x, coords.y)) {
+                    entry.getValue().restore(dimension.getTileForEditing(coords));
+                }
+            }
+        }
+    }
+
     private static boolean hasMissingNeighbour(Point coords, Set<Point> tileCoords, int range) {
         for (int dx = -range; dx <= range; dx++) {
             for (int dy = -range; dy <= range; dy++) {
@@ -597,8 +694,61 @@ public class EdgeBlendOperation {
     private ProceduralTerrainSettings target;
     private VanillaBiomeSource vanillaTarget;
     private Terrain targetTerrain = Terrain.GRASS;
-    private boolean applyTerrain = true, applyWater = true;
+    private boolean applyTerrain = true, applyWater = true, restartFromBase = true;
     private long seed;
+
+    /**
+     * The original edge of the map, before the first blend: which tiles the blends added, and which blocks of the
+     * tiles of the map were missing. Kept with the dimension, with undo.
+     */
+    public static final org.pepsoft.util.AttributeKey<EdgeBlendBase> ATTRIBUTE_BASE = new org.pepsoft.util.AttributeKey<>("org.pepsoft.worldpainter.modernised.edgeBlendBase");
+
+    /**
+     * The land near the edge as it was before the first blend faded it, for this session only (it is too large to keep
+     * with the world).
+     */
+    private static final Map<Dimension, Map<Point, TileSnapshot>> SNAPSHOTS = Collections.synchronizedMap(new WeakHashMap<>());
+
+    public static final class EdgeBlendBase implements java.io.Serializable {
+        final HashSet<Point> addedTiles = new HashSet<>();
+        final HashMap<Point, boolean[]> missing = new HashMap<>();
+
+        private static final long serialVersionUID = 1L;
+    }
+
+    /**
+     * The heights, terrain and water of a tile.
+     */
+    private static final class TileSnapshot {
+        TileSnapshot(Tile tile) {
+            for (int x = 0; x < TILE_SIZE; x++) {
+                for (int y = 0; y < TILE_SIZE; y++) {
+                    final int i = x | (y << TILE_SIZE_BITS);
+                    heights[i] = tile.getHeight(x, y);
+                    waterLevels[i] = tile.getWaterLevel(x, y);
+                    terrains[i] = tile.getTerrain(x, y);
+                    lava[i] = tile.getBitLayerValue(FloodWithLava.INSTANCE, x, y);
+                }
+            }
+        }
+
+        void restore(Tile tile) {
+            for (int x = 0; x < TILE_SIZE; x++) {
+                for (int y = 0; y < TILE_SIZE; y++) {
+                    final int i = x | (y << TILE_SIZE_BITS);
+                    tile.setHeight(x, y, heights[i]);
+                    tile.setWaterLevel(x, y, waterLevels[i]);
+                    tile.setTerrain(x, y, terrains[i]);
+                    tile.setBitLayerValue(FloodWithLava.INSTANCE, x, y, lava[i]);
+                }
+            }
+        }
+
+        private final float[] heights = new float[TILE_SIZE * TILE_SIZE];
+        private final int[] waterLevels = new int[TILE_SIZE * TILE_SIZE];
+        private final Terrain[] terrains = new Terrain[TILE_SIZE * TILE_SIZE];
+        private final boolean[] lava = new boolean[TILE_SIZE * TILE_SIZE];
+    }
     private final SimplexNoise clumpNoise = new SimplexNoise(0x61C8864680B583EBL);
 
     /**

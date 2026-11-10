@@ -37,4 +37,35 @@ public class EdgeBlendOperationTest {
         // The map itself is untouched
         assertFalse(dimension.getBitLayerValueAt(NotPresent.INSTANCE, 64, 64));
     }
+
+    /**
+     * Blending again starts from the original edge of the map, replacing the previous blend, instead of extending the
+     * map further each time; unless asked to extend it.
+     */
+    @Test
+    public void testBlendingAgainReplacesThePreviousBlend() throws Exception {
+        final org.pepsoft.worldpainter.Dimension dimension = org.pepsoft.worldpainter.TestData.createDimension(new java.awt.Rectangle(0, 0, 256, 128), 140);
+        final EdgeBlendOperation first = new EdgeBlendOperation();
+        first.setWidth(100);
+        first.setPlacement(EdgeBlendOperation.Placement.OUTSIDE);
+        first.setIrregularity(0);
+        first.setTargetHeight(62);
+        first.apply(dimension, null);
+        final int tiles = dimension.getTileCount();
+        final float transition = dimension.getHeightAt(300, 60);
+        final EdgeBlendOperation second = new EdgeBlendOperation();
+        second.setWidth(100);
+        second.setPlacement(EdgeBlendOperation.Placement.OUTSIDE);
+        second.setIrregularity(0);
+        second.setTargetHeight(80);
+        second.apply(dimension, null);
+        assertEquals("no more tiles", tiles, dimension.getTileCount());
+        assertTrue("blended into the new target from the original edge", dimension.getHeightAt(300, 60) > transition);
+        first.apply(dimension, null);
+        assertEquals("as the first time", transition, dimension.getHeightAt(300, 60), 0.01f);
+        // Extending instead
+        first.setRestartFromBase(false);
+        first.apply(dimension, null);
+        assertTrue("extended", dimension.getTileCount() > tiles);
+    }
 }
