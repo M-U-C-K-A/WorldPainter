@@ -279,7 +279,108 @@ public class EdgeBlendOperation {
         if (! edgeTiles.isEmpty()) {
             ParallelTileProcessor.process(edgeTiles, tile -> processInsideTile(context, tile), ((progressReceiver != null) && (split > 0.0f)) ? new SubProgressReceiver(progressReceiver, split, 1.0f - split) : progressReceiver);
         }
+        smoothOutside(context, newTiles);
     }
+
+    /**
+     * Smooth the land added outside the map, the more the further it is from the edge. Each block outside takes its
+     * height from the nearest block of the edge, which jumps from one block of the edge to another where the edge has
+     * points and hollows: that leaves steps (ridges and fans of lines) in the land. Right at the edge nothing changes, so
+     * that the land still joins the map exactly.
+     */
+    private void smoothOutside(Context context, List<Tile> tiles) {
+        final Map<Tile, float[]> results = new java.util.concurrent.ConcurrentHashMap<>();
+        tiles.parallelStream().forEach(tile -> {
+            final boolean[] missing = context.notPresent.get(new Point(tile.getX(), tile.getY()));
+            final NearestBlocks nearest = context.nearest(tile, true, reach());
+            final int margin = SMOOTH_RADIUS * 2, size = TILE_SIZE + margin * 2;
+            final int wx0 = (tile.getX() << TILE_SIZE_BITS) - margin, wy0 = (tile.getY() << TILE_SIZE_BITS) - margin;
+            float[] values = new float[size * size];
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    final float height = context.dimension.getHeightAt(wx0 + x, wy0 + y);
+                    values[x + y * size] = (height == -Float.MAX_VALUE) ? Float.NaN : height;
+                }
+            }
+            // A light blur for close to the edge (where a jagged edge leaves a comb of short steps) and a wide one for
+            // further out
+            float[] fine = values;
+            for (int pass = 0; pass < 2; pass++) {
+                fine = boxBlur(fine, size, 2, true);
+                fine = boxBlur(fine, size, 2, false);
+            }
+            for (int pass = 0; pass < 2; pass++) {
+                values = boxBlur(values, size, SMOOTH_RADIUS, true);
+                values = boxBlur(values, size, SMOOTH_RADIUS, false);
+            }
+            final float[] result = new float[TILE_SIZE * TILE_SIZE];
+            for (int y = 0; y < TILE_SIZE; y++) {
+                for (int x = 0; x < TILE_SIZE; x++) {
+                    final int i = x | (y << TILE_SIZE_BITS);
+                    final float current = tile.getHeight(x, y);
+                    final int at = (x + margin) + (y + margin) * size;
+                    final float distance = nearest.distance[i];
+                    if (((missing != null) && (! missing[i])) || Float.isNaN(values[at]) || Float.isNaN(fine[at]) || (distance == Float.MAX_VALUE)) {
+                        result[i] = current;
+                    } else {
+                        float height = current + (fine[at] - current) * (float) ProceduralTerrain.smoothStep(0, 4, distance);
+                        height += (values[at] - height) * (float) ProceduralTerrain.smoothStep(4, 3 * SMOOTH_RADIUS, distance);
+                        result[i] = height;
+                    }
+                }
+            }
+            results.put(tile, result);
+        });
+        for (Map.Entry<Tile, float[]> entry: results.entrySet()) {
+            final Tile tile = entry.getKey();
+            final float[] result = entry.getValue();
+            for (int y = 0; y < TILE_SIZE; y++) {
+                for (int x = 0; x < TILE_SIZE; x++) {
+                    tile.setHeight(x, y, result[x | (y << TILE_SIZE_BITS)]);
+                }
+            }
+        }
+    }
+
+    /**
+     * A box blur along one axis, ignoring the samples where there is no land (NaN).
+     */
+    private static float[] boxBlur(float[] values, int size, int radius, boolean horizontal) {
+        final float[] result = new float[values.length];
+        for (int line = 0; line < size; line++) {
+            double sum = 0;
+            int count = 0;
+            for (int i = 0; i < Math.min(radius, size); i++) {
+                final float value = values[horizontal ? (i + line * size) : (line + i * size)];
+                if (! Float.isNaN(value)) {
+                    sum += value;
+                    count++;
+                }
+            }
+            for (int i = 0; i < size; i++) {
+                final int entering = i + radius, leaving = i - radius - 1;
+                if (entering < size) {
+                    final float value = values[horizontal ? (entering + line * size) : (line + entering * size)];
+                    if (! Float.isNaN(value)) {
+                        sum += value;
+                        count++;
+                    }
+                }
+                if (leaving >= 0) {
+                    final float value = values[horizontal ? (leaving + line * size) : (line + leaving * size)];
+                    if (! Float.isNaN(value)) {
+                        sum -= value;
+                        count--;
+                    }
+                }
+                final int at = horizontal ? (i + line * size) : (line + i * size);
+                result[at] = (Float.isNaN(values[at]) || (count == 0)) ? Float.NaN : (float) (sum / count);
+            }
+        }
+        return result;
+    }
+
+    private static final int SMOOTH_RADIUS = 8;
 
     /**
      * The weight of the original terrain (1) versus the target (0) at a particular signed distance from the edge
