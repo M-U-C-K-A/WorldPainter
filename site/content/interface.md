@@ -135,16 +135,21 @@ The legend next to the buttons gives the heights or slopes at either end of the 
 
 ## What the land is made of
 
-The **Composition** page (in the editor type menu of any area, or the pickaxe button of the 3D view) tells at a glance what the land in view is made of, and follows it as it moves:
+The **Composition** page (in the editor type menu of any area, or the pickaxe button of the 3D view) tells at a glance what a piece of land is made of, and follows it as it moves. The three buttons at its top choose which land, and say under them what it covers:
 
-- **Surface**: the lowest, highest and average height, the share of flat, gentle, steep and cliff land, and of each terrain type;
-- **Water**: how much of it is under water or lava, and how deep;
-- **Biomes**: the share of each, and how much of it is painted;
-- **On the land**: the layers painted on it (trees, plants, frost…), on how much of it and how densely;
-- **Underground**: the caves, tunnels, pockets and ores painted under it, those which apply everywhere, and from which height to which;
+- **3D view**: the land the 3D view looks at, a square around the point it turns around, as large as the camera is far from it; the rock column is the one at that point;
+- **Map**: everything the map shows at the moment;
+- **Selection**: only the land you selected with the Select tools, wherever it is.
+
+At the top a small map of the world shows where that land is, with its size; then key figures (average height, relief, average and steepest slope, water, tree cover, number of biomes); then sections, each of which folds away when its heading is clicked:
+
+- **Relief**: how much of the land lies at each height (in the colours of the Height view), and how much of it is flat, gentle, steep or cliff;
+- **Surface**: the share of each terrain type;
+- **Water**: how much is under water or lava, and how deep;
+- **Biomes**: the share of each, and how much is painted;
+- **On the land**: the trees, the plants and ground cover and the other layers, each with how much of the land it is on and how dense;
+- **Underground**: the caves, tunnels and pockets painted under it, what applies everywhere in the world and between which heights, and a table of the ores with their heights and how common they are;
 - **Rock column**: the blocks of a column from the top down to the bottom of the world, as they will be exported before the caves and ores: the top layer of its terrain, then the rock under it (stone with granite, diorite and andesite, deepslate and tuff below Y 0), down to the bedrock.
-
-The buttons at its top choose what it follows: the **3D view** (the land it looks at, and the column at the point it turns around), the **Map** (what the map shows) or the **Selection**.
 
 ## Canvas
 

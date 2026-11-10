@@ -46,6 +46,8 @@ public final class AreaComposition {
         final int step = Math.max(1, (int) Math.ceil(Math.sqrt((double) area.width * area.height / MAX_SAMPLES)));
         result.step = step;
         float heightSum = 0, depthSum = 0;
+        final float[] heights = new float[MAX_SAMPLES + 1000];
+        int heightCount = 0;
         for (int y = area.y + step / 2; y < area.y + area.height; y += step) {
             for (int x = area.x + step / 2; x < area.x + area.width; x += step) {
                 final Tile tile = dimension.getTile(x >> TILE_SIZE_BITS, y >> TILE_SIZE_BITS);
@@ -64,10 +66,15 @@ public final class AreaComposition {
                 final int intHeight = Math.round(height);
                 heightSum += height;
                 result.lowest = Math.min(result.lowest, height);
+                if (heightCount < heights.length) {
+                    heights[heightCount++] = height;
+                }
                 result.highest = Math.max(result.highest, height);
                 result.terrains.merge(tile.getTerrain(xInTile, yInTile), 1, Integer::sum);
                 final float slope = (float) Math.toDegrees(Math.atan(dimension.getSlope(x, y)));
                 result.slopes[(slope < 10) ? 0 : (slope < 30) ? 1 : (slope < 50) ? 2 : 3]++;
+                result.slopeSum += slope;
+                result.steepest = Math.max(result.steepest, slope);
                 final int waterLevel = tile.getWaterLevel(xInTile, yInTile);
                 if (waterLevel > intHeight) {
                     if (tile.getBitLayerValue(FloodWithLava.INSTANCE, xInTile, yInTile)) {
@@ -116,6 +123,11 @@ public final class AreaComposition {
         }
         if (result.samples > 0) {
             result.averageHeight = heightSum / result.samples;
+            // How much of the land is at each height
+            final float range = Math.max(1, result.highest - result.lowest);
+            for (int i = 0; i < heightCount; i++) {
+                result.heightBins[Math.min(HEIGHT_BINS - 1, (int) ((heights[i] - result.lowest) / range * HEIGHT_BINS))]++;
+            }
         }
         if (result.water > 0) {
             result.averageDepth = depthSum / result.water;
@@ -263,6 +275,9 @@ public final class AreaComposition {
     int samples, step;
     float lowest = Float.MAX_VALUE, highest = -Float.MAX_VALUE, averageHeight, averageDepth, deepest;
     final int[] slopes = new int[4];
+    float slopeSum, steepest;
+    final int[] heightBins = new int[HEIGHT_BINS];
+    static final int HEIGHT_BINS = 32;
     int water, lava, paintedBiomes;
     final Map<Terrain, Integer> terrains = new HashMap<>();
     final Map<Integer, Integer> biomes = new HashMap<>();
