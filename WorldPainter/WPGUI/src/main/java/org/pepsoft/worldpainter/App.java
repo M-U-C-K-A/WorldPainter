@@ -5979,6 +5979,17 @@ public final class App extends JFrame implements BrushControl,
      * Bring what the theme does not update by itself up to date after the theme has been switched, whether with the
      * button in the toolbar or in the preferences.
      */
+    /**
+     * Bring a component which was not on screen when the theme was switched (and so still has the colours of the old
+     * theme: dark on light, or light on dark) up to date with the current theme.
+     */
+    private static void withCurrentTheme(JComponent component) {
+        if (component.getClientProperty(KEY_LOOK_AND_FEEL) != UIManager.getLookAndFeel()) {
+            SwingUtilities.updateComponentTreeUI(component);
+            component.putClientProperty(KEY_LOOK_AND_FEEL, UIManager.getLookAndFeel());
+        }
+    }
+
     private void themeChanged() {
         if (themeToggleButton != null) {
             updateThemeToggleButton();
@@ -6365,6 +6376,7 @@ public final class App extends JFrame implements BrushControl,
                     toolSettingsPanel.removeAll();
                     toolSettingsEmptyState.setTitle("No tool chosen");
                     toolSettingsEmptyState.setText("Choose a tool in the Tools panel to see its settings here");
+                    withCurrentTheme(toolSettingsEmptyState);
                     toolSettingsPanel.add(toolSettingsEmptyState, BorderLayout.CENTER);
                     refreshOptionsPanel = true;
                 } else {
@@ -6441,10 +6453,14 @@ public final class App extends JFrame implements BrushControl,
                     JPanel optionsPanel = operation.getOptionsPanel();
                     toolSettingsPanel.removeAll();
                     if (optionsPanel != null) {
+                        // An options panel which was not on screen when the theme was switched still has the colours
+                        // of the old one (dark on light, or light on dark): bring it up to date first
+                        withCurrentTheme(optionsPanel);
                         toolSettingsPanel.add(optionsPanel, BorderLayout.CENTER);
                     } else {
                         toolSettingsEmptyState.setTitle(operation.getName());
                         toolSettingsEmptyState.setText("This tool has no settings of its own");
+                        withCurrentTheme(toolSettingsEmptyState);
                         toolSettingsPanel.add(toolSettingsEmptyState, BorderLayout.CENTER);
                     }
                     refreshOptionsPanel = true;
@@ -8397,6 +8413,7 @@ public final class App extends JFrame implements BrushControl,
     /**
      * The pages of the areas which are not built with a {@link DockableFrameBuilder}.
      */
+    private static final String KEY_LOOK_AND_FEEL = "org.pepsoft.worldpainter.lookAndFeel";
     private static final String PAGE_MAP = AreaManager.MAIN_PAGE, PAGE_3D = AreaManager.MAIN_PAGE_2, PAGE_COMPOSITION = "composition";
     /**
      * The kinds of editors; the pages of each kind share the tabs of the area which shows them.

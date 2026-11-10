@@ -10,6 +10,7 @@ Documentation and tutorials: https://m-u-c-k-a.github.io/WorldPainter/
 - **Fix**: the 3D view shows lava as lava, glowing orange, instead of as water
 - **Fix**: the ready made mixes (snowy rock, glacier, volcanic rock, the cliff strata…) show their blocks on the map and in the 3D view, as in Minecraft, instead of one colour (snowy rock was all white); also in worlds where they were already added
 - **Fix**: land lowered under the sea or a lake (an island flattened away, a coast smoothed down) now fills with its water, as it would in Minecraft, instead of coming out as a dry hole with walls of water around it; *Tools > Fill Holes in the Water* repairs the holes already made
+- **Fix**: the settings of a tool no longer come up in the colours of the other theme (black with white text in the light theme) when the theme was switched before the tool was first chosen
 - **Fix**: maps saved by Minecraft 26.1 and later import again: Minecraft now writes blocks without their default properties, and plain blocks as just their names, which made WorldPainter skip most chunks with *Could not parse section* (and with a null pointer for water); structure files in the new format load too
 
 ## New in 2.27.2-modernised.13
